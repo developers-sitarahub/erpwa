@@ -2,10 +2,10 @@
 
 import type React from "react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/button"
+import { Card } from "@/components/card"
+import { Badge } from "@/components/badge"
+import { Select } from "@/components/select"
 import { Plus, X } from "lucide-react"
 
 interface User {
@@ -63,13 +63,13 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-md bg-card border-border">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Add New User</CardTitle>
+        <Card.Header className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <Card.Title>Add New User</Card.Title>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-5 h-5" />
           </button>
-        </CardHeader>
-        <CardContent>
+        </Card.Header>
+        <Card.Content>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Name</label>
@@ -95,13 +95,13 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Role</label>
               <Select value={formData.role} onValueChange={(val) => setFormData({ ...formData, role: val })}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Select role..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sales_executive">Sales Executive</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
+                <Select.Trigger className="bg-secondary border-border">
+                  <Select.Value placeholder="Select role..." />
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Item value="sales_executive">Sales Executive</Select.Item>
+                  <Select.Item value="admin">Admin</Select.Item>
+                </Select.Content>
               </Select>
             </div>
             <div className="flex gap-2 pt-4">
@@ -118,7 +118,7 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
               </Button>
             </div>
           </form>
-        </CardContent>
+        </Card.Content>
       </Card>
     </div>
   )
@@ -150,10 +150,10 @@ export default function UsersPage() {
         </div>
 
         <Card className="bg-card border-border overflow-hidden">
-          <CardHeader>
-            <CardTitle>All Users</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+          <Card.Header>
+            <Card.Title>All Users</Card.Title>
+          </Card.Header>
+          <Card.Content className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -178,7 +178,7 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
-          </CardContent>
+          </Card.Content>
         </Card>
       </div>
 

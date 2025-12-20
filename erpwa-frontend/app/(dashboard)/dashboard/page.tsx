@@ -157,22 +157,22 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
         >
           {kpis.map((kpi, i) => (
             <KPICard key={i} {...kpi} index={i} />
           ))}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 20 }} transition={{ delay: 0.6 }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg font-semibold">Recent Conversations</CardTitle>
-              <CardDescription>Latest messages from your customers</CardDescription>
+              <CardTitle className="text-base md:text-lg font-semibold">Recent Conversations</CardTitle>
+              <CardDescription className="text-sm">Latest messages from your customers</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-96 overflow-y-auto">

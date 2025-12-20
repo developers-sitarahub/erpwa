@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/button"
+import { Card } from "@/components/card"
+import { Select } from "@/components/select"
+import { Badge } from "@/components/badge"
+import { Checkbox } from "@/components/checkbox"
 import { AlertCircle, CheckCircle2, Send } from "lucide-react"
 
 interface Contact {
@@ -191,12 +191,12 @@ export default function SendMessagePage() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-6">
-      <div className="max-w-4xl space-y-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Status Messages */}
         {sendingStatus === "sent" && (
           <Card className="bg-green-500/10 border-green-500/30">
-            <CardContent className="pt-6 flex items-start gap-3">
+            <div className="pt-6 flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-green-400">Messages sent successfully!</p>
@@ -204,54 +204,50 @@ export default function SendMessagePage() {
                   {selectedContacts.length} message{selectedContacts.length !== 1 ? "s" : ""} queued for delivery.
                 </p>
               </div>
-            </CardContent>
+            </div>
           </Card>
         )}
 
         {sendingStatus === "sending" && (
           <Card className="bg-blue-500/10 border-blue-500/30">
-            <CardContent className="pt-6 flex items-start gap-3">
+            <div className="pt-6 flex items-start gap-3">
               <div className="w-5 h-5 rounded-full border-2 border-blue-500/50 border-t-blue-500 animate-spin" />
               <div>
                 <p className="font-medium text-blue-400">Sending messages...</p>
                 <p className="text-sm text-blue-400/70 mt-1">Please wait while we deliver your messages.</p>
               </div>
-            </CardContent>
+            </div>
           </Card>
         )}
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column: Template & Recipients */}
-          <div className="md:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6">
             {/* Template Selection */}
             <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle>Select Template</CardTitle>
-                <CardDescription>Choose an approved template to send</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                  <SelectTrigger className="bg-secondary border-border">
-                    <SelectValue placeholder="Select a template..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+              <div>
+                <h2 className="text-lg font-bold">Select Template</h2>
+                <p className="text-sm text-muted-foreground">Choose an approved template to send</p>
+              </div>
+              <div>
+                <Select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
+                  <option value="">Select a template...</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
                 </Select>
-              </CardContent>
+              </div>
             </Card>
 
             {/* Template Preview */}
             {currentTemplate && (
               <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="text-base">Template Preview</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                <div>
+                  <h2 className="text-base font-bold">Template Preview</h2>
+                </div>
+                <div className="space-y-4">
                   <div className="bg-secondary p-4 rounded-lg border border-border">
                     <p className="text-sm text-foreground">{currentTemplate.preview}</p>
                   </div>
@@ -278,36 +274,31 @@ export default function SendMessagePage() {
                       ))}
                     </div>
                   )}
-                </CardContent>
+                </div>
               </Card>
             )}
 
             <Card className="bg-card border-border">
-              <CardHeader>
+              <div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Select Recipients</CardTitle>
-                    <CardDescription>Choose contacts by category or filter by status</CardDescription>
+                    <h2 className="text-lg font-bold">Select Recipients</h2>
+                    <p className="text-sm text-muted-foreground">Choose contacts by category or filter by status</p>
                   </div>
                   <Badge variant="secondary" className="text-sm">
                     {selectedRecipients.length} selected
                   </Badge>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </div>
+              <div className="space-y-4">
                 {/* Status Filter */}
                 <div className="flex gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="bg-secondary border-border w-full">
-                      <SelectValue placeholder="Filter by status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all-statuses">All Statuses</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="contacted">Contacted</SelectItem>
-                      <SelectItem value="qualified">Qualified</SelectItem>
-                      <SelectItem value="converted">Converted</SelectItem>
-                    </SelectContent>
+                  <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="all-statuses">All Statuses</option>
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="qualified">Qualified</option>
+                    <option value="converted">Converted</option>
                   </Select>
                 </div>
 
@@ -367,17 +358,17 @@ export default function SendMessagePage() {
                     )
                   })}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </div>
 
           {/* Right Column: Summary */}
           <div className="space-y-6">
-            <Card className="bg-card border-border sticky top-6">
-              <CardHeader>
-                <CardTitle className="text-base">Send Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <Card className="bg-card border-border lg:sticky lg:top-6">
+              <div>
+                <h2 className="text-base font-bold">Send Summary</h2>
+              </div>
+              <div className="space-y-4">
                 {/* Recipients Summary */}
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase">Recipients</p>
@@ -442,7 +433,7 @@ export default function SendMessagePage() {
                   <p className="font-medium text-foreground mb-1">Important</p>
                   Messages use WhatsApp approved templates. Free tier limited to 24 hours after customer initiation.
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </div>
         </div>
