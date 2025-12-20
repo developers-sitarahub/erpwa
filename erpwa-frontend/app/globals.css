@@ -1,15 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Complete redesign with vibrant light mode and sophisticated dark mode colors */
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  /* Light Mode - Fresh, Vibrant & Colorful */
   --background: #ffffff;
   --foreground: #0f172a;
   --card: #f8fafc;
   --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
   --primary: #25a55f;
   --primary-foreground: #ffffff;
   --secondary: #e0f2fe;
@@ -23,30 +23,29 @@
   --border: #e2e8f0;
   --input: #f1f5f9;
   --ring: #3b82f6;
-  --chart-1: #25a55f;
-  --chart-2: #3b82f6;
-  --chart-3: #f59e0b;
-  --chart-4: #8b5cf6;
-  --chart-5: #ec4899;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #25a55f;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #3b82f6;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #3b82f6;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
 .dark {
-  /* Dark Mode - Sophisticated & Premium */
   --background: #0f172a;
   --foreground: #f1f5f9;
   --card: #1e293b;
   --card-foreground: #f1f5f9;
-  --popover: #1e293b;
-  --popover-foreground: #f1f5f9;
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
   --primary: #31d84b;
   --primary-foreground: #0f172a;
   --secondary: #1e3a5f;
@@ -60,24 +59,24 @@
   --border: #334155;
   --input: #1e293b;
   --ring: #60a5fa;
-  --chart-1: #31d84b;
-  --chart-2: #60a5fa;
-  --chart-3: #fbbf24;
-  --chart-4: #a78bfa;
-  --chart-5: #f472b6;
-  --sidebar: #1e293b;
-  --sidebar-foreground: #f1f5f9;
-  --sidebar-primary: #31d84b;
-  --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #60a5fa;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #334155;
-  --sidebar-ring: #60a5fa;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
 }
 
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback";
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -123,4 +122,63 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+body {
+  font-family: "Geist", system-ui, -apple-system, sans-serif;
+}
+
+/* Adding scrollbar-hide utility to remove scrollbars completely */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Adding custom themed scrollbars for light and dark mode */
+/* Custom scrollbar styling for light mode */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(226 232 240) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(226 232 240);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(203 213 225);
+}
+
+/* Custom scrollbar styling for dark mode */
+.dark * {
+  scrollbar-color: rgb(51 65 85) transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(51 65 85);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(71 85 105);
+}
+
+/* Smooth scrolling for all elements */
+* {
+  scroll-behavior: smooth;
 }

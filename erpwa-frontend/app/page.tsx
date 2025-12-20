@@ -19,7 +19,11 @@ export default function AuthPage() {
     e.preventDefault()
     localStorage.setItem("userEmail", email)
     localStorage.setItem("userRole", role)
-    router.push(`/(dashboard)/dashboard`)
+    if (role === "admin") {
+      router.push("/admin/dashboard")
+    } else {
+      router.push("/dashboard")
+    }
   }
 
   return (
