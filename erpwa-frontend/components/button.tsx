@@ -1,15 +1,20 @@
 "use client"
 
 import type React from "react"
-import { motion } from "framer-motion"
+import { motion, type HTMLMotionProps } from "framer-motion"
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends HTMLMotionProps<"button"> {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "danger"
   size?: "sm" | "md" | "lg"
-  children: React.ReactNode
 }
 
-export function Button({ variant = "primary", size = "md", className = "", children, ...props }: ButtonProps) {
+export function Button({
+  variant = "primary",
+  size = "md",
+  className = "",
+  children,
+  ...props
+}: ButtonProps) {
   const baseStyles =
     "font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer"
 
