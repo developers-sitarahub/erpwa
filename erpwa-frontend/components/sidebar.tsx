@@ -64,7 +64,7 @@ export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
             </div>
           </div>
 
-          <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+          <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
             {menuItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname.startsWith(item.href)
@@ -130,7 +130,7 @@ export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
         </button>
       </div>
 
-      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
         {menuItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname.startsWith(item.href)

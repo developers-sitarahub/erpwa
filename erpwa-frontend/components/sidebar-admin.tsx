@@ -69,7 +69,7 @@ export function SidebarAdmin() {
             </div>
           </div>
 
-          <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+          <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
             {menuItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
@@ -137,7 +137,7 @@ export function SidebarAdmin() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
         {menuItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname === item.href

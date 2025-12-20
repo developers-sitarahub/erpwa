@@ -64,6 +64,7 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+  --radius: 0.625rem;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -125,4 +126,59 @@
 
 body {
   font-family: "Geist", system-ui, -apple-system, sans-serif;
+}
+
+/* Adding scrollbar-hide utility to remove scrollbars completely */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Adding custom themed scrollbars for light and dark mode */
+/* Custom scrollbar styling for light mode */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(226 232 240) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(226 232 240);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(203 213 225);
+}
+
+/* Custom scrollbar styling for dark mode */
+.dark * {
+  scrollbar-color: rgb(51 65 85) transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(51 65 85);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(71 85 105);
+}
+
+/* Smooth scrolling for all elements */
+* {
+  scroll-behavior: smooth;
 }
