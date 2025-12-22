@@ -2,11 +2,20 @@
 
 import type React from "react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, X } from "lucide-react"
+
+import { Button } from "@/components/button"
+import { Badge } from "@/components/badge"
+import { Select } from "@/components/select"
+
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/card"
+
+/* ===================== TYPES ===================== */
 
 interface User {
   id: string
@@ -14,6 +23,8 @@ interface User {
   role: "admin" | "sales_executive"
   status: "active" | "inactive"
 }
+
+/* ===================== BADGES ===================== */
 
 function RoleBadge({ role }: { role: User["role"] }) {
   return (
@@ -45,7 +56,15 @@ function StatusBadge({ status }: { status: User["status"] }) {
   )
 }
 
-function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+/* ===================== MODAL ===================== */
+
+function AddUserModal({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean
+  onClose: () => void
+}) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -54,6 +73,7 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // submit logic here
     setFormData({ name: "", email: "", role: "" })
     onClose()
   }
@@ -61,57 +81,73 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md bg-card border-border">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="flex items-center justify-between pb-4">
           <CardTitle>Add New User</CardTitle>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-5 w-5" />
           </button>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Name</label>
+              <label className="text-sm font-medium">Name</label>
               <input
+                required
                 placeholder="User name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                required
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="w-full rounded-lg border border-border bg-secondary px-4 py-2 text-sm focus:ring-2 focus:ring-primary outline-none"
               />
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Email</label>
+              <label className="text-sm font-medium">Email</label>
               <input
+                required
                 type="email"
                 placeholder="user@example.com"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                required
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                className="w-full rounded-lg border border-border bg-secondary px-4 py-2 text-sm focus:ring-2 focus:ring-primary outline-none"
               />
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Role</label>
-              <Select value={formData.role} onValueChange={(val) => setFormData({ ...formData, role: val })}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Select role..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sales_executive">Sales Executive</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
+              <label className="text-sm font-medium">Role</label>
+
+              <Select
+                required
+                value={formData.role}
+                onChange={(e) =>
+                  setFormData({ ...formData, role: e.target.value })
+                }
+              >
+                <option value="" disabled>
+                  Select role...
+                </option>
+                <option value="sales_executive">Sales Executive</option>
+                <option value="admin">Admin</option>
               </Select>
             </div>
+
             <div className="flex gap-2 pt-4">
-              <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
+              <Button type="submit" className="flex-1">
                 Add User
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                className="flex-1"
                 onClick={onClose}
               >
                 Cancel
@@ -123,6 +159,8 @@ function AddUserModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
     </div>
   )
 }
+
+/* ===================== PAGE ===================== */
 
 export default function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -140,37 +178,50 @@ export default function UsersPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Team Members</h2>
-            <p className="text-sm text-muted-foreground mt-1">Manage users and their roles</p>
+            <h2 className="text-xl font-semibold">Team Members</h2>
+            <p className="text-sm text-muted-foreground">
+              Manage users and their roles
+            </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)} className="bg-primary hover:bg-primary/90">
-            <Plus className="w-4 h-4 mr-2" />
+
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
             Add User
           </Button>
         </div>
 
-        <Card className="bg-card border-border overflow-hidden">
+        <Card className="overflow-hidden">
           <CardHeader>
             <CardTitle>All Users</CardTitle>
           </CardHeader>
+
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-secondary/30">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Role</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                  <tr className="border-b bg-secondary/30">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Name
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Role
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((user) => (
-                    <tr key={user.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-4 text-foreground">{user.name}</td>
-                      <td className="py-3 px-4">
+                    <tr
+                      key={user.id}
+                      className="border-b hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3">{user.name}</td>
+                      <td className="px-4 py-3">
                         <RoleBadge role={user.role} />
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="px-4 py-3">
                         <StatusBadge status={user.status} />
                       </td>
                     </tr>
@@ -182,7 +233,10 @@ export default function UsersPage() {
         </Card>
       </div>
 
-      <AddUserModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <AddUserModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   )
 }

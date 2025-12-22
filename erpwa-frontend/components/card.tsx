@@ -41,7 +41,7 @@ export function CardDescription({ className = "", children, ...props }: CardProp
 
 export function CardContent({ className = "", children, ...props }: CardProps) {
   return (
-    <div className={`${className}`} {...props}>
+    <div className={className} {...props}>
       {children}
     </div>
   )

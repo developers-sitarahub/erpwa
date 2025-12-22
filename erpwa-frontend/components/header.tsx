@@ -1,7 +1,7 @@
 "use client"
 
 import { Bell, Search, User, LogOut, Settings } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/button"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
@@ -43,7 +43,7 @@ export function Header({ title }: HeaderProps) {
           )}
 
           {/* Notification Bell */}
-          <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted">
+          <Button variant="ghost" size="sm" className="text-foreground hover:bg-muted">
             <Bell className="w-5 h-5" />
             <span className="sr-only">Notifications</span>
           </Button>
@@ -51,7 +51,7 @@ export function Header({ title }: HeaderProps) {
           <div className="relative">
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
               className="text-foreground hover:bg-muted"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
             >

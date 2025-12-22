@@ -3,9 +3,7 @@
 import type React from "react"
 import { ChevronDown } from "lucide-react"
 
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {}
-
-export function Select({ className = "", children, ...props }: SelectProps & { children: React.ReactNode }) {
+export function Select({ className = "", children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
   return (
     <div className="relative w-full">
       <select

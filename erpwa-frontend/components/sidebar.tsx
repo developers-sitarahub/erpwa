@@ -2,9 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, MessageSquare, Send, Users, FileText, Settings, LogOut, ChevronRight } from "lucide-react"
+import { useAuth } from "@/context/authContext"
+import { Home, MessageSquare, Send, Users, FileText, Settings, LogOut, ChevronRight, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/context/sidebar-provider"
+import { useState, useEffect } from "react"
 
 interface SidebarProps {
   userRole?: "admin" | "sales_executive"
@@ -13,6 +15,16 @@ interface SidebarProps {
 export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
   const pathname = usePathname()
   const { isCollapsed, toggleSidebar } = useSidebar()
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const { logout } = useAuth()
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
 
   const menuItems = [
     { href: "/dashboard", icon: Home, label: "Dashboard" },
@@ -24,14 +36,83 @@ export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
     { href: "/settings", icon: Settings, label: "Settings" },
   ]
 
+  if (isMobile) {
+    return (
+      <>
+        <button
+          onClick={() => setIsMobileOpen(!isMobileOpen)}
+          className="fixed top-4 left-4 z-50 p-2 bg-sidebar rounded-lg text-sidebar-foreground md:hidden"
+        >
+          {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+
+        {isMobileOpen && (
+          <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileOpen(false)} />
+        )}
+
+        <aside
+          className={cn(
+            "fixed left-0 top-0 bg-sidebar border-r border-sidebar-border h-screen flex flex-col transition-transform duration-300 ease-in-out z-40 w-64",
+            isMobileOpen ? "translate-x-0" : "-translate-x-full",
+            "md:translate-x-0",
+          )}
+        >
+          <div className="flex items-center justify-between px-4 py-6 border-b border-sidebar-border">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-md">
+                <MessageSquare className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <h1 className="text-lg font-bold text-sidebar-foreground">WhatsApp</h1>
+            </div>
+          </div>
+
+          <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
+            {menuItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname.startsWith(item.href)
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full",
+                    isActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+                  )}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+
+          <div className="border-t border-sidebar-border p-3">
+            <button
+              onClick={logout}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg
+             text-sm font-medium text-sidebar-foreground
+             hover:bg-sidebar-accent/50 w-full transition-all"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </aside>
+      </>
+    )
+  }
+
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 bg-sidebar border-r border-sidebar-border h-screen flex flex-col transition-all duration-300 ease-in-out z-40",
+        "hidden md:flex fixed left-0 top-0 bg-sidebar border-r border-sidebar-border h-screen flex-col transition-all duration-300 ease-in-out z-40",
         isCollapsed ? "w-20" : "w-64",
       )}
     >
-      {/* Logo Section */}
       <div className="flex items-center justify-between px-4 py-6 border-b border-sidebar-border">
         <div className={cn("flex items-center", isCollapsed ? "w-full justify-center" : "gap-2")}>
           <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-md">
@@ -49,8 +130,7 @@ export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
         </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
         {menuItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname.startsWith(item.href)
@@ -84,10 +164,10 @@ export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
         })}
       </nav>
 
-      {/* Logout Button */}
       <div className="border-t border-sidebar-border p-3">
         <div className="group relative">
           <button
+            onClick={logout}
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-all duration-200",
               isCollapsed && "justify-center px-0",

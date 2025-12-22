@@ -1,28 +1,53 @@
-import dotenv from "dotenv";
-dotenv.config();
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
 
-import app from "./app.js";
-import pool from "./db/index.js";
+import prisma from "./prisma.js";
+import authRoutes from "./routes/auth.routes.js";
 
-const PORT = process.env.PORT;
+const app = express();
+
+/* ================= MIDDLEWARE ================= */
+
+app.use(express.json());
+app.use(cookieParser());
+
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",").map((o) => o.trim())
+  : [];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
+
+app.set("etag", false);
+
+/* ================= ROUTES ================= */
+
+app.use("/api/auth", authRoutes);
+
+/* ================= SERVER START ================= */
+
+const PORT = process.env.PORT || 5000;
 
 async function startServer() {
   try {
-    // 🔹 Test DB connection
-    const client = await pool.connect();
-    await client.query("SELECT 1");
-    client.release();
+    // ✅ Prisma DB health check
+    await prisma.$queryRaw`SELECT 1`;
 
     console.log("✅ Database connected successfully");
 
-    // 🔹 Start server only if DB is OK
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("❌ Failed to connect to database");
+    console.error("❌ Database connection failed");
     console.error(error);
-    process.exit(1); // stop app if DB fails
+    process.exit(1);
   }
 }
 

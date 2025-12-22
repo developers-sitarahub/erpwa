@@ -7,16 +7,26 @@
     "start": "node src/server.js"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "axios": "^1.13.2",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "bullmq": "^5.66.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
     "ioredis": "^5.8.2",
-    "pg": "^8.16.3"
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.11",
+    "pg": "^8.16.3",
+    "prisma": "^7.2.0"
   },
   "devDependencies": {
+    "@types/node": "^25.0.3",
     "nodemon": "^3.1.11"
   }
 }

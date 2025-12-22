@@ -1,7 +1,7 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card } from "@/components/card"
+import { Button } from "@/components/button"
 import { useTheme } from "@/context/theme-provider"
 import { Sun, Moon, Lock } from "lucide-react"
 import Link from "next/link"

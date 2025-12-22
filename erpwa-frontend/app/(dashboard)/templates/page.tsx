@@ -1,7 +1,12 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/card"
+import { Badge } from "@/components/badge"
 import { ImageIcon } from "lucide-react"
 
 interface Template {
@@ -19,8 +24,8 @@ function TemplateCard({ template }: { template: Template }) {
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-base text-foreground">{template.name}</CardTitle>
-            <CardDescription className="text-xs">{template.category}</CardDescription>
+            <h3 className="text-base text-foreground">{template.name}</h3>
+            <p className="text-xs">{template.category}</p>
           </div>
           {template.adminOnly && (
             <Badge variant="secondary" className="text-xs flex-shrink-0">
@@ -91,16 +96,16 @@ export default function TemplatesPage() {
   ]
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Message Templates</h2>
+          <h2 className="text-lg md:text-xl font-semibold text-foreground mb-2">Message Templates</h2>
           <p className="text-sm text-muted-foreground">
             WhatsApp approved templates for sending bulk messages. Admin-only templates require special permissions.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {templates.map((template) => (
             <TemplateCard key={template.id} template={template} />
           ))}

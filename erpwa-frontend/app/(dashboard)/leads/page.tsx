@@ -2,10 +2,15 @@
 
 import type React from "react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/button"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/card"
+import { Badge } from "@/components/badge"
+import { Select } from "@/components/select"
 import { Plus, X } from "lucide-react"
 
 interface Lead {
@@ -59,7 +64,7 @@ function AddLeadModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-md bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Add New Lead</CardTitle>
+          <h2 className="text-xl font-semibold text-foreground">Add New Lead</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -88,21 +93,19 @@ function AddLeadModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Assign To</label>
-              <Select
+              <select
                 value={formData.assignedExecutive}
-                onValueChange={(val) => setFormData({ ...formData, assignedExecutive: val })}
+                onChange={(e) => setFormData({ ...formData, assignedExecutive: e.target.value })}
+                className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                required
               >
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Select executive..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {executives.map((exec) => (
-                    <SelectItem key={exec} value={exec}>
-                      {exec}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">Select executive...</option>
+                {executives.map((exec) => (
+                  <option key={exec} value={exec}>
+                    {exec}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex gap-2 pt-4">
               <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
@@ -166,14 +169,14 @@ export default function LeadsPage() {
   ]
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">Sales Leads</h2>
+            <h2 className="text-lg md:text-xl font-semibold text-foreground">Sales Leads</h2>
             <p className="text-sm text-muted-foreground mt-1">Manage and track your sales pipeline</p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setIsModalOpen(true)} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
             Add Lead
           </Button>
@@ -181,11 +184,11 @@ export default function LeadsPage() {
 
         <Card className="bg-card border-border overflow-hidden">
           <CardHeader>
-            <CardTitle>All Leads</CardTitle>
+            <h2 className="text-lg md:text-xl font-semibold text-foreground">All Leads</h2>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="border-b border-border bg-secondary/30">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
