@@ -1,32 +1,36 @@
-"use client"
+"use client";
 
-import { Bell, Search, User, LogOut, Settings } from "lucide-react"
-import { Button } from "@/components/button"
-import { usePathname } from "next/navigation"
-import { useState } from "react"
-import Link from "next/link"
-import { useSidebar } from "@/context/sidebar-provider"
+import { Bell, Search, User, LogOut, Settings } from "lucide-react";
+import { Button } from "@/components/button";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import Link from "next/link";
+import { useSidebar } from "@/context/sidebar-provider";
 
 export function HeaderAdmin() {
-  const pathname = usePathname()
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const { isCollapsed } = useSidebar()
-  const showSearch = pathname === "/admin/dashboard"
+  const pathname = usePathname();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { isCollapsed } = useSidebar();
+  const showSearch = pathname === "/admin/dashboard";
 
-  const userEmail = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null
-  const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") : null
+  const userEmail =
+    typeof window !== "undefined" ? localStorage.getItem("userEmail") : null;
+  const userRole =
+    typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
 
   const handleLogout = () => {
-    localStorage.removeItem("userRole")
-    localStorage.removeItem("userEmail")
-    window.location.href = "/"
-  }
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userEmail");
+    window.location.href = "/";
+  };
 
   return (
     <header className="border-b border-border bg-card sticky top-0 z-10">
       <div className="flex items-center justify-between px-6 py-4 h-16">
         {/* Title */}
-        <h2 className="text-xl font-semibold text-foreground">Admin Dashboard</h2>
+        <h2 className="text-xl font-semibold text-foreground">
+          Admin Dashboard
+        </h2>
 
         {/* Actions */}
         <div className="flex items-center gap-4 ml-auto">
@@ -42,7 +46,11 @@ export function HeaderAdmin() {
           )}
 
           {/* Notification Bell */}
-          <Button variant="ghost" size="sm" className="text-foreground hover:bg-muted">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-foreground hover:bg-muted"
+          >
             <Bell className="w-5 h-5" />
             <span className="sr-only">Notifications</span>
           </Button>
@@ -62,8 +70,12 @@ export function HeaderAdmin() {
             {userMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-lg py-2 z-50">
                 <div className="px-4 py-3 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground truncate">{userEmail || "Admin"}</p>
-                  <p className="text-xs text-muted-foreground capitalize mt-1">{userRole || "admin"}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {userEmail || "Admin"}
+                  </p>
+                  <p className="text-xs text-muted-foreground capitalize mt-1">
+                    {userRole || "admin"}
+                  </p>
                 </div>
 
                 <Link href="/admin/settings">
@@ -85,7 +97,7 @@ export function HeaderAdmin() {
         </div>
       </div>
     </header>
-  )
+  );
 }
 
-export default HeaderAdmin
+export default HeaderAdmin;

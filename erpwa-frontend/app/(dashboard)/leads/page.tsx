@@ -1,5 +1,7 @@
 "use client"
 
+import { CardContent } from "@/components/ui/card"
+import { CardHeader } from "@/components/ui/card"
 import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/button"
