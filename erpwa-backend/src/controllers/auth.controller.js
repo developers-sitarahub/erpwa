@@ -1,58 +1,51 @@
 import * as Auth from "../services/auth/auth.service.js";
-import * as Reset from "../services/auth/passwordReset.service.js";
-import { asyncHandler } from "../middleware/asyncHandler.js";
 
-export const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-  const data = await Auth.login(email, password);
-  res.json(data);
-});
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: false, // true in production (HTTPS)
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000, // ✅ REQUIRED
+};
 
-export const refresh = asyncHandler(async (req, res) => {
-  const data = await Auth.refresh(req.body.refreshToken);
-  res.json(data);
-});
+/* ================= LOGIN ================= */
 
-export const logout = asyncHandler(async (req, res) => {
-  await Auth.logout(req.body.refreshToken);
-  res.json({ success: true });
-});
+export async function login(req, res) {
+  const data = await Auth.login(req.body.email, req.body.password);
 
-export const resetPassword = asyncHandler(async (req, res) => {
-  await Reset.resetPassword(req.body.email, req.body.otp, req.body.newPassword);
-  res.json({ success: true });
-});
-
-export const me = asyncHandler(async (req, res) => {
-  res.json({
-    id: req.user.id,
-    role: req.user.role,
+  res.cookie("refreshToken", data.refreshToken, COOKIE_OPTIONS).json({
+    accessToken: data.accessToken,
+    user: {
+      id: data.user.id,
+      email: data.user.email,
+      role: data.user.role,
+    },
   });
-});
+}
 
-export const forgotPassword = asyncHandler(async (req, res) => {
-  await Reset.sendResetOtp(req.body.email);
-  res.json({ success: true });
-});
+/* ================= REFRESH ================= */
 
-export const verifyForgotOtp = asyncHandler(async (req, res) => {
-  const resetToken = await Reset.verifyForgotOtp(
-    req.body.email,
-    req.body.otp
-  );
-  res.json({ resetToken });
-});
+export async function refresh(req, res) {
+  const token = req.cookies?.refreshToken;
+  if (!token) return res.status(401).json({ message: "No token" });
 
-export const resetForgotPassword = asyncHandler(async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Missing reset token" });
+  const data = await Auth.refresh(token);
+  res.json(data);
+}
+
+/* ================= LOGOUT ================= */
+
+export async function logout(req, res) {
+  if (req.cookies?.refreshToken) {
+    await Auth.logout(req.cookies.refreshToken);
   }
 
-  await Reset.resetForgotPassword(
-    authHeader.split(" ")[1],
-    req.body.newPassword
-  );
-
+  res.clearCookie("refreshToken", COOKIE_OPTIONS);
   res.json({ success: true });
-});
+}
+
+export function me(req, res) {
+  res.json({
+    user: req.user,
+  });
+}

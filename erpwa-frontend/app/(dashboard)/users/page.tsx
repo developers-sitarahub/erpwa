@@ -154,7 +154,7 @@ function AddUserModal({
               </Button>
             </div>
           </form>
-        </Card.Content>
+        </CardContent>
       </Card>
     </div>
   )
@@ -229,7 +229,7 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
-          </Card.Content>
+          </CardContent>
         </Card>
       </div>
 

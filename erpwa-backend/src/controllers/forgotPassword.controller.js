@@ -1,8 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import pool from "../db/index.js";
+import pool from "../prisma.js";
 
-import { hashToken } from "../utils/hash.js";
 import { generateOtp, hashOtp } from "../utils/otp.js";
 import { sendMail } from "../utils/mailer.js";
 

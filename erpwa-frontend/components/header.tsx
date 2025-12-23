@@ -5,7 +5,7 @@ import { Button } from "@/components/button"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
-
+import { useAuth } from "@/context/authContext"
 interface HeaderProps {
   title?: string
 }
@@ -17,11 +17,7 @@ export function Header({ title }: HeaderProps) {
 
   const userEmail = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null
   const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") : null
-
-  const handleLogout = () => {
-    localStorage.removeItem("userRole")
-    window.location.href = "/"
-  }
+  const { logout, user } = useAuth()
 
   return (
     <header className="border-b border-border bg-card sticky top-0 z-10">
@@ -63,8 +59,8 @@ export function Header({ title }: HeaderProps) {
             {userMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-lg py-2 z-50">
                 <div className="px-4 py-3 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground truncate">{userEmail || "User"}</p>
-                  <p className="text-xs text-muted-foreground capitalize mt-1">{userRole || "user"}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{user?.name || "User"}</p>
+                  <p className="text-xs text-muted-foreground capitalize mt-1">{user?.role || "user"}</p>
                 </div>
 
                 <Link href="/settings">
@@ -74,7 +70,7 @@ export function Header({ title }: HeaderProps) {
                   </button>
                 </Link>
                 <button
-                  onClick={handleLogout}
+                  onClick={logout}
                   className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted flex items-center gap-2"
                 >
                   <LogOut className="w-4 h-4" />

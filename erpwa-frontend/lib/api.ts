@@ -12,11 +12,21 @@ export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 
-/* ================= AXIOS INSTANCE ================= */
+/* ================= AXIOS INSTANCES ================= */
+/**
+ * IMPORTANT:
+ * - baseURL MUST be "/api"
+ * - NEVER point Axios directly to localhost:5000
+ */
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
-  withCredentials: true, // REQUIRED for refresh cookie
+  baseURL: "/api",
+  withCredentials: true,
+});
+
+const refreshApi = axios.create({
+  baseURL: "/api",
+  withCredentials: true,
 });
 
 /* ================= REQUEST INTERCEPTOR ================= */
@@ -33,18 +43,16 @@ api.interceptors.request.use(
 
 /* ================= REFRESH QUEUE ================= */
 
-interface FailedQueueItem {
+let isRefreshing = false;
+let failedQueue: {
   resolve: (token: string) => void;
   reject: (error: AxiosError) => void;
-}
-
-let isRefreshing = false;
-let failedQueue: FailedQueueItem[] = [];
+}[] = [];
 
 const processQueue = (error: AxiosError | null, token: string | null) => {
-  failedQueue.forEach((prom) => {
-    if (error) prom.reject(error);
-    else if (token) prom.resolve(token);
+  failedQueue.forEach((p) => {
+    if (error) p.reject(error);
+    else if (token) p.resolve(token);
   });
   failedQueue = [];
 };
@@ -59,15 +67,26 @@ api.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // 🚫 If no response or already retried, reject
     if (!error.response || originalRequest._retry) {
       return Promise.reject(error);
     }
 
-    // 🔐 Handle 401 → Refresh once
+    const url = originalRequest.url || "";
+
+    /**
+     * 🚫 NEVER refresh for auth endpoints
+     * Prevents infinite loops and logout crashes
+     */
+    if (
+      url.includes("/auth/login") ||
+      url.includes("/auth/logout") ||
+      url.includes("/auth/refresh")
+    ) {
+      return Promise.reject(error);
+    }
+
     if (error.response.status === 401) {
       if (isRefreshing) {
-        // Queue requests while refreshing
         return new Promise((resolve, reject) => {
           failedQueue.push({
             resolve: (token: string) => {
@@ -85,7 +104,9 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const res = await api.post<{ accessToken: string }>("/auth/refresh");
+        const res = await refreshApi.post<{ accessToken: string }>(
+          "/auth/refresh"
+        );
 
         const newToken = res.data.accessToken;
         setAccessToken(newToken);
@@ -100,9 +121,6 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError as AxiosError, null);
         setAccessToken(null);
-
-        // ❗ DO NOT redirect here
-        // Middleware will handle navigation
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -7,7 +7,6 @@ import { Home, MessageSquare, Send, Users, FileText, Settings, LogOut, ChevronRi
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/context/sidebar-provider"
 import { useState, useEffect } from "react"
-import { useState, useEffect } from "react"
 
 interface SidebarProps {
   userRole?: "admin" | "sales_executive"

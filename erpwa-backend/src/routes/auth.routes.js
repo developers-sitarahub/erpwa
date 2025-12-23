@@ -4,11 +4,13 @@ import {
   refresh,
   logout,
   me,
+} from "../controllers/auth.controller.js";
+
+import {
   forgotPassword,
   verifyForgotOtp,
   resetForgotPassword,
-} from "../controllers/auth.controller.js";
-
+} from "../controllers/forgotPassword.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateEmail,
@@ -19,10 +21,9 @@ import { passwordResetLimiter } from "../middleware/rateLimit.middleware.js";
 
 const router = express.Router();
 
-/* ---------- AUTH ---------- */
 router.post("/login", login);
 router.post("/refresh", refresh);
-router.post("/logout", authenticate, logout);
+router.post("/logout", logout);
 router.get("/me", authenticate, me);
 
 /* ---------- PASSWORD RESET (OTP FLOW) ---------- */
