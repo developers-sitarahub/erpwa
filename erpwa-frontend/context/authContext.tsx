@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const mountedRef = useRef(false);
 
-  /* ===== Restore session ===== */
+  /* ===== Restore session on load ===== */
 
   useEffect(() => {
     mountedRef.current = true;
@@ -40,20 +40,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const restoreSession = async () => {
       try {
         const res = await api.get("/auth/me");
-        if (mountedRef.current) setUser(res.data.user);
+        if (mountedRef.current) {
+          setUser(res.data.user);
+        }
       } catch {
         setAccessToken(null);
-        if (mountedRef.current) setUser(null);
+        if (mountedRef.current) {
+          setUser(null);
+        }
       } finally {
-        if (mountedRef.current) setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     restoreSession();
+
     return () => {
       mountedRef.current = false;
     };
   }, []);
+
+  /* ===== GLOBAL LOGOUT LISTENER (OPTION 1) ===== */
+
+  useEffect(() => {
+    const handleLogout = () => {
+      setAccessToken(null);
+      setUser(null);
+      router.replace("/login");
+    };
+
+    window.addEventListener("auth:logout", handleLogout);
+
+    return () => {
+      window.removeEventListener("auth:logout", handleLogout);
+    };
+  }, [router]);
 
   /* ================= LOGIN ================= */
 
@@ -65,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(res.data.accessToken);
     setUser(loggedInUser);
 
-    // ✅ ROLE-BASED REDIRECT (THE FIX)
+    // ✅ ROLE-BASED REDIRECT
     if (
       loggedInUser.role === "vendor_owner" ||
       loggedInUser.role === "vendor_admin"

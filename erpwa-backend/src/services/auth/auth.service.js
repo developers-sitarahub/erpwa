@@ -1,6 +1,9 @@
 import prisma from "../../prisma.js";
 import bcrypt from "bcryptjs";
-import { generateAccessToken, generateRefreshToken } from "../../utils/token.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+} from "../../utils/token.js";
 import { hashToken } from "../../utils/hash.js";
 
 /* ================= LOGIN ================= */
@@ -32,13 +35,27 @@ export async function login(email, password) {
 /* ================= REFRESH ================= */
 
 export async function refresh(refreshToken) {
+  const tokenHash = hashToken(refreshToken);
+
   const record = await prisma.refreshToken.findUnique({
-    where: { tokenHash: hashToken(refreshToken) },
+    where: { tokenHash },
     include: { user: true },
   });
 
-  if (!record || record.expiresAt < new Date()) {
+  // 🔴 INVALID OR MISSING TOKEN → DELETE IF EXISTS
+  if (!record) {
+    await prisma.refreshToken.deleteMany({
+      where: { tokenHash },
+    });
     throw new Error("Invalid refresh token");
+  }
+
+  // 🔴 EXPIRED TOKEN → DELETE
+  if (record.expiresAt < new Date()) {
+    await prisma.refreshToken.delete({
+      where: { tokenHash },
+    });
+    throw new Error("Expired refresh token");
   }
 
   return {

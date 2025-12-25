@@ -194,3 +194,22 @@ input:-webkit-autofill:active {
   transition: background-color 9999s ease-in-out 0s;
 }
 /* ====================================================== */
+
+/* Toast card */
+.toast-base {
+  background: var(--color-card) !important;
+  color: var(--color-card-foreground) !important;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* Toast content */
+.toast-base .Toastify__toast-body {
+  color: inherit;
+  font-family: inherit;
+}
+
+/* Progress bar */
+.toast-progress {
+  background: var(--color-primary);
+}

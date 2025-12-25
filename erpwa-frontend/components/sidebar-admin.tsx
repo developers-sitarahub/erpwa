@@ -39,6 +39,7 @@ export function SidebarAdmin() {
     { href: "/admin/create-template", icon: FileText, label: "Templates" },
     { href: "/admin/add-lead", icon: UserPlus, label: "Add Lead" },
     { href: "/admin/manage-team", icon: Users, label: "Manage Team" },
+    { href: "/admin/setup", icon: MessageSquare, label: "Setup" },
     { href: "/admin/settings", icon: Settings, label: "Settings" },
   ]
 

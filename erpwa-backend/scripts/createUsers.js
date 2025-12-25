@@ -1,14 +1,20 @@
-import "dotenv/config"; // 👈 IMPORTANT
+import "dotenv/config";
 import prisma from "../src/prisma.js";
 import { hashPassword } from "../src/utils/password.js";
-
-// ✅ DEBUG: check if DATABASE_URL is loaded
-console.log("DATABASE_URL loaded:", !!process.env.DATABASE_URL);
-console.log("DATABASE_URL value:", process.env.DATABASE_URL);
 
 async function main() {
   const passwordHash = await hashPassword("Password@123");
 
+  // 1️⃣ Create Vendor FIRST
+  const vendor = await prisma.vendor.create({
+    data: {
+      name: "Sitarahub",
+    },
+  });
+
+  console.log("✅ Vendor created:", vendor.id);
+
+  // 2️⃣ Create users linked to vendor
   const users = [
     {
       email: "gauravrai3133@gmail.com",
@@ -28,24 +34,17 @@ async function main() {
   ];
 
   for (const user of users) {
-    const exists = await prisma.user.findUnique({
-      where: { email: user.email },
+    await prisma.user.create({
+      data: {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        passwordHash,
+        vendorId: vendor.id, // 🔑 THIS IS THE FIX
+      },
     });
 
-    if (!exists) {
-      await prisma.user.create({
-        data: {
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          passwordHash,
-        },
-      });
-
-      console.log(`✅ Created user: ${user.email}`);
-    } else {
-      console.log(`⚠️ User already exists: ${user.email}`);
-    }
+    console.log(`✅ Created ${user.role}: ${user.email}`);
   }
 }
 

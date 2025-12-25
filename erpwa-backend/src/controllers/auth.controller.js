@@ -27,10 +27,20 @@ export async function login(req, res) {
 
 export async function refresh(req, res) {
   const token = req.cookies?.refreshToken;
-  if (!token) return res.status(401).json({ message: "No token" });
 
-  const data = await Auth.refresh(token);
-  res.json(data);
+  if (!token) {
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
+    return res.status(401).json({ message: "No token" });
+  }
+
+  try {
+    const data = await Auth.refresh(token);
+    return res.json(data);
+  } catch (err) {
+    // 🔴 DELETE COOKIE ON FAILURE
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
+    return res.status(401).json({ message: "Invalid refresh token" });
+  }
 }
 
 /* ================= LOGOUT ================= */

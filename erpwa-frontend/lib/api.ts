@@ -13,11 +13,6 @@ export function setAccessToken(token: string | null) {
 }
 
 /* ================= AXIOS INSTANCES ================= */
-/**
- * IMPORTANT:
- * - baseURL MUST be "/api"
- * - NEVER point Axios directly to localhost:5000
- */
 
 const api = axios.create({
   baseURL: "/api",
@@ -44,6 +39,7 @@ api.interceptors.request.use(
 /* ================= REFRESH QUEUE ================= */
 
 let isRefreshing = false;
+
 let failedQueue: {
   resolve: (token: string) => void;
   reject: (error: AxiosError) => void;
@@ -73,10 +69,7 @@ api.interceptors.response.use(
 
     const url = originalRequest.url || "";
 
-    /**
-     * 🚫 NEVER refresh for auth endpoints
-     * Prevents infinite loops and logout crashes
-     */
+    /* 🚫 NEVER refresh auth endpoints */
     if (
       url.includes("/auth/login") ||
       url.includes("/auth/logout") ||
@@ -121,6 +114,12 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError as AxiosError, null);
         setAccessToken(null);
+
+        // 🔴 GLOBAL LOGOUT EVENT (OPTION 1)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("auth:logout"));
+        }
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
