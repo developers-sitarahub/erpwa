@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api, { setAccessToken } from "@/lib/api";
+import { connectSocket, disconnectSocket } from "@/lib/socket";
 
 /* ================= TYPES ================= */
 
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const mountedRef = useRef(false);
 
-  /* ===== Restore session on load ===== */
+  /* ================= RESTORE SESSION ================= */
 
   useEffect(() => {
     mountedRef.current = true;
@@ -40,9 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const restoreSession = async () => {
       try {
         const res = await api.get("/auth/me");
-        if (mountedRef.current) {
-          setUser(res.data.user);
-        }
+
+        if (!mountedRef.current) return;
+
+        setUser(res.data.user);
+
+        // 🔐 CONNECT SOCKET AFTER SESSION RESTORE
+        connectSocket();
       } catch {
         setAccessToken(null);
         if (mountedRef.current) {
@@ -62,10 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  /* ===== GLOBAL LOGOUT LISTENER (OPTION 1) ===== */
+  /* ================= GLOBAL LOGOUT LISTENER ================= */
 
   useEffect(() => {
     const handleLogout = () => {
+      disconnectSocket(); // 🔥 IMPORTANT
       setAccessToken(null);
       setUser(null);
       router.replace("/login");
@@ -88,6 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(res.data.accessToken);
     setUser(loggedInUser);
 
+    // 🔐 CONNECT SOCKET AFTER LOGIN
+    connectSocket();
+
     // ✅ ROLE-BASED REDIRECT
     if (
       loggedInUser.role === "vendor_owner" ||
@@ -105,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.post("/auth/logout");
     } finally {
+      disconnectSocket(); // 🔥 IMPORTANT
       setAccessToken(null);
       setUser(null);
       router.replace("/login");

@@ -37,6 +37,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --wa-chat-bg: #efeae2;
+  --wa-inbound: #ffffff;
+  --wa-outbound: #dcf8c6;
+  --wa-date: #e4e6eb;
 }
 
 .dark {
@@ -73,6 +77,10 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --wa-chat-bg: #0b141a;
+  --wa-inbound: #202c33;
+  --wa-outbound: #005c4b;
+  --wa-date: #1f2c34;
 }
 
 @theme inline {

@@ -29,7 +29,7 @@ export default function WhatsAppSetupPage() {
     whatsappAccessToken: "",
   });
 
-  /* ================= CONFIRM TOAST (v11 SAFE) ================= */
+  /* ================= CONFIRM TOAST ================= */
 
   function showConfirmToast(options: {
     title: string;
@@ -40,8 +40,7 @@ export default function WhatsAppSetupPage() {
     toast(
       ({ closeToast }) => (
         <div className="space-y-2">
-          <p className="font-medium text-foreground">{options.title}</p>
-
+          <p className="font-medium">{options.title}</p>
           <p className="text-sm text-muted-foreground">{options.message}</p>
 
           <div className="flex gap-2 pt-2">
@@ -57,17 +56,14 @@ export default function WhatsAppSetupPage() {
 
             <button
               onClick={closeToast}
-              className="border border-border text-foreground px-3 py-1.5 rounded-md text-sm"
+              className="border border-border px-3 py-1.5 rounded-md text-sm"
             >
               Cancel
             </button>
           </div>
         </div>
       ),
-      {
-        autoClose: false,
-        closeOnClick: false,
-      }
+      { autoClose: false, closeOnClick: false }
     );
   }
 
@@ -91,6 +87,18 @@ export default function WhatsAppSetupPage() {
 
     loadStatus();
   }, [user]);
+
+  /* ================= PREFILL FORM ON EDIT ================= */
+
+  useEffect(() => {
+    if (isEditing && config) {
+      setForm({
+        whatsappBusinessId: config.whatsappBusinessId || "",
+        whatsappPhoneNumberId: config.whatsappPhoneNumberId || "",
+        whatsappAccessToken: "", // never prefill token
+      });
+    }
+  }, [isEditing, config]);
 
   /* ================= SUBMIT ================= */
 
@@ -148,7 +156,7 @@ export default function WhatsAppSetupPage() {
         </p>
       </div>
 
-      {/* Status Badge */}
+      {/* Status */}
       <div>
         {status === "connected" && (
           <span className="rounded-full bg-primary/10 text-primary px-3 py-1 text-sm">
@@ -196,76 +204,80 @@ export default function WhatsAppSetupPage() {
               showConfirmToast({
                 title: "Edit WhatsApp configuration?",
                 message:
-                  "Reconfiguring will replace the existing connection and may interrupt message delivery until setup is completed again.",
+                  "Reconfiguring will replace the existing connection and may interrupt message delivery.",
                 confirmLabel: "Yes, edit",
                 onConfirm: () => setIsEditing(true),
               })
             }
-            className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm hover:bg-muted transition"
+            className="border border-border rounded-md px-4 py-2 text-sm hover:bg-muted"
           >
             Reconfigure
           </button>
         </div>
       )}
 
-      {/* ================= EDIT / SETUP FORM ================= */}
+      {/* ================= FORM ================= */}
       {(status !== "connected" || isEditing) && (
         <form
           onSubmit={handleSubmit}
           className="bg-card border border-border rounded-lg p-5 space-y-4"
         >
-          {/* Back button */}
           {isEditing && (
-            <button
-              type="button"
-              onClick={() =>
-                showConfirmToast({
-                  title: "Discard changes?",
-                  message:
-                    "Any unsaved changes will be lost. Your existing WhatsApp connection will remain active.",
-                  confirmLabel: "Discard & go back",
-                  onConfirm: () => {
-                    setIsEditing(false);
-                    setError(null);
-                  },
-                })
-              }
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              ← Back
-            </button>
+            <p className="text-xs text-muted-foreground">
+              Existing values are pre-filled. Access token must be re-entered.
+            </p>
           )}
 
-          <input
-            className="w-full bg-input border border-border rounded-md px-3 py-2 focus:ring-2 focus:ring-ring"
-            placeholder="WhatsApp Business Account ID"
-            value={form.whatsappBusinessId}
-            onChange={(e) =>
-              setForm({ ...form, whatsappBusinessId: e.target.value })
-            }
-            required
-          />
+          {/* Business ID */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">
+              WhatsApp Business Account ID
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Meta Business Manager → WhatsApp Accounts
+            </p>
+            <input
+              className="w-full bg-input border border-border rounded-md px-3 py-2"
+              value={form.whatsappBusinessId}
+              onChange={(e) =>
+                setForm({ ...form, whatsappBusinessId: e.target.value })
+              }
+              required
+            />
+          </div>
 
-          <input
-            className="w-full bg-input border border-border rounded-md px-3 py-2 focus:ring-2 focus:ring-ring"
-            placeholder="Phone Number ID"
-            value={form.whatsappPhoneNumberId}
-            onChange={(e) =>
-              setForm({ ...form, whatsappPhoneNumberId: e.target.value })
-            }
-            required
-          />
+          {/* Phone Number ID */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Phone Number ID</label>
+            <p className="text-xs text-muted-foreground">
+              Linked WhatsApp phone number identifier
+            </p>
+            <input
+              className="w-full bg-input border border-border rounded-md px-3 py-2"
+              value={form.whatsappPhoneNumberId}
+              onChange={(e) =>
+                setForm({ ...form, whatsappPhoneNumberId: e.target.value })
+              }
+              required
+            />
+          </div>
 
-          <textarea
-            className="w-full bg-input border border-border rounded-md px-3 py-2 focus:ring-2 focus:ring-ring"
-            placeholder="WhatsApp Access Token (stored securely)"
-            value={form.whatsappAccessToken}
-            onChange={(e) =>
-              setForm({ ...form, whatsappAccessToken: e.target.value })
-            }
-            required
-            rows={4}
-          />
+          {/* Access Token */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Access Token</label>
+            <p className="text-xs text-muted-foreground">
+              Permanent token with WhatsApp permissions (stored securely)
+            </p>
+            <textarea
+              className="w-full bg-input border border-border rounded-md px-3 py-2"
+              value={form.whatsappAccessToken}
+              onChange={(e) =>
+                setForm({ ...form, whatsappAccessToken: e.target.value })
+              }
+              rows={4}
+              required
+            />
+          </div>
 
           {error && (
             <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded p-2">
@@ -275,7 +287,7 @@ export default function WhatsAppSetupPage() {
 
           <button
             disabled={saving}
-            className="w-full bg-primary text-primary-foreground rounded-md py-2 font-medium hover:opacity-90 disabled:opacity-50"
+            className="w-full bg-primary text-primary-foreground rounded-md py-2 font-medium disabled:opacity-50"
           >
             {saving ? "Verifying…" : "Verify & Save"}
           </button>

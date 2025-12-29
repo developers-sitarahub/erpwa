@@ -2,13 +2,19 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-
+import http from "http";
+import "./cron/templateStatus.cron.js";
 import prisma from "./prisma.js";
 import authRoutes from "./routes/auth.routes.js";
 import vendorWhatsappRoutes from "./routes/vendorWhatsapp.route.js";
 import vendorWhatsappMessageRoutes from "./routes/vendorWhatsappMessage.route.js";
 import whatsappWebhookRoutes from "./routes/whatsappWebhook.route.js";
 import whatsappTestRoutes from "./routes/whatsappTest.route.js";
+import vendorTemplateRoutes from "./routes/vendorTemplate.route.js";
+import vendorWhatsappTemplateSendRoutes from "./routes/vendorWhatsappTemplateSend.route.js";
+import inboxRoutes from "./routes/inbox.route.js";
+import { initSocket } from "./socket.js";
+
 const app = express();
 
 /* ================= MIDDLEWARE ================= */
@@ -32,13 +38,12 @@ app.set("etag", false);
 app.get("/ping", (req, res) => res.send("pong"));
 
 app.use("/api/auth", authRoutes);
-
-// Vendor WhatsApp (setup, config, send message)
 app.use("/api/whatsapp-test", whatsappTestRoutes);
 app.use("/api/vendor", vendorWhatsappRoutes);
 app.use("/api/vendor/whatsapp", vendorWhatsappMessageRoutes);
-
-// WhatsApp Webhook (Meta → Your server)
+app.use("/api/vendor/templates", vendorTemplateRoutes);
+app.use("/api/vendor/whatsapp/template", vendorWhatsappTemplateSendRoutes);
+app.use("/api/inbox", inboxRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
 
 /* ================= SERVER START ================= */
@@ -49,8 +54,14 @@ async function startServer() {
     await prisma.$queryRaw`SELECT 1`;
     console.log("✅ Database connected successfully");
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Backend running on port ${PORT}`);
+    // 🔥 Create HTTP server
+    const server = http.createServer(app);
+
+    // 🔥 Initialize Socket.IO
+    initSocket(server);
+
+    server.listen(PORT, () => {
+      console.log(`🚀 Backend + WebSocket running on port ${PORT}`);
     });
   } catch (error) {
     console.error("❌ Database connection failed");

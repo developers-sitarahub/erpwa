@@ -136,37 +136,88 @@ model Conversation {
 model Template {
   id               String   @id @default(uuid())
   vendorId         String
+
   metaTemplateName String
-  displayName      String?
-  language         String   @default("en")
-  category         String?
-  status           String   @default("pending")
-  hasMedia         Boolean  @default(false)
-  adminOnly        Boolean  @default(false)
+  displayName      String
+  category         String
+  status           String   @default("draft")
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  vendor    Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  media     TemplateMedia[]
-  campaigns Campaign[]
+  vendor     Vendor                    @relation(fields: [vendorId], references: [id])
+  languages  TemplateLanguage[]
+  buttons    TemplateButton[]
+  media      TemplateMedia[]
+  campaigns  Campaign[]
 
-  @@unique([vendorId, metaTemplateName, language])
+  @@unique([vendorId, metaTemplateName])
+  @@index([vendorId])
 }
 
-model TemplateMedia {
-  id              String    @id @default(uuid())
-  templateId      String
-  s3Url           String
-  whatsappMediaId String?   @unique
-  mediaType       String    @default("image")
-  caption         String?
-  position        Int       @default(0)
-  uploadStatus    String    @default("pending")
-  uploadedAt      DateTime?
-  createdAt       DateTime  @default(now())
+
+model TemplateButton {
+  id         String @id @default(uuid())
+  templateId String
+
+  type       String
+  text       String
+  value      String?
+  position   Int
 
   template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, position])
 }
+
+
+model TemplateMedia {
+  id              String   @id @default(uuid())
+  templateId      String
+
+  // 🔑 Important additions
+  language        String   // en_US, hi_IN
+  position        Int      @default(0) // always 0 for header (future-proof)
+
+  mediaType       String   // image | video | document
+  s3Url           String
+  whatsappMediaId String?
+
+  uploadStatus    String   @default("pending") 
+  // pending | uploaded | failed
+
+  uploadError     String?
+  uploadedAt      DateTime?
+
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, language, position])
+}
+
+
+model TemplateLanguage {
+  id          String @id @default(uuid())
+  templateId  String
+
+  language    String
+  body        String
+  footerText  String?
+
+  headerType  String?
+  headerText  String?
+
+  metaStatus  String  @default("draft")
+  metaReason  String?
+  metaId      String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, language])
+}
+
 
 model Campaign {
   id          String    @id @default(uuid())
@@ -190,10 +241,13 @@ model Message {
   campaignId        String?
   senderId          String?
   direction         String
+  channel           String
   messageType       String?
   content           String?
   inboundPayload    Json?
-  whatsappMessageId String?   @unique
+  outboundPayload   Json?
+  whatsappMessageId String   @unique
+  replyToMessageId  String?
   status            String?
   errorCode         String?
   createdAt         DateTime  @default(now())
