@@ -18,9 +18,11 @@ import {
   CheckCheck,
   Clock,
   AlertCircle,
+  Star,
+  Archive,
+  Trash2,
   MessageSquareIcon,
 } from "lucide-react";
-import Image from "next/image";
 
 /* =======================
    UI MODELS (UNCHANGED)
@@ -34,10 +36,7 @@ interface Message {
   // 👇 ADD THIS (frontend only)
   replyTo?: {
     sender: "customer" | "executive";
-    text?: string;
-    mediaUrl?: string;
-    mimeType?: string;
-    caption?: string;
+    text: string;
   };
 
   text?: string;
@@ -55,15 +54,10 @@ interface Conversation {
   phone: string;
   lastMessage: string;
   lastActivity: string;
-
-  // ✅ NEW (required)
-  lastMessageDirection?: "inbound" | "outbound";
-  lastMessageStatus?: "sent" | "delivered" | "read" | "failed";
-  unreadCount?: number;
-
+  businessHoursRemaining?: string;
   hasUnread?: boolean;
   isPinned?: boolean;
-  businessHoursRemaining?: string;
+  tags?: string[];
 }
 
 /* =======================
@@ -87,8 +81,6 @@ interface ApiConversation {
 
 interface ApiMessage {
   id: string;
-  whatsappMessageId?: string;
-  replyToMessageId?: string;
   content: string;
   direction: "inbound" | "outbound";
   status?: "sent" | "delivered" | "read" | "failed";
@@ -98,27 +90,6 @@ interface ApiMessage {
 /* =======================
    CONVERSATION LIST (UI UNCHANGED)
 ======================= */
-
-const getConversationTick = (
-  direction?: "inbound" | "outbound",
-  status?: "sent" | "delivered" | "read" | "failed"
-) => {
-  // 🔒 HARD RULE: ticks ONLY for outbound
-  if (direction !== "outbound") return null;
-
-  switch (status) {
-    case "sent":
-      return <Check className="w-4 h-4 text-muted-foreground" />;
-    case "delivered":
-      return <CheckCheck className="w-4 h-4 text-muted-foreground" />;
-    case "read":
-      return <CheckCheck className="w-4 h-4 text-blue-500" />;
-    case "failed":
-      return <AlertCircle className="w-4 h-4 text-destructive" />;
-    default:
-      return null;
-  }
-};
 
 function ConversationList({
   conversations,
@@ -194,32 +165,20 @@ function ConversationList({
                     {conv.lastActivity}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  {/* LEFT: tick + message text */}
-                  <div className="flex items-center gap-1 min-w-0">
-                    {getConversationTick(
-                      conv.lastMessageDirection,
-                      conv.lastMessageStatus
-                    )}
+                <div className="flex items-center justify-between">
+                  <p
+                    className={`text-sm truncate pr-2 ${
+                      conv.hasUnread
+                        ? "font-medium text-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {conv.lastMessage}
+                  </p>
 
-                    <p
-                      className={`text-sm truncate ${
-                        conv.hasUnread
-                          ? "font-medium text-foreground"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {conv.lastMessage}
-                    </p>
-                  </div>
-
-                  {/* RIGHT: unread badge (ONLY if last message is inbound) */}
-                  {conv.lastMessageDirection === "inbound" &&
-                    conv.unreadCount! > 0 && (
-                      <span className="ml-2 min-w-[20px] h-5 px-2 rounded-full bg-primary text-white text-xs flex items-center justify-center">
-                        {conv.unreadCount}
-                      </span>
-                    )}
+                  {conv.isPinned && (
+                    <Star className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                  )}
                 </div>
               </div>
             </div>
@@ -234,19 +193,18 @@ function ChatArea({
   conversation,
   messages,
   setMessages,
-  readSentRef,
   onBack,
 }: {
   conversation: Conversation;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  readSentRef: React.MutableRefObject<Set<string>>;
   onBack?: () => void;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [actionMenu, setActionMenu] = useState<{
     message: Message;
@@ -288,55 +246,25 @@ function ChatArea({
       return <AlertCircle className="w-4 h-4 text-destructive" />;
     return null;
   };
-
   useEffect(() => {
     if (!conversation?.id) return;
 
     const socket = getSocket();
 
-    const maybeMarkRead = async () => {
-      if (document.visibilityState !== "visible") return;
-      if (readSentRef.current.has(conversation.id)) return;
-
-      // ✅ ALWAYS notify backend when chat is opened
-      readSentRef.current.add(conversation.id);
-
-      try {
-        await api.post(`/inbox/${conversation.id}/mark-read`);
-      } catch {
-        readSentRef.current.delete(conversation.id);
-      }
-    };
-
-    socket.emit("join-conversation", conversation.id);
-
-    // Run once after render
-    requestAnimationFrame(maybeMarkRead);
-
-    // Re-run when tab becomes visible
-    document.addEventListener("visibilitychange", maybeMarkRead);
+    if (socket.connected) {
+      socket.emit("join-conversation", conversation.id);
+    } else {
+      const onConnect = () => {
+        socket.emit("join-conversation", conversation.id);
+        socket.off("connect", onConnect);
+      };
+      socket.on("connect", onConnect);
+    }
 
     return () => {
       socket.emit("leave-conversation", conversation.id);
-      document.removeEventListener("visibilitychange", maybeMarkRead);
     };
   }, [conversation.id]);
-
-  useEffect(() => {
-    if (!conversation?.id) return;
-    if (document.visibilityState !== "visible") return;
-
-    if (!readSentRef.current.has(conversation.id)) {
-      requestAnimationFrame(async () => {
-        try {
-          readSentRef.current.add(conversation.id);
-          await api.post(`/inbox/${conversation.id}/mark-read`);
-        } catch {
-          readSentRef.current.delete(conversation.id);
-        }
-      });
-    }
-  }, [messages.length, conversation.id]);
 
   useEffect(() => {
     if (!conversation?.id) return;
@@ -345,14 +273,33 @@ function ChatArea({
 
     const handleNewMessage = (msg: Message) => {
       setMessages((prev) => {
+        // 🔁 Replace optimistic message
+        if (msg.sender === "executive" && msg.whatsappMessageId) {
+          const optimisticIndex = prev.findIndex(
+            (m) => m.id.startsWith("temp-") && m.whatsappMessageId === m.id
+          );
+
+          if (optimisticIndex !== -1) {
+            const copy = [...prev];
+            const existing = copy[optimisticIndex];
+
+            copy[optimisticIndex] = {
+              ...msg,
+              status: "sent",
+
+              // ✅ KEEP THE REPLY SNAPSHOT
+              replyTo: existing.replyTo,
+              replyToMessageId: existing.replyToMessageId,
+            };
+
+            return copy;
+          }
+        }
+
+        // ➕ Add if not exists
         const exists = prev.some((m) => m.id === msg.id);
         return exists ? prev : [...prev, msg];
       });
-
-      if (msg.sender === "customer" && document.visibilityState === "visible") {
-        // allow read receipt to be sent again
-        readSentRef.current.delete(conversation.id);
-      }
     };
 
     const STATUS_PRIORITY = {
@@ -423,6 +370,29 @@ function ChatArea({
     setInputValue("");
     setSending(true);
 
+    const tempId = `temp-${Date.now()}`;
+
+    const optimisticMessage: Message = {
+      id: tempId,
+      whatsappMessageId: tempId,
+      text,
+      sender: "executive",
+      timestamp: new Date().toISOString(),
+      status: "sent",
+      replyToMessageId: replyTo?.whatsappMessageId,
+
+      // 👇 SNAPSHOT OF ORIGINAL MESSAGE
+      replyTo: replyTo
+        ? {
+            sender: replyTo.sender,
+            text: replyTo.text || "",
+          }
+        : undefined,
+    };
+
+    // optimistic update
+    setMessages((prev) => [...prev, optimisticMessage]);
+
     try {
       await api.post("/vendor/whatsapp/send-message", {
         conversationId: conversation.id,
@@ -431,10 +401,17 @@ function ChatArea({
       });
 
       setReplyTo(null);
-      requestAnimationFrame(() => inputRef.current?.focus());
+
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
     } catch (err) {
       console.error("Failed to send message", err);
-      // optional: toast / snackbar
+
+      // mark failed safely
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m))
+      );
     } finally {
       setSending(false);
     }
@@ -547,108 +524,14 @@ function ChatArea({
                             : conversation.customerName}
                         </div>
                         <div className="truncate">
-                          {(msg.replyTo ?? repliedMessage)?.text ||
-                            ((msg.replyTo ?? repliedMessage)?.mediaUrl
-                              ? "Media message"
-                              : "")}
+                          {(msg.replyTo ?? repliedMessage)?.text}
                         </div>
                       </div>
                     )}
 
-                    {/* 🖼 IMAGE */}
-                    {/* 🖼 IMAGE (WhatsApp style) */}
-                    {msg.mediaUrl && msg.mimeType?.startsWith("image/") && (
-                      <div className="mb-1">
-                        <div
-                          className="relative w-[320px] max-w-full aspect-[4/3] rounded-lg overflow-hidden cursor-pointer"
-                          onClick={() => window.open(msg.mediaUrl, "_blank")}
-                        >
-                          <Image
-                            src={msg.mediaUrl}
-                            alt="Image"
-                            fill
-                            sizes="(max-width: 768px) 90vw, 320px"
-                            className="object-cover"
-                          />
-                        </div>
-
-                        {msg.caption && (
-                          <p className="mt-1 text-sm text-foreground">
-                            {msg.caption}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 🎥 VIDEO (WhatsApp style) */}
-                    {msg.mediaUrl && msg.mimeType?.startsWith("video/") && (
-                      <div className="mb-1">
-                        <div className="w-[320px] max-w-full rounded-lg overflow-hidden bg-black">
-                          <video
-                            src={msg.mediaUrl}
-                            controls
-                            className="w-full h-auto"
-                          />
-                        </div>
-
-                        {msg.caption && (
-                          <p className="mt-1 text-sm text-foreground">
-                            {msg.caption}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 🎵 AUDIO (WhatsApp style) */}
-                    {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
-                      <div className="mb-1 w-[260px] max-w-full">
-                        <audio
-                          src={msg.mediaUrl}
-                          controls
-                          className="w-full h-10"
-                        />
-
-                        {msg.caption && (
-                          <p className="mt-1 text-sm text-foreground">
-                            {msg.caption}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 📄 DOCUMENT (WhatsApp style) */}
-                    {msg.mediaUrl &&
-                      msg.mimeType &&
-                      !msg.mimeType.startsWith("image/") &&
-                      !msg.mimeType.startsWith("video/") &&
-                      !msg.mimeType.startsWith("audio/") && (
-                        <a
-                          href={msg.mediaUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-[260px] max-w-full flex items-center gap-3 p-3 rounded-lg border bg-muted hover:bg-muted/70"
-                        >
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                            📄
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {msg.mediaUrl.split("/").pop()}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Document
-                            </p>
-                          </div>
-                        </a>
-                      )}
-
-                    {/* 📝 TEXT MESSAGE */}
-                    {msg.text && (
-                      <p className="text-sm text-foreground break-words leading-relaxed">
-                        {msg.text}
-                      </p>
-                    )}
+                    <p className="text-sm text-foreground break-words leading-relaxed">
+                      {msg.text}
+                    </p>
 
                     <div className="flex items-center gap-1 mt-1 justify-end">
                       <span className="text-[10px] text-muted-foreground">
@@ -880,42 +763,10 @@ function ActionButton({
   );
 }
 
-const mapApiConversation = (c: ApiConversation): Conversation => {
-  const lastMsg = c.messages?.[c.messages.length - 1];
-
-  const unreadCount =
-    c.messages?.filter((m) => m.direction === "inbound" && m.status !== "read")
-      .length ?? 0;
-
-  return {
-    id: c.id,
-    customerName: c.lead.name || c.lead.phoneNumber,
-    phone: c.lead.phoneNumber,
-    lastMessage: (() => {
-      if (!lastMsg) return "";
-
-      if (lastMsg.content?.startsWith("[image")) return "📷 Photo";
-      if (lastMsg.content?.startsWith("[video")) return "🎥 Video";
-      if (lastMsg.content?.startsWith("[audio")) return "🎵 Audio";
-      if (lastMsg.content?.startsWith("[document")) return "📄 Document";
-
-      return lastMsg.content;
-    })(),
-    lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    lastMessageDirection: lastMsg?.direction,
-    lastMessageStatus: lastMsg?.status,
-    unreadCount,
-    hasUnread: unreadCount > 0,
-  };
-};
-
 export default function InboxPage() {
   const [selectedConversation, setSelectedConversation] = useState<string>("");
   const [showChat, setShowChat] = useState(false);
-  const readSentRef = useRef<Set<string>>(new Set());
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
 
@@ -927,7 +778,26 @@ export default function InboxPage() {
       try {
         const res = await api.get<ApiConversation[]>("/inbox");
 
-        const mapped = res.data.map(mapApiConversation);
+        const mapped: Conversation[] = res.data.map((c: any) => {
+          const lastMsg = c.messages?.[c.messages.length - 1];
+
+          const hasUnread = c.messages?.some(
+            (m: any) =>
+              m.direction === "inbound" && (!m.status || m.status !== "read")
+          );
+
+          return {
+            id: c.id,
+            customerName: c.lead.name || c.lead.phoneNumber,
+            phone: c.lead.phoneNumber,
+            lastMessage: lastMsg?.content || "",
+            lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            hasUnread,
+          };
+        });
 
         setConversations(mapped);
       } catch (err) {
@@ -947,9 +817,7 @@ export default function InboxPage() {
 
     const socket = getSocket();
 
-    socket.on("connect", async () => {
-      const res = await api.get<ApiConversation[]>("/inbox");
-      setConversations(res.data.map(mapApiConversation));
+    socket.on("connect", () => {
       console.log("✅ SOCKET CONNECTED:", socket.id);
     });
 
@@ -969,11 +837,50 @@ export default function InboxPage() {
   }, []);
 
   /* =======================
+     LOAD INBOX (BACKEND)
+  ======================= */
+  useEffect(() => {
+    const loadInbox = async () => {
+      try {
+        const res = await api.get<ApiConversation[]>("/inbox");
+
+        const mapped: Conversation[] = res.data.map((c: any) => {
+          const lastMsg = c.messages?.[c.messages.length - 1];
+
+          const hasUnread = c.messages?.some(
+            (m: any) =>
+              m.direction === "inbound" && (!m.status || m.status !== "read")
+          );
+
+          return {
+            id: c.id,
+            customerName: c.lead.name || c.lead.phoneNumber,
+            phone: c.lead.phoneNumber,
+            lastMessage: lastMsg?.content || "",
+            lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            hasUnread, // 👈 HERE
+            tags: [],
+            businessHoursRemaining: undefined,
+          };
+        });
+
+        setConversations(mapped);
+      } catch (err) {
+        console.error("Failed to load inbox", err);
+        setConversations([]);
+      }
+    };
+
+    loadInbox();
+  }, []);
+
+  /* =======================
      SELECT CONVERSATION
   ======================= */
   const handleSelectConversation = async (id: string) => {
-    readSentRef.current.delete(id);
-
     setMessages([]);
     setSelectedConversation(id);
     setShowChat(true);
@@ -981,35 +888,27 @@ export default function InboxPage() {
     try {
       const res = await api.get<{ messages: ApiMessage[] }>(`/inbox/${id}`);
 
-      const mappedMessages: Message[] = res.data.messages.map((m: any) => {
-        const media = m.media?.[0]; // WhatsApp = 1 media per message
-
-        return {
-          id: m.id,
-          whatsappMessageId: m.whatsappMessageId,
-          replyToMessageId: m.replyToMessageId,
-
-          // TEXT
-          text: media ? undefined : m.content,
-
-          // MEDIA
-          mediaUrl: media?.mediaUrl,
-          mimeType: media?.mimeType,
-          caption: media?.caption,
-
-          sender: m.direction === "outbound" ? "executive" : "customer",
-          timestamp: m.createdAt,
-          status: m.status ?? "delivered",
-        };
-      });
+      const mappedMessages: Message[] = res.data.messages.map((m: any) => ({
+        id: m.id,
+        whatsappMessageId: m.whatsappMessageId,
+        replyToMessageId: m.replyToMessageId,
+        text: m.content,
+        sender: m.direction === "outbound" ? "executive" : "customer",
+        timestamp: m.createdAt,
+        status: m.status,
+      }));
 
       setMessages((prev) => {
-        const map = new Map(prev.map((m) => [m.id, m]));
-        mappedMessages.forEach((m) => map.set(m.id, m));
-        return Array.from(map.values()).sort(
-          (a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
+        const existingIds = new Set(prev.map((m) => m.id));
+        const merged = [...prev];
+
+        mappedMessages.forEach((m) => {
+          if (!existingIds.has(m.id)) {
+            merged.push(m);
+          }
+        });
+
+        return merged;
       });
     } catch (err) {
       console.error("Failed to load conversation", err);
@@ -1042,7 +941,6 @@ export default function InboxPage() {
             conversation={currentConversation}
             messages={messages}
             setMessages={setMessages}
-            readSentRef={readSentRef}
             onBack={() => setShowChat(false)}
           />
         ) : (

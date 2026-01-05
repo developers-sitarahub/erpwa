@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/context/authContext"
-import { Home, MessageSquare, Send, Users, FileText, Settings, LogOut, ChevronRight, Menu, X } from "lucide-react"
+import { Home, MessageSquare, Send, Users, FileText, Settings, LogOut, ChevronRight, Menu, X, FolderOpen, Image } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/context/sidebar-provider"
 import { useState, useEffect } from "react"
@@ -31,6 +31,8 @@ export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
     { href: "/inbox", icon: MessageSquare, label: "Inbox" },
     { href: "/send-message", icon: Send, label: "Send Message" },
     { href: "/leads", icon: Users, label: "Leads" },
+    { href: "/categories", icon: FolderOpen, label: "Categories" },
+    { href: "/gallery", icon: Image, label: "Gallery" },
     { href: "/templates", icon: FileText, label: "Templates" },
     ...(userRole === "admin" ? [{ href: "/users", icon: Users, label: "Users" }] : []),
     { href: "/settings", icon: Settings, label: "Settings" },

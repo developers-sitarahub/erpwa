@@ -1,9 +1,6 @@
 import express from "express";
 import prisma from "../prisma.js";
 import { getIO } from "../socket.js";
-import { uploadToS3 } from "../services/media.service.js";
-import { downloadWhatsappMedia } from "../services/whatsappMedia.service.js";
-import { decrypt } from "../utils/encryption.js";
 
 const router = express.Router();
 
@@ -132,50 +129,6 @@ router.post("/", async (req, res) => {
           },
         });
 
-        if (
-          ["image", "video", "audio", "document", "sticker"].includes(msg.type)
-        ) {
-          try {
-            const accessToken = decrypt(vendor.whatsappAccessToken);
-
-            const mediaId = msg[msg.type].id;
-            const caption = msg[msg.type].caption || null;
-
-            const { buffer, mimeType, fileName } = await downloadWhatsappMedia(
-              mediaId,
-              accessToken
-            );
-
-            const extension =
-              fileName?.split(".").pop() ||
-              (mimeType === "application/pdf"
-                ? "pdf"
-                : mimeType.split("/")[1] || "bin");
-
-            const mediaUrl = await uploadToS3({
-              buffer,
-              mimeType,
-              vendorId: vendor.id,
-              conversationId: conversation.id,
-              extension,
-            });
-
-            await prisma.messageMedia.create({
-              data: {
-                messageId: inboundMessage.id,
-                mediaType: msg.type,
-                mimeType,
-                mediaUrl,
-                caption,
-                fileName,
-              },
-            });
-          } catch (err) {
-            console.error("Inbound media processing failed:", err);
-            // ❗ NEVER throw from webhook
-          }
-        }
-
         /* 🔥 EMIT INBOX UPDATE */
         try {
           const io = getIO();
@@ -187,23 +140,14 @@ router.post("/", async (req, res) => {
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
           const io = getIO();
-          const fullMessage = await prisma.message.findUnique({
-            where: { id: inboundMessage.id },
-            include: { media: true },
-          });
-
           io.to(`conversation:${conversation.id}`).emit("message:new", {
-            id: fullMessage.id,
-            whatsappMessageId: fullMessage.whatsappMessageId,
+            id: inboundMessage.id,
+            whatsappMessageId: inboundMessage.whatsappMessageId,
+            text: inboundMessage.content,
             sender: "customer",
-            timestamp: fullMessage.createdAt.toISOString(),
-            replyToMessageId: fullMessage.replyToMessageId,
-
-            text: fullMessage.media.length ? undefined : fullMessage.content,
-
-            mediaUrl: fullMessage.media[0]?.mediaUrl,
-            mimeType: fullMessage.media[0]?.mimeType,
-            caption: fullMessage.media[0]?.caption,
+            timestamp: inboundMessage.createdAt.toISOString(),
+            status: "delivered",
+            replyToMessageId: inboundMessage.replyToMessageId,
           });
         } catch {
           // socket not ready – ignore (webhook must never fail)
@@ -268,6 +212,79 @@ router.post("/", async (req, res) => {
   } catch (err) {
     console.error("WhatsApp webhook error:", err);
     return res.sendStatus(200); // 👈 NEVER fail webhook
+  }
+});
+
+// ===============================
+// MARK INBOUND MESSAGES AS READ
+// ===============================
+router.post("/mark-read/:conversationId", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        vendor: true,
+        messages: {
+          where: {
+            direction: "inbound",
+            status: { not: "read" },
+            whatsappMessageId: { not: null },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1, // 🔥 ONLY LATEST MESSAGE
+        },
+      },
+    });
+
+    if (!conversation || !conversation.vendor) {
+      return res.sendStatus(404);
+    }
+
+    const accessToken = conversation.vendor.whatsappAccessToken;
+
+    // 🔥 Mark each inbound message as read on WhatsApp
+    await Promise.all(
+      conversation.messages.map((msg) =>
+        fetch(
+          `https://graph.facebook.com/v19.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              messaging_product: "whatsapp",
+              status: "read",
+              message_id: msg.whatsappMessageId,
+            }),
+          }
+        )
+      )
+    );
+
+    const messageIds = conversation.messages.map((m) => m.id);
+
+    await prisma.message.updateMany({
+      where: { id: { in: messageIds } },
+      data: { status: "read" },
+    });
+
+    // 🔥 Emit socket update
+    const io = getIO();
+    conversation.messages.forEach((msg) => {
+      io.to(`conversation:${conversationId}`).emit("message:status", {
+        whatsappMessageId: msg.whatsappMessageId,
+        status: "read",
+      });
+    });
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error("Mark read failed:", err);
+    return res.sendStatus(200);
   }
 });
 

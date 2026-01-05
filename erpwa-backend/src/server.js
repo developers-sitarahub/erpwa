@@ -14,11 +14,16 @@ import vendorTemplateRoutes from "./routes/vendorTemplate.route.js";
 import vendorWhatsappTemplateSendRoutes from "./routes/vendorWhatsappTemplateSend.route.js";
 import inboxRoutes from "./routes/inbox.route.js";
 import { initSocket } from "./socket.js";
+import leadRoutes from "./routes/lead.routes.js";
+import categoryRoutes from "./routes/category.routes.js";
+import leadManagementRoutes from "./routes/leadManagement.routes.js";
+import galleryRoutes from "./routes/gallery.routes.js"; 
 
 const app = express();
 
 /* ================= MIDDLEWARE ================= */
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 const allowedOrigins = process.env.FRONTEND_URL
@@ -45,6 +50,11 @@ app.use("/api/vendor/templates", vendorTemplateRoutes);
 app.use("/api/vendor/whatsapp/template", vendorWhatsappTemplateSendRoutes);
 app.use("/api/inbox", inboxRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
+app.use("/api/leads", leadRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/leads-management", leadManagementRoutes);
+app.use("/api/gallery", galleryRoutes);
+
 
 /* ================= SERVER START ================= */
 const PORT = process.env.PORT || 5000;
