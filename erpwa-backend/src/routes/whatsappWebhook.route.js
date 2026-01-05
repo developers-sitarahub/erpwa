@@ -187,14 +187,23 @@ router.post("/", async (req, res) => {
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
           const io = getIO();
+          const fullMessage = await prisma.message.findUnique({
+            where: { id: inboundMessage.id },
+            include: { media: true },
+          });
+
           io.to(`conversation:${conversation.id}`).emit("message:new", {
-            id: inboundMessage.id,
-            whatsappMessageId: inboundMessage.whatsappMessageId,
-            text: inboundMessage.content,
+            id: fullMessage.id,
+            whatsappMessageId: fullMessage.whatsappMessageId,
             sender: "customer",
-            timestamp: inboundMessage.createdAt.toISOString(),
-            status: "delivered",
-            replyToMessageId: inboundMessage.replyToMessageId,
+            timestamp: fullMessage.createdAt.toISOString(),
+            replyToMessageId: fullMessage.replyToMessageId,
+
+            text: fullMessage.media.length ? undefined : fullMessage.content,
+
+            mediaUrl: fullMessage.media[0]?.mediaUrl,
+            mimeType: fullMessage.media[0]?.mimeType,
+            caption: fullMessage.media[0]?.caption,
           });
         } catch {
           // socket not ready – ignore (webhook must never fail)

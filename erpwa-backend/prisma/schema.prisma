@@ -308,6 +308,7 @@ model MessageMedia {
   mimeType  String
   mediaUrl  String
   caption   String?
+  fileName  String?
 
   assetId String? // link to MediaAsset (only image/video)
 
