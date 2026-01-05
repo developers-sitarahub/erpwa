@@ -1,7 +1,7 @@
 // Real API wrapper for leads - connects to backend
 import api from './api'
 import type { ApiResponse, Lead } from './types'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 export const leadsAPI = {
   /**
@@ -153,7 +153,7 @@ export const leadsAPI = {
 
   /**
    * Upload file and return preview
-   * Supports both Excel (.xlsx, .xls) and CSV files
+   * Supports both Excel (.xlsx) and CSV files
    */
   uploadFile: async (data: FormData): Promise<ApiResponse<any>> => {
     const file = data.get('leads_file') as File
@@ -163,21 +163,43 @@ export const leadsAPI = {
     }
 
     return new Promise((resolve, reject) => {
+      const isCsv = file.name.toLowerCase().endsWith('.csv')
       const reader = new FileReader()
 
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
-          const binaryStr = e.target?.result
-          const workbook = XLSX.read(binaryStr, { type: 'binary' })
-          const sheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[sheetName]
-          
-          // Convert to JSON with header row
-          const json = XLSX.utils.sheet_to_json(worksheet, { 
-            header: 1, // Use array of arrays format
-            defval: '', // Default value for empty cells
-          }) as any[][]
+          let json: any[][] = []
 
+          if (isCsv) {
+            const text = e.target?.result as string
+            // Simple CSV parser
+            const rows = text.split('\n')
+            json = rows.map(row => {
+              // Handle quotes? For now simple split by comma
+              // This is a basic implementation. 
+              // If complex CSV parsing is needed, a library like papaparse is recommended, 
+              // but we are avoiding adding new deps if possible.
+              return row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
+            })
+          } else {
+            const buffer = e.target?.result as ArrayBuffer
+            const workbook = new ExcelJS.Workbook()
+            await workbook.xlsx.load(buffer)
+            
+            const worksheet = workbook.worksheets[0]
+            if (!worksheet) {
+               throw new Error('No worksheet found in file')
+            }
+
+            worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+              // ExcelJS row.values is 1-based, index 0 is null/undefined
+              const rowValues = Array.isArray(row.values) ? row.values.slice(1) : []
+              // Convert all values to string to match previous behavior roughly
+              const stringValues = rowValues.map(val => val === null || val === undefined ? '' : String(val))
+              json.push(stringValues)
+            })
+          }
+          
           if (json.length === 0) {
             throw new Error('File is empty or has no data')
           }
@@ -290,8 +312,12 @@ export const leadsAPI = {
         })
       }
 
-      // Read as binary string for XLSX
-      reader.readAsBinaryString(file)
+      // Read as ArrayBuffer for XLSX, Text for CSV
+      if (isCsv) {
+        reader.readAsText(file)
+      } else {
+        reader.readAsArrayBuffer(file)
+      }
     })
   },
 

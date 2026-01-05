@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import api from "@/lib/api";
 
 /* ================= Types ================= */
@@ -116,9 +116,30 @@ export default function LeadsPage() {
       setLoading(true);
 
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(sheet);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.worksheets[0];
+
+      const rows: any[] = [];
+      let headers: string[] = [];
+
+      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        // ExcelJS row.values is 1-based.
+        const rowValues = Array.isArray(row.values) ? row.values.slice(1) : [];
+
+        if (rowNumber === 1) {
+          headers = rowValues.map(val => String(val));
+        } else {
+          const rowData: any = {};
+          headers.forEach((header, index) => {
+            const val = rowValues[index];
+            if (val !== undefined && val !== null) {
+              rowData[header] = val;
+            }
+          });
+          rows.push(rowData);
+        }
+      });
 
       const payload = rows
         .filter((r) => r.phoneNumber)
