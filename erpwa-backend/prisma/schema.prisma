@@ -47,6 +47,9 @@ model Vendor {
   messages       Message[]
   leadCategories LeadCategory[]
   mediaAlbums    MediaAlbum[]
+  categories     Category[]
+  contacts       Contact[]
+  galleryImages  GalleryImage[]
 }
 
 model User {
@@ -103,7 +106,6 @@ model LeadCategory {
 model Lead {
   id              String    @id @default(uuid())
   vendorId        String
-  name            String?
   phoneNumber     String
   status          String    @default("new")
   whatsappOptIn   Boolean   @default(true)
@@ -115,11 +117,97 @@ model Lead {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
+  category        String    @default("standard")
+  city            String?
+  companyName     String?
+  email           String?
+  subcategory     String?
+  categoryId      Int?
+  salesPersonName String?
+  subCategoryId   Int?
 
-  vendor        Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  conversations Conversation[]
+  vendor          Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  conversations   Conversation[]
+  leadCategory    Category?      @relation("LeadCategory", fields: [categoryId], references: [id])
+  leadSubCategory Category?      @relation("LeadSubCategory", fields: [subCategoryId], references: [id])
 
   @@unique([vendorId, phoneNumber])
+  @@index([email])
+  @@index([category])
+  @@index([subcategory])
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@index([status])
+}
+
+model Category {
+  id             Int            @id @default(autoincrement())
+  vendorId       String
+  name           String
+  parentId       Int?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  parent         Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children       Category[]     @relation("CategoryTree")
+  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  contacts       Contact[]      @relation("ContactCategory")
+  contactSubcats Contact[]      @relation("ContactSubCategory")
+  galleryImages  GalleryImage[] @relation("GalleryCategory")
+  gallerySubcats GalleryImage[] @relation("GallerySubCategory")
+  leads          Lead[]         @relation("LeadCategory")
+  leadSubcats    Lead[]         @relation("LeadSubCategory")
+
+  @@unique([vendorId, name, parentId])
+  @@index([vendorId])
+  @@index([parentId])
+}
+
+model Contact {
+  id              Int       @id @default(autoincrement())
+  vendorId        String
+  companyName     String
+  mobileNumber    String
+  categoryId      Int?
+  subCategoryId   Int?
+  salesPersonName String?
+  status          String    @default("pending")
+  assignedTo      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  category    Category? @relation("ContactCategory", fields: [categoryId], references: [id])
+  subCategory Category? @relation("ContactSubCategory", fields: [subCategoryId], references: [id])
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, mobileNumber])
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@index([status])
+}
+
+model GalleryImage {
+  id            Int       @id @default(autoincrement())
+  vendorId      String
+  categoryId    Int?
+  subCategoryId Int?
+  title         String?
+  description   String?
+  s3Url         String
+  s3Key         String?   // S3 object key for deletion
+  price         Float?
+  priceCurrency String?   @default("USD")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  category    Category? @relation("GalleryCategory", fields: [categoryId], references: [id])
+  subCategory Category? @relation("GallerySubCategory", fields: [subCategoryId], references: [id])
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([subCategoryId])
 }
 
 model Conversation {
@@ -335,3 +423,4 @@ model MessageDelivery {
 
   @@unique([messageMediaId, conversationId])
 }
+

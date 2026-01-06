@@ -17,8 +17,8 @@ async function main() {
   // 2️⃣ Create users linked to vendor
   const users = [
     {
-      email: "gauravrai3133@gmail.com",
-      name: "Gaurav Rai",
+      email: "sohamsawalakhe@gmail.com",
+      name: "Soham Sawalakhe",
       role: "vendor_owner",
     },
     {
