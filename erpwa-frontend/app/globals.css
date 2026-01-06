@@ -221,3 +221,9 @@ input:-webkit-autofill:active {
 .toast-progress {
   background: var(--color-primary);
 }
+
+
+/* globals.css */
+.scrollbar-stable {
+  scrollbar-gutter: stable;
+}

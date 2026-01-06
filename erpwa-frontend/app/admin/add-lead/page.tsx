@@ -1,321 +1,144 @@
-"use client";
+"use client"
 
-import { useEffect, useState, useRef } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
-import * as XLSX from "xlsx";
-import api from "@/lib/api";
+import { useState } from "react"
+import { motion } from "framer-motion"
+import { Card } from "@/components/card"
+import { Button } from "@/components/button"
+import { Input } from "@/components/input"
+import { Badge } from "@/components/badge"
+import { Plus, Trash2 } from "lucide-react"
 
-/* ================= Types ================= */
-type Lead = {
-  id: string;
-  companyName: string | null;
-  email: string | null;
-  phoneNumber: string;
-  city: string | null;
-  category: string;
-  subcategory: string | null;
-};
+export default function AddLead() {
+  const [leads, setLeads] = useState([
+    { id: 1, name: "Acme Corp", email: "contact@acme.com", phone: "+1 (555) 123-4567", category: "Enterprise" },
+    { id: 2, name: "Tech Start", email: "hello@techstart.com", phone: "+1 (555) 234-5678", category: "Startup" },
+  ])
 
-/* ================= Component ================= */
-export default function LeadsPage() {
-  /* ---------- State ---------- */
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "", category: "Standard" })
 
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [subcategoryFilter, setSubcategoryFilter] = useState("all");
-
-  const [form, setForm] = useState({
-    companyName: "",
-    email: "",
-    phoneNumber: "",
-    city: "",
-    category: "standard",
-    subcategory: "",
-  });
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  /* ================= FETCH LEADS ================= */
-  const fetchLeads = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/leads");
-      setLeads(res.data || []);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch leads");
-    } finally {
-      setLoading(false);
+  const handleAddLead = () => {
+    if (formData.name && formData.email && formData.phone) {
+      setLeads([
+        ...leads,
+        {
+          id: Date.now(),
+          ...formData,
+        },
+      ])
+      setFormData({ name: "", email: "", phone: "", category: "Standard" })
     }
-  };
+  }
 
-  /* ================= CREATE LEAD ================= */
-  const handleAddLead = async () => {
-    if (!form.phoneNumber) {
-      toast.error("Phone number is required");
-      return;
-    }
+  const handleDeleteLead = (id: number) => {
+    setLeads(leads.filter((l) => l.id !== id))
+  }
 
-    try {
-      setLoading(true);
-      await api.post("/leads", {
-        companyName: form.companyName || null,
-        email: form.email || null,
-        phoneNumber: form.phoneNumber,
-        city: form.city || null,
-        category: form.category,
-        subcategory: form.subcategory || null,
-      });
-
-      toast.success("Lead added");
-      setForm({
-        companyName: "",
-        email: "",
-        phoneNumber: "",
-        city: "",
-        category: "standard",
-        subcategory: "",
-      });
-
-      fetchLeads();
-      await api.post("/leads/revalidate");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to create lead");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ================= DELETE LEAD ================= */
-  const handleDelete = async (id: string) => {
-    try {
-      setLoading(true);
-      await api.delete(`/leads/${id}`);
-      setLeads((prev) => prev.filter((l) => l.id !== id));
-      toast.success("Lead deleted");
-      await api.post("/leads/revalidate");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to delete lead");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ================= EXCEL UPLOAD ================= */
-  const handleExcelUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setLoading(true);
-
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(sheet);
-
-      const payload = rows
-        .filter((r) => r.phoneNumber)
-        .map((r) => ({
-          companyName: r.companyName ?? null,
-          email: r.email ?? null,
-          phoneNumber: String(r.phoneNumber),
-          city: r.city ?? null,
-          category: r.category ?? "standard",
-          subcategory: r.subcategory ?? null,
-        }));
-
-      if (!payload.length) {
-        toast.error("No valid rows found");
-        return;
-      }
-
-      await api.post("/leads/bulk", { leads: payload });
-      toast.success(`${payload.length} leads imported`);
-      fetchLeads();
-    } catch (err) {
-      console.error(err);
-      toast.error("Excel import failed");
-    } finally {
-      setLoading(false);
-      e.target.value = "";
-    }
-  };
-
-  /* ================= FILTERED LEADS ================= */
-  const filteredLeads = leads.filter((lead) => {
-    const categoryMatch =
-      categoryFilter === "all" || lead.category === categoryFilter;
-
-    const subcategoryMatch =
-      subcategoryFilter === "all" ||
-      lead.subcategory === subcategoryFilter;
-
-    return categoryMatch && subcategoryMatch;
-  });
-
-  /* ================= LOAD ================= */
-  useEffect(() => {
-    fetchLeads();
-  }, []);
-
-  /* ================= UI ================= */
   return (
-    <>
-      <Toaster position="top-right" />
+    <div className="flex-1 overflow-auto">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8 bg-background">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Add Lead</h1>
+          <p className="text-sm text-muted-foreground mt-2">Add new leads to the system</p>
+        </motion.div>
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ================= LEFT: ADD LEAD ================= */}
-        <div className="bg-slate-900 rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold">New Lead</h2>
-
-          <input
-            className="w-full p-2 rounded bg-slate-800"
-            placeholder="Company name"
-            value={form.companyName}
-            onChange={(e) =>
-              setForm({ ...form, companyName: e.target.value })
-            }
-          />
-
-          <input
-            className="w-full p-2 rounded bg-slate-800"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) =>
-              setForm({ ...form, email: e.target.value })
-            }
-          />
-
-          <input
-            className="w-full p-2 rounded bg-slate-800"
-            placeholder="+15550000001"
-            value={form.phoneNumber}
-            onChange={(e) =>
-              setForm({ ...form, phoneNumber: e.target.value })
-            }
-          />
-
-          <input
-            className="w-full p-2 rounded bg-slate-800"
-            placeholder="City"
-            value={form.city}
-            onChange={(e) =>
-              setForm({ ...form, city: e.target.value })
-            }
-          />
-
-          <input
-            className="w-full p-2 rounded bg-slate-800"
-            placeholder="Subcategory (mens_wear, kids)"
-            value={form.subcategory}
-            onChange={(e) =>
-              setForm({ ...form, subcategory: e.target.value })
-            }
-          />
-
-          <select
-            className="w-full p-2 rounded bg-slate-800"
-            value={form.category}
-            onChange={(e) =>
-              setForm({ ...form, category: e.target.value })
-            }
-          >
-            <option value="standard">Standard</option>
-            <option value="enterprise">Enterprise</option>
-            <option value="startup">Startup</option>
-          </select>
-
-          <button
-            onClick={handleAddLead}
-            disabled={loading}
-            className="w-full bg-green-500 text-black font-medium p-2 rounded flex items-center justify-center gap-2"
-          >
-            <Plus size={16} /> Add Lead
-          </button>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleExcelUpload}
-            className="hidden"
-          />
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading}
-            className="w-full bg-blue-500 text-white p-2 rounded"
-          >
-            Upload Excel
-          </button>
-        </div>
-
-        {/* ================= RIGHT: LEADS LIST ================= */}
-        <div className="lg:col-span-2 bg-slate-900 rounded-xl p-6">
-          <div className="flex gap-3 mb-4">
-            <select
-              className="bg-slate-800 p-2 rounded"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-            >
-              <option value="all">All Categories</option>
-              <option value="standard">Standard</option>
-              <option value="enterprise">Enterprise</option>
-              <option value="startup">Startup</option>
-            </select>
-
-            <select
-              className="bg-slate-800 p-2 rounded"
-              value={subcategoryFilter}
-              onChange={(e) => setSubcategoryFilter(e.target.value)}
-            >
-              <option value="all">All Subcategories</option>
-              <option value="mens_wear">Mens Wear</option>
-              <option value="kids">Kids</option>
-              <option value="retail">Retail</option>
-            </select>
-          </div>
-
-          <h2 className="text-lg font-semibold mb-4">
-            All Leads ({filteredLeads.length})
-          </h2>
-
-          <div className="space-y-3">
-            {filteredLeads.map((lead) => (
-              <div
-                key={lead.id}
-                className="bg-slate-800 p-4 rounded flex justify-between"
-              >
-                <div>
-                  <p className="font-medium">
-                    {lead.companyName || lead.phoneNumber}
-                  </p>
-                  <p className="text-sm text-slate-400">{lead.email}</p>
-                  <p className="text-sm text-slate-400">
-                    {lead.city} • {lead.phoneNumber}
-                  </p>
-                  <p className="text-xs mt-1">
-                    {lead.category}
-                    {lead.subcategory && ` • ${lead.subcategory}`}
-                  </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Form */}
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+            <Card className="p-4 md:p-6 bg-card border-border">
+              <h3 className="text-base md:text-lg font-semibold text-foreground mb-4">New Lead</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Company Name</label>
+                  <Input
+                    placeholder="Company name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
                 </div>
 
-                <button onClick={() => handleDelete(lead.id)}>
-                  <Trash2 size={16} className="text-red-400" />
-                </button>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="contact@company.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Phone</label>
+                  <Input
+                    placeholder="+1 (555) 000-0000"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  >
+                    <option>Standard</option>
+                    <option>Enterprise</option>
+                    <option>Startup</option>
+                  </select>
+                </div>
+
+                <Button
+                  onClick={handleAddLead}
+                  className="w-full"
+                  disabled={!formData.name || !formData.email || !formData.phone}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Lead
+                </Button>
               </div>
-            ))}
-          </div>
+            </Card>
+          </motion.div>
+
+          {/* Leads List */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-2"
+          >
+            <Card className="p-4 md:p-6 bg-card border-border">
+              <h3 className="text-base md:text-lg font-semibold text-foreground mb-4">All Leads ({leads.length})</h3>
+              <div className="space-y-3">
+                {leads.map((lead, index) => (
+                  <motion.div
+                    key={lead.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="p-4 bg-card border border-border rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-primary/50 transition-all"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground">{lead.name}</p>
+                      <p className="text-sm text-muted-foreground break-words">{lead.email}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant="outline">{lead.category}</Badge>
+                        <span className="text-xs text-muted-foreground">{lead.phone}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteLead(lead.id)}
+                      className="p-2 hover:bg-destructive/10 rounded-lg transition-colors self-end sm:self-auto"
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
         </div>
       </div>
-    </>
-  );
+    </div>
+  )
 }

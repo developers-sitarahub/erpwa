@@ -16,7 +16,7 @@ const router = express.Router();
 router.post(
   "/",
   authenticate,
-  requireRoles(["vendor_owner"]),
+  requireRoles(["vendor_owner", "vendor_admin"]),
   asyncHandler(async (req, res) => {
     const {
       metaTemplateName,
@@ -28,52 +28,115 @@ router.post(
       buttons = [],
     } = req.body;
 
+    /* ===============================
+       1️⃣ Basic validation
+       =============================== */
     if (!metaTemplateName || !category || !language || !body) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
-
-    if (buttons.length > 2) {
-      return res.status(400).json({ message: "Max 2 buttons allowed" });
-    }
-
-    const template = await prisma.template.create({
-      data: {
-        vendorId: req.user.vendorId,
-        metaTemplateName,
-        displayName,
-        category,
-        status: "draft",
-      },
-    });
-
-    const templateLanguage = await prisma.templateLanguage.create({
-      data: {
-        templateId: template.id,
-        language,
-        body,
-        footerText,
-        metaStatus: "draft",
-      },
-    });
-
-    for (let i = 0; i < buttons.length; i++) {
-      const btn = buttons[i];
-
-      await prisma.templateButton.create({
-        data: {
-          templateId: template.id,
-          type: btn.type,
-          text: btn.text,
-          position: i,
-          value:
-            btn.type === "URL" || btn.type === "PHONE_NUMBER"
-              ? btn.value
-              : null,
-        },
+      return res.status(400).json({
+        message: "metaTemplateName, category, language and body are required",
       });
     }
 
-    res.json({ template, language: templateLanguage });
+    if (buttons.length > 2) {
+      return res.status(400).json({
+        message: "WhatsApp allows a maximum of 2 buttons",
+      });
+    }
+
+    /* ===============================
+       2️⃣ Button validation (CRITICAL)
+       =============================== */
+    for (const [index, btn] of buttons.entries()) {
+      if (!btn.type || !btn.text) {
+        return res.status(400).json({
+          message: `Button ${index + 1} must have type and text`,
+        });
+      }
+
+      if (btn.type === "URL") {
+        if (!btn.value) {
+          return res.status(400).json({
+            message: "URL button requires a value",
+          });
+        }
+
+        // Meta rule: only {{1}} allowed and must be at the end
+        if (/\{\{\d+\}\}/.test(btn.value) && !btn.value.endsWith("{{1}}")) {
+          return res.status(400).json({
+            message: "CTA URL can only contain {{1}} at the end",
+            invalidUrl: btn.value,
+          });
+        }
+      }
+
+      if (btn.type === "QUICK_REPLY" && btn.value) {
+        return res.status(400).json({
+          message: "Quick reply buttons must not contain value",
+        });
+      }
+    }
+
+    /* ===============================
+       3️⃣ Transaction-safe creation
+       =============================== */
+    const result = await prisma.$transaction(async (tx) => {
+      // Create template
+      const template = await tx.template.create({
+        data: {
+          vendorId: req.user.vendorId,
+          metaTemplateName,
+          displayName,
+          category,
+          status: "draft",
+        },
+      });
+
+      // Create language
+      const templateLanguage = await tx.templateLanguage.create({
+        data: {
+          templateId: template.id,
+          language,
+          body,
+          footerText,
+          metaStatus: "draft",
+        },
+      });
+
+      // Create buttons
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = buttons[i];
+
+        await tx.templateButton.create({
+          data: {
+            type: btn.type,
+            text: btn.text,
+            position: i,
+
+            // 🔑 THIS IS THE KEY FIX
+            value:
+              btn.type === "URL" || btn.type === "PHONE" ? btn.value : null,
+
+            template: {
+              connect: { id: template.id },
+            },
+          },
+        });
+      }
+
+      return template;
+    });
+
+    /* ===============================
+       4️⃣ Success response
+       =============================== */
+    res.status(201).json({
+      success: true,
+      template: {
+        id: result.id,
+        metaTemplateName: result.metaTemplateName,
+        status: result.status,
+      },
+    });
   })
 );
 
@@ -111,52 +174,15 @@ router.post(
       return res.status(400).json({ message: "Template language missing" });
     }
 
-    /**
-     * ===============================
-     * CTA URL VALIDATION (META RULE)
-     * ===============================
-     */
-    for (const b of template.buttons) {
-      if (b.type !== "URL") continue;
-
-      const vars = b.value?.match(/\{\{\d+\}\}/g) || [];
-
-      if (vars.length === 0) continue;
-      if (vars.length === 1 && b.value.endsWith("{{1}}")) continue;
-
-      return res.status(400).json({
-        message: "CTA URL can only contain {{1}} at the end",
-        invalidUrl: b.value,
-      });
-    }
-
     const accessToken = decrypt(template.vendor.whatsappAccessToken);
 
-    /**
-     * ===============================
-     * VARIABLE HANDLING (CRITICAL)
-     * ===============================
-     */
-    const bodyVars = language.body.match(/\{\{\d+\}\}/g) || [];
-    const bodyVarCount = bodyVars.length;
-
-    const bodyComponent = {
-      type: "BODY",
-      text: language.body,
-    };
-
-    // ✅ REQUIRED BY META WHEN VARIABLES EXIST
-    if (bodyVarCount > 0) {
-      bodyComponent.example = {
-        body_text: [
-          Array.from({ length: bodyVarCount }).map(
-            (_, i) => `Example ${i + 1}`
-          ),
-        ],
-      };
-    }
-
-    const components = [bodyComponent];
+    // Build Meta components
+    const components = [
+      {
+        type: "BODY",
+        text: language.body,
+      },
+    ];
 
     if (language.footerText) {
       components.push({
@@ -165,46 +191,20 @@ router.post(
       });
     }
 
-    if (template.buttons.length > 0) {
+    if (template.buttons.length) {
       components.push({
         type: "BUTTONS",
-        buttons: template.buttons.map((b) => {
-          if (b.type === "URL") {
-            const hasVar = /\{\{\d+\}\}/.test(b.value);
-
-            return {
-              type: "URL",
-              text: b.text,
-              url: b.value,
-              ...(hasVar && {
-                example: ["TRACK123"],
-              }),
-            };
-          }
-
-          if (b.type === "PHONE_NUMBER") {
-            return {
-              type: "PHONE_NUMBER",
-              text: b.text,
-              phone_number: b.value,
-            };
-          }
-
-          return {
-            type: "QUICK_REPLY",
-            text: b.text,
-          };
-        }),
+        buttons: template.buttons.map((b) => ({
+          type: b.type,
+          text: b.text,
+          ...(b.type === "URL" && { url: b.value }),
+          ...(b.type === "PHONE" && { phone_number: b.value }),
+        })),
       });
     }
 
-    /**
-     * ===============================
-     * SUBMIT TO META
-     * ===============================
-     */
     const metaResp = await fetch(
-      `https://graph.facebook.com/v19.0/${template.vendor.whatsappBusinessId}/message_templates`,
+      `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates`,
       {
         method: "POST",
         headers: {
@@ -226,7 +226,7 @@ router.post(
       const reason =
         metaData?.error?.error_user_msg ||
         metaData?.error?.message ||
-        "Template rejected by Meta";
+        "Meta rejected the template at submission";
 
       await prisma.templateLanguage.update({
         where: { id: language.id },
@@ -241,7 +241,10 @@ router.post(
         data: { status: "rejected" },
       });
 
-      return res.status(400).json({ message: reason });
+      return res.status(400).json({
+        message: "Meta template submission failed",
+        metaReason: reason,
+      });
     }
 
     await prisma.templateLanguage.update({
@@ -258,15 +261,16 @@ router.post(
     });
 
     res.json({
-      message: "Template submitted successfully",
+      message: "Template submitted to Meta",
       metaTemplateId: metaData.id,
+      status: "pending",
     });
   })
 );
 
 /**
  * ===============================
- * LIST TEMPLATES
+ * GET ALL VENDOR TEMPLATES
  * ===============================
  */
 router.get(

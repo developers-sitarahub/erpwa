@@ -18,11 +18,9 @@ import {
   CheckCheck,
   Clock,
   AlertCircle,
-  Star,
-  Archive,
-  Trash2,
   MessageSquareIcon,
 } from "lucide-react";
+import Image from "next/image";
 
 /* =======================
    UI MODELS (UNCHANGED)
@@ -36,7 +34,10 @@ interface Message {
   // 👇 ADD THIS (frontend only)
   replyTo?: {
     sender: "customer" | "executive";
-    text: string;
+    text?: string;
+    mediaUrl?: string;
+    mimeType?: string;
+    caption?: string;
   };
 
   text?: string;
@@ -45,7 +46,7 @@ interface Message {
   caption?: string;
   sender: "customer" | "executive";
   timestamp: string;
-  status?: "sent" | "delivered" | "read" | "failed";
+  status?: "sent" | "delivered" | "read" | "failed" | "received";
 }
 
 interface Conversation {
@@ -54,10 +55,16 @@ interface Conversation {
   phone: string;
   lastMessage: string;
   lastActivity: string;
-  businessHoursRemaining?: string;
+
+  // ✅ NEW (required)
+  lastMessageDirection?: "inbound" | "outbound";
+  lastMessageStatus?: "sent" | "delivered" | "read" | "received" | "failed";
+  unreadCount?: number;
+
   hasUnread?: boolean;
   isPinned?: boolean;
-  tags?: string[];
+  businessHoursRemaining?: string;
+  templateRequired?: boolean;
 }
 
 /* =======================
@@ -81,6 +88,8 @@ interface ApiConversation {
 
 interface ApiMessage {
   id: string;
+  whatsappMessageId?: string;
+  replyToMessageId?: string;
   content: string;
   direction: "inbound" | "outbound";
   status?: "sent" | "delivered" | "read" | "failed";
@@ -90,6 +99,29 @@ interface ApiMessage {
 /* =======================
    CONVERSATION LIST (UI UNCHANGED)
 ======================= */
+
+const getConversationTick = (
+  direction?: "inbound" | "outbound",
+  status?: "sent" | "delivered" | "read" | "failed" | "received"
+) => {
+  // 🔒 HARD RULE: ticks ONLY for outbound
+  if (direction !== "outbound") return null;
+
+  switch (status) {
+    case "sent":
+      return <Check className="w-4 h-4 text-muted-foreground" />;
+    case "delivered":
+      return <CheckCheck className="w-4 h-4 text-muted-foreground" />;
+    case "read":
+      return <CheckCheck className="w-4 h-4 text-blue-500" />;
+    case "failed":
+      return <AlertCircle className="w-4 h-4 text-destructive" />;
+    case "received":
+      return <CheckCheck className="w-4 h-4 text-muted-foreground" />;
+    default:
+      return null;
+  }
+};
 
 function ConversationList({
   conversations,
@@ -165,20 +197,32 @@ function ConversationList({
                     {conv.lastActivity}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <p
-                    className={`text-sm truncate pr-2 ${
-                      conv.hasUnread
-                        ? "font-medium text-foreground"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {conv.lastMessage}
-                  </p>
+                <div className="flex items-center justify-between gap-2">
+                  {/* LEFT: tick + message text */}
+                  <div className="flex items-center gap-1 min-w-0">
+                    {getConversationTick(
+                      conv.lastMessageDirection,
+                      conv.lastMessageStatus
+                    )}
 
-                  {conv.isPinned && (
-                    <Star className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                  )}
+                    <p
+                      className={`text-sm truncate ${
+                        conv.hasUnread
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {conv.lastMessage}
+                    </p>
+                  </div>
+
+                  {/* RIGHT: unread badge (ONLY if last message is inbound) */}
+                  {conv.lastMessageDirection === "inbound" &&
+                    conv.unreadCount! > 0 && (
+                      <span className="ml-2 min-w-[20px] h-5 px-2 rounded-full bg-primary text-white text-xs flex items-center justify-center">
+                        {conv.unreadCount}
+                      </span>
+                    )}
                 </div>
               </div>
             </div>
@@ -193,25 +237,58 @@ function ChatArea({
   conversation,
   messages,
   setMessages,
+  readSentRef,
   onBack,
 }: {
   conversation: Conversation;
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  readSentRef: React.MutableRefObject<Set<string>>;
   onBack?: () => void;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [actionMenu, setActionMenu] = useState<{
     message: Message;
     rect: DOMRect;
   } | null>(null);
 
+  const [imagePreview, setImagePreview] = useState<{
+    files: File[];
+    urls: string[];
+    caption: string;
+  } | null>(null);
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+
+    const files = Array.from(e.target.files);
+    const urls = files.map((f) => URL.createObjectURL(f));
+
+    setImagePreview({
+      files,
+      urls,
+      caption: "",
+    });
+
+    setMediaModal(null);
+    e.target.value = "";
+  };
+
   const [copied, setCopied] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+
+  type ImageMode = "single" | "bulk";
+  const [imageMode, setImageMode] = useState<ImageMode>("single");
+
+  const [mediaModal, setMediaModal] = useState<{
+    type: "image" | "video" | "audio" | "document" | "template";
+  } | null>(null);
+
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const genericInputRef = useRef<HTMLInputElement | null>(null);
 
   const copyMessage = async (message: Message): Promise<boolean> => {
     try {
@@ -236,6 +313,30 @@ function ChatArea({
     }
   };
 
+  const sendImageFromPreview = async () => {
+    if (!imagePreview) return;
+
+    try {
+      for (const file of imagePreview.files) {
+        const form = new FormData();
+        form.append("conversationId", conversation.id);
+        form.append("file", file);
+        if (imagePreview.caption) {
+          form.append("caption", imagePreview.caption);
+        }
+
+        await api.post("/vendor/whatsapp/send-media", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      setImagePreview(null);
+    } catch (err) {
+      console.error("Image send failed", err);
+      alert("Failed to send image");
+    }
+  };
+
   const getMessageStatusIcon = (status?: string) => {
     if (!status) return null;
     if (status === "sent") return <Check className="w-4 h-4" />;
@@ -246,25 +347,55 @@ function ChatArea({
       return <AlertCircle className="w-4 h-4 text-destructive" />;
     return null;
   };
+
   useEffect(() => {
     if (!conversation?.id) return;
 
     const socket = getSocket();
 
-    if (socket.connected) {
-      socket.emit("join-conversation", conversation.id);
-    } else {
-      const onConnect = () => {
-        socket.emit("join-conversation", conversation.id);
-        socket.off("connect", onConnect);
-      };
-      socket.on("connect", onConnect);
-    }
+    const maybeMarkRead = async () => {
+      if (document.visibilityState !== "visible") return;
+      if (readSentRef.current.has(conversation.id)) return;
+
+      // ✅ ALWAYS notify backend when chat is opened
+      readSentRef.current.add(conversation.id);
+
+      try {
+        await api.post(`/inbox/${conversation.id}/mark-read`);
+      } catch {
+        readSentRef.current.delete(conversation.id);
+      }
+    };
+
+    socket.emit("join-conversation", conversation.id);
+
+    // Run once after render
+    requestAnimationFrame(maybeMarkRead);
+
+    // Re-run when tab becomes visible
+    document.addEventListener("visibilitychange", maybeMarkRead);
 
     return () => {
       socket.emit("leave-conversation", conversation.id);
+      document.removeEventListener("visibilitychange", maybeMarkRead);
     };
   }, [conversation.id]);
+
+  useEffect(() => {
+    if (!conversation?.id) return;
+    if (document.visibilityState !== "visible") return;
+
+    if (!readSentRef.current.has(conversation.id)) {
+      requestAnimationFrame(async () => {
+        try {
+          readSentRef.current.add(conversation.id);
+          await api.post(`/inbox/${conversation.id}/mark-read`);
+        } catch {
+          readSentRef.current.delete(conversation.id);
+        }
+      });
+    }
+  }, [messages.length, conversation.id]);
 
   useEffect(() => {
     if (!conversation?.id) return;
@@ -273,33 +404,14 @@ function ChatArea({
 
     const handleNewMessage = (msg: Message) => {
       setMessages((prev) => {
-        // 🔁 Replace optimistic message
-        if (msg.sender === "executive" && msg.whatsappMessageId) {
-          const optimisticIndex = prev.findIndex(
-            (m) => m.id.startsWith("temp-") && m.whatsappMessageId === m.id
-          );
-
-          if (optimisticIndex !== -1) {
-            const copy = [...prev];
-            const existing = copy[optimisticIndex];
-
-            copy[optimisticIndex] = {
-              ...msg,
-              status: "sent",
-
-              // ✅ KEEP THE REPLY SNAPSHOT
-              replyTo: existing.replyTo,
-              replyToMessageId: existing.replyToMessageId,
-            };
-
-            return copy;
-          }
-        }
-
-        // ➕ Add if not exists
         const exists = prev.some((m) => m.id === msg.id);
         return exists ? prev : [...prev, msg];
       });
+
+      if (msg.sender === "customer" && document.visibilityState === "visible") {
+        // allow read receipt to be sent again
+        readSentRef.current.delete(conversation.id);
+      }
     };
 
     const STATUS_PRIORITY = {
@@ -307,6 +419,7 @@ function ChatArea({
       sent: 1,
       delivered: 2,
       read: 3,
+      received: 2,
     };
 
     const handleStatusUpdate = ({
@@ -370,29 +483,6 @@ function ChatArea({
     setInputValue("");
     setSending(true);
 
-    const tempId = `temp-${Date.now()}`;
-
-    const optimisticMessage: Message = {
-      id: tempId,
-      whatsappMessageId: tempId,
-      text,
-      sender: "executive",
-      timestamp: new Date().toISOString(),
-      status: "sent",
-      replyToMessageId: replyTo?.whatsappMessageId,
-
-      // 👇 SNAPSHOT OF ORIGINAL MESSAGE
-      replyTo: replyTo
-        ? {
-            sender: replyTo.sender,
-            text: replyTo.text || "",
-          }
-        : undefined,
-    };
-
-    // optimistic update
-    setMessages((prev) => [...prev, optimisticMessage]);
-
     try {
       await api.post("/vendor/whatsapp/send-message", {
         conversationId: conversation.id,
@@ -401,17 +491,10 @@ function ChatArea({
       });
 
       setReplyTo(null);
-
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-      });
+      requestAnimationFrame(() => inputRef.current?.focus());
     } catch (err) {
       console.error("Failed to send message", err);
-
-      // mark failed safely
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m))
-      );
+      // optional: toast / snackbar
     } finally {
       setSending(false);
     }
@@ -442,8 +525,57 @@ function ChatArea({
   const isNewDay = (a: string, b: string) =>
     new Date(a).toDateString() !== new Date(b).toDateString();
 
+  const getReplyPreview = (m?: Message | Message["replyTo"]) => {
+    if (!m) return null;
+
+    // TEXT
+    if (m.text) {
+      return {
+        type: "text",
+        title: m.sender === "executive" ? "You" : conversation.customerName,
+        subtitle: m.text,
+      };
+    }
+
+    // IMAGE
+    if (m.mimeType?.startsWith("image/")) {
+      return {
+        type: "image",
+        title: m.sender === "executive" ? "You" : conversation.customerName,
+        subtitle: "Photo",
+        thumb: m.mediaUrl,
+      };
+    }
+
+    // VIDEO
+    if (m.mimeType?.startsWith("video/")) {
+      return {
+        type: "video",
+        title: m.sender === "executive" ? "You" : conversation.customerName,
+        subtitle: "Video",
+        thumb: m.mediaUrl,
+      };
+    }
+
+    // AUDIO
+    if (m.mimeType?.startsWith("audio/")) {
+      return {
+        type: "audio",
+        title: m.sender === "executive" ? "You" : conversation.customerName,
+        subtitle: "Voice message",
+      };
+    }
+
+    // DOCUMENT
+    return {
+      type: "document",
+      title: m.sender === "executive" ? "You" : conversation.customerName,
+      subtitle: "Document",
+    };
+  };
+
   return (
-    <div className="flex-1 flex flex-col bg-muted/20 relative h-full overflow-hidden">
+    <div className="flex-1 flex flex-col bg-muted/20 relative h-full">
       {/* Header */}
       <div className="relative z-10 bg-card px-4 py-2.5 flex items-center justify-between border-b border-border flex-shrink-0">
         {onBack && (
@@ -475,114 +607,8 @@ function ChatArea({
           </motion.button>
         </div>
       </div>
-
-      {/* Messages */}
-      <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-2">
-        <AnimatePresence>
-          {messages.map((msg, i) => {
-            const showDateSeparator =
-              i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
-
-            const repliedMessage =
-              msg.replyTo ??
-              messages.find(
-                (m) => m.whatsappMessageId === msg.replyToMessageId
-              );
-
-            return (
-              <div key={msg.id}>
-                {/* 📅 DATE SEPARATOR (WhatsApp style) */}
-                {showDateSeparator && (
-                  <div className="flex justify-center my-4">
-                    <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground shadow-sm">
-                      {getDateLabel(msg.timestamp)}
-                    </span>
-                  </div>
-                )}
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: i * 0.03 }}
-                  className={`flex items-end gap-2 ${
-                    msg.sender === "executive" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`group relative max-w-md px-3 py-2 shadow-sm ${
-                      msg.sender === "executive"
-                        ? "bg-primary/10 border border-primary/20 rounded-lg rounded-br-none"
-                        : "bg-card border border-border rounded-lg rounded-bl-none"
-                    }`}
-                  >
-                    {(msg.replyTo || repliedMessage) && (
-                      <div className="mb-1 px-2 py-1 border-l-4 border-primary bg-muted/50 rounded text-xs text-muted-foreground">
-                        <div className="font-medium">
-                          {(msg.replyTo ?? repliedMessage)?.sender ===
-                          "executive"
-                            ? "You"
-                            : conversation.customerName}
-                        </div>
-                        <div className="truncate">
-                          {(msg.replyTo ?? repliedMessage)?.text}
-                        </div>
-                      </div>
-                    )}
-
-                    <p className="text-sm text-foreground break-words leading-relaxed">
-                      {msg.text}
-                    </p>
-
-                    <div className="flex items-center gap-1 mt-1 justify-end">
-                      <span className="text-[10px] text-muted-foreground">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-
-                      {msg.sender === "executive" && (
-                        <span
-                          className={
-                            msg.status === "read"
-                              ? "text-blue-500"
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {getMessageStatusIcon(msg.status)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-
-                          setActionMenu({
-                            message: msg,
-                            rect,
-                          });
-                        }}
-                        className="p-1.5 rounded-full bg-card border shadow hover:bg-muted"
-                      >
-                        <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            );
-          })}
-        </AnimatePresence>
-
-        {/* 👇 Auto-scroll anchor */}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Footer */}
-      <div className="relative z-10 flex-shrink-0 bg-card border-t border-border">
-        {conversation.businessHoursRemaining && (
+      {conversation.businessHoursRemaining &&
+        !conversation.templateRequired && (
           <div className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2">
             <Clock className="w-4 h-4 text-yellow-600" />
             <span className="text-xs text-yellow-700">
@@ -591,7 +617,255 @@ function ChatArea({
             </span>
           </div>
         )}
+      {conversation.templateRequired && (
+        <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600" />
+          <span className="text-xs text-red-700">
+            24-hour window closed. Send a template message to start the
+            conversation.
+          </span>
+        </div>
+      )}
+      <div
+        className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 relative"
+        style={{
+          backgroundImage: "url('/chat-bg.png')",
+          backgroundRepeat: "repeat",
+          backgroundSize: "auto",
+          backgroundPosition: "center",
+        }}
+      >
+        {/* Messages */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 relative"
+          style={{
+            backgroundImage: "url('/chat-bg.png')",
+            backgroundRepeat: "repeat",
+            backgroundSize: "auto",
+            backgroundPosition: "center",
+          }}
+        >
+          <AnimatePresence>
+            {messages.map((msg, i) => {
+              const showDateSeparator =
+                i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
 
+              const repliedMessage =
+                msg.replyTo ??
+                messages.find(
+                  (m) => m.whatsappMessageId === msg.replyToMessageId
+                );
+              return (
+                <div key={msg.id}>
+                  {/* 📅 DATE SEPARATOR (WhatsApp style) */}
+                  {showDateSeparator && (
+                    <div className="flex justify-center my-4">
+                      <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground shadow-sm">
+                        {getDateLabel(msg.timestamp)}
+                      </span>
+                    </div>
+                  )}
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: i * 0.03 }}
+                    className={`flex items-end gap-2 ${
+                      msg.sender === "executive"
+                        ? "justify-end"
+                        : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`group relative
+                                  max-w-md
+                                  px-3 py-2
+                                  shadow-sm
+                                  ${
+                                    msg.sender === "executive"
+                                      ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none"
+                                      : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none"
+                                  }
+                                `}
+                    >
+                      {(() => {
+                        const reply = getReplyPreview(
+                          msg.replyTo ?? repliedMessage
+                        );
+                        if (!reply) return null;
+
+                        return (
+                          <div className="mb-1 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-[rgba(0,0,0,0.04)] dark:bg-[rgba(255,255,255,0.08)] rounded">
+                            {reply.thumb && (
+                              <div className="relative w-10 h-10 flex-shrink-0">
+                                <Image
+                                  src={reply.thumb}
+                                  alt=""
+                                  fill
+                                  sizes="40px"
+                                  className="rounded object-cover"
+                                />
+                              </div>
+                            )}
+
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium text-[#25D366] leading-tight">
+                                {reply.title}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate leading-tight">
+                                {reply.subtitle}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* 🖼 IMAGE */}
+                      {/* 🖼 IMAGE (WhatsApp style) */}
+                      {msg.mediaUrl && msg.mimeType?.startsWith("image/") && (
+                        <div className="mb-1">
+                          <div
+                            className="relative w-[320px] max-w-full aspect-[4/3] rounded-lg overflow-hidden cursor-pointer"
+                            onClick={() => window.open(msg.mediaUrl, "_blank")}
+                          >
+                            <Image
+                              src={msg.mediaUrl}
+                              alt="Image"
+                              fill
+                              sizes="(max-width: 768px) 90vw, 320px"
+                              className="object-cover"
+                            />
+                          </div>
+
+                          {msg.caption && (
+                            <p className="mt-1 text-sm text-foreground">
+                              {msg.caption}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 🎥 VIDEO (WhatsApp style) */}
+                      {msg.mediaUrl && msg.mimeType?.startsWith("video/") && (
+                        <div className="mb-1">
+                          <div className="w-[320px] max-w-full rounded-lg overflow-hidden bg-black">
+                            <video
+                              src={msg.mediaUrl}
+                              controls
+                              className="w-full h-auto"
+                            />
+                          </div>
+
+                          {msg.caption && (
+                            <p className="mt-1 text-sm text-foreground">
+                              {msg.caption}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 🎵 AUDIO (WhatsApp style) */}
+                      {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
+                        <div className="mb-1 w-[260px] max-w-full">
+                          <audio
+                            src={msg.mediaUrl}
+                            controls
+                            className="w-full h-10"
+                          />
+
+                          {msg.caption && (
+                            <p className="mt-1 text-sm text-foreground">
+                              {msg.caption}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 📄 DOCUMENT (WhatsApp style) */}
+                      {msg.mediaUrl &&
+                        msg.mimeType &&
+                        !msg.mimeType.startsWith("image/") &&
+                        !msg.mimeType.startsWith("video/") &&
+                        !msg.mimeType.startsWith("audio/") && (
+                          <a
+                            href={msg.mediaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-[260px] max-w-full flex items-center gap-3 p-3 rounded-lg border bg-muted hover:bg-muted/70"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                              📄
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {msg.mediaUrl.split("/").pop()}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Document
+                              </p>
+                            </div>
+                          </a>
+                        )}
+
+                      {/* 📝 TEXT MESSAGE */}
+                      {msg.text && (
+                        <p className="text-sm leading-[1.35] break-words whitespace-pre-wrap overflow-hidden">
+                          {msg.text}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-1 mt-1 justify-end">
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+
+                        {msg.sender === "executive" && (
+                          <span
+                            className={
+                              msg.status === "read"
+                                ? "text-blue-500"
+                                : "text-muted-foreground"
+                            }
+                          >
+                            {getMessageStatusIcon(msg.status)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            const rect =
+                              e.currentTarget.getBoundingClientRect();
+
+                            setActionMenu({
+                              message: msg,
+                              rect,
+                            });
+                          }}
+                          className="p-1.5 rounded-full bg-card border shadow hover:bg-muted"
+                        >
+                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+              );
+            })}
+          </AnimatePresence>
+
+          {/* 👇 Auto-scroll anchor */}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="relative z-10 flex-shrink-0 bg-card border-t border-border">
         {replyTo && (
           <div className="px-4 py-2 bg-muted/50 border-l-4 border-primary flex justify-between items-center">
             <div className="text-xs">
@@ -617,7 +891,10 @@ function ChatArea({
               <motion.button className="p-2 rounded-full hover:bg-muted">
                 <Smile className="w-5 h-5 text-muted-foreground" />
               </motion.button>
-              <motion.button className="p-2 rounded-full hover:bg-muted">
+              <motion.button
+                onClick={() => setShowAttachMenu((v) => !v)}
+                className="p-2 rounded-full hover:bg-muted"
+              >
                 <Paperclip className="w-5 h-5 text-muted-foreground" />
               </motion.button>
             </div>
@@ -626,11 +903,20 @@ function ChatArea({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Type a message"
+                disabled={conversation.templateRequired}
+                placeholder={
+                  conversation.templateRequired
+                    ? "Template message required"
+                    : "Type a message"
+                }
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  if (
+                    e.key === "Enter" &&
+                    !e.nativeEvent.isComposing &&
+                    !conversation.templateRequired
+                  ) {
                     e.preventDefault();
                     sendMessage();
                   }
@@ -639,7 +925,17 @@ function ChatArea({
               />
             </div>
 
-            {inputValue.trim() ? (
+            {conversation.templateRequired ? (
+              <motion.button
+                className="bg-primary text-white px-4 py-2 rounded-lg"
+                onClick={() => {
+                  // TODO: open template picker modal
+                  alert("Open template picker");
+                }}
+              >
+                Send Template
+              </motion.button>
+            ) : inputValue.trim() ? (
               <motion.button
                 onClick={sendMessage}
                 className="bg-primary text-white p-2.5 rounded-full"
@@ -654,6 +950,83 @@ function ChatArea({
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {showAttachMenu && (
+          <>
+            {/* Click outside */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowAttachMenu(false)}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              transition={{ duration: 0.15 }}
+              className="
+              absolute bottom-20 left-4 z-50
+              w-48
+              rounded-xl
+              shadow-2xl
+              py-2
+            bg-[#1f1f1f]
+            "
+            >
+              <AttachItem
+                icon={<span className="text-md">📝</span>}
+                label="Template"
+                color="#8b5cf6"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "template" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">🖼️</span>}
+                label="Photos"
+                color="#22c55e"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "image" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">📷</span>}
+                label="Videos"
+                color="#ef4444"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "video" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">🎧</span>}
+                label="Audio"
+                color="#f97316"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "audio" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">📄</span>}
+                label="Document"
+                color="#3b82f6"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "document" });
+                }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {actionMenu && (
           <>
@@ -734,6 +1107,257 @@ function ChatArea({
           Copied
         </motion.div>
       )}
+      <AnimatePresence>
+        {mediaModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 z-50 bg-black/60"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMediaModal(null)}
+            />
+
+            {/* Center Modal */}
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="
+          fixed z-50
+          top-1/2 left-1/2
+          -translate-x-1/2 -translate-y-1/2
+          w-[420px] max-w-[90vw]
+          bg-card
+          rounded-xl
+          shadow-2xl
+          p-6
+        "
+            >
+              <h3 className="text-lg font-semibold mb-2">
+                {mediaModal.type === "template"
+                  ? "Send Template"
+                  : "Send Media"}
+              </h3>
+
+              {/* IMAGE */}
+              {mediaModal.type === "image" && (
+                <div className="mt-4 space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold">Send Photos</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose how you want to send images
+                    </p>
+                  </div>
+
+                  {/* SEND MODE */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Send mode
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setImageMode("single")}
+                        className={`flex-1 py-2.5 rounded-lg ${
+                          imageMode === "single"
+                            ? "bg-primary text-white"
+                            : "bg-muted"
+                        }`}
+                      >
+                        Single
+                      </button>
+                      <button
+                        onClick={() => setImageMode("bulk")}
+                        className={`flex-1 py-2.5 rounded-lg ${
+                          imageMode === "bulk"
+                            ? "bg-primary text-white"
+                            : "bg-muted"
+                        }`}
+                      >
+                        Bulk
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DEVICE */}
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="rounded-xl border p-5 hover:bg-muted text-left"
+                  >
+                    <div className="text-3xl mb-2">📁</div>
+                    <p className="font-medium text-sm">Device</p>
+                  </button>
+
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple={imageMode === "bulk"}
+                    className="hidden"
+                    onChange={handleImageSelect}
+                  />
+                </div>
+              )}
+
+              {/* VIDEO */}
+              {mediaModal.type === "video" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Select videos
+                </p>
+              )}
+
+              {/* AUDIO */}
+              {mediaModal.type === "audio" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Select audio files
+                </p>
+              )}
+
+              {/* DOCUMENT */}
+              {mediaModal.type === "document" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Select documents
+                </p>
+              )}
+
+              {/* TEMPLATE */}
+              {mediaModal.type === "template" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Choose a WhatsApp template
+                </p>
+              )}
+
+              {/* Hidden file input */}
+              {mediaModal.type !== "template" && (
+                <>
+                  <input
+                    ref={genericInputRef}
+                    type="file"
+                    multiple
+                    accept={
+                      mediaModal.type === "video"
+                        ? "video/*"
+                        : mediaModal.type === "audio"
+                        ? "audio/*"
+                        : "*"
+                    }
+                    className="hidden"
+                    onChange={async (e) => {
+                      if (!e.target.files?.length) return;
+
+                      const files = Array.from(e.target.files);
+
+                      for (const file of files) {
+                        const form = new FormData();
+                        form.append("conversationId", conversation.id);
+                        form.append("file", file);
+
+                        await api.post("/vendor/whatsapp/send-media", form);
+                      }
+
+                      setMediaModal(null);
+                    }}
+                  />
+
+                  <button
+                    onClick={() => genericInputRef.current?.click()}
+                    className="w-full bg-primary text-white py-2 rounded-lg"
+                  >
+                    Choose Files
+                  </button>
+                </>
+              )}
+
+              {/* Template placeholder */}
+              {mediaModal.type === "template" && (
+                <button
+                  onClick={() => {
+                    alert("Template picker coming next");
+                    setMediaModal(null);
+                  }}
+                  className="w-full bg-primary text-white py-2 rounded-lg"
+                >
+                  Open Template Picker
+                </button>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {imagePreview && (
+          <>
+            {/* BACKDROP */}
+            <motion.div
+              className="fixed inset-0 z-50 bg-black"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+
+            {/* PREVIEW SCREEN */}
+            <motion.div
+              className="fixed inset-0 z-50 flex flex-col bg-black text-white"
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+            >
+              {/* HEADER */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <button onClick={() => setImagePreview(null)}>✕</button>
+                <span className="text-sm">
+                  {imagePreview.files.length} photo
+                  {imagePreview.files.length > 1 ? "s" : ""}
+                </span>
+              </div>
+
+              {/* MAIN IMAGE */}
+              <div className="flex-1 flex items-center justify-center">
+                <img
+                  src={imagePreview.urls[0]}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+
+              {/* THUMBNAILS */}
+              {imagePreview.urls.length > 1 && (
+                <div className="flex gap-2 px-4 py-2 overflow-x-auto">
+                  {imagePreview.urls.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      className="w-16 h-16 rounded object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* CAPTION + SEND */}
+              <div className="flex items-center gap-3 p-4">
+                <input
+                  placeholder="Add a caption…"
+                  value={imagePreview.caption}
+                  onChange={(e) =>
+                    setImagePreview((p) =>
+                      p ? { ...p, caption: e.target.value } : p
+                    )
+                  }
+                  className="flex-1 bg-white/10 px-4 py-2 rounded-full outline-none"
+                />
+
+                <button
+                  onClick={sendImageFromPreview}
+                  className="bg-primary w-12 h-12 rounded-full flex items-center justify-center"
+                >
+                  <Send className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -762,13 +1386,92 @@ function ActionButton({
     </button>
   );
 }
+function AttachItem({
+  icon,
+  label,
+  color,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="
+        w-full flex items-center gap-4
+        px-4 py-2
+        text-sm
+        text-white
+        hover:bg-white/10
+        transition-colors
+      "
+    >
+      <div
+        className="w-9 h-9 rounded-full flex items-center justify-center text-white"
+        style={{ backgroundColor: color }}
+      >
+        {icon}
+      </div>
+
+      <span className="font-normal">{label}</span>
+    </button>
+  );
+}
+
+const mapApiConversation = (c: ApiConversation): Conversation => {
+  const lastMsg = c.messages?.[c.messages.length - 1];
+
+  const unreadCount =
+    c.messages?.filter((m) => m.direction === "inbound" && m.status !== "read")
+      .length ?? 0;
+
+  return {
+    id: c.id,
+    customerName: c.lead.name || c.lead.phoneNumber,
+    phone: c.lead.phoneNumber,
+    lastMessage: (() => {
+      if (!lastMsg) return "";
+
+      if (lastMsg.content?.startsWith("[image")) return "📷 Photo";
+      if (lastMsg.content?.startsWith("[video")) return "🎥 Video";
+      if (lastMsg.content?.startsWith("[audio")) return "🎵 Audio";
+      if (lastMsg.content?.startsWith("[document")) return "📄 Document";
+
+      return lastMsg.content;
+    })(),
+    lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    lastMessageDirection: lastMsg?.direction,
+    lastMessageStatus: lastMsg?.status,
+    unreadCount,
+    hasUnread: unreadCount > 0,
+  };
+};
 
 export default function InboxPage() {
   const [selectedConversation, setSelectedConversation] = useState<string>("");
   const [showChat, setShowChat] = useState(false);
-
+  const readSentRef = useRef<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+
+  useEffect(() => {
+    const loadInbox = async () => {
+      try {
+        const res = await api.get<ApiConversation[]>("/inbox");
+        setConversations(res.data.map(mapApiConversation));
+      } catch (err) {
+        console.error("❌ Failed to load inbox", err);
+      }
+    };
+
+    loadInbox();
+  }, []);
 
   // 🔥 2️⃣ THEN LISTEN FOR INBOX UPDATES
   useEffect(() => {
@@ -778,26 +1481,7 @@ export default function InboxPage() {
       try {
         const res = await api.get<ApiConversation[]>("/inbox");
 
-        const mapped: Conversation[] = res.data.map((c: any) => {
-          const lastMsg = c.messages?.[c.messages.length - 1];
-
-          const hasUnread = c.messages?.some(
-            (m: any) =>
-              m.direction === "inbound" && (!m.status || m.status !== "read")
-          );
-
-          return {
-            id: c.id,
-            customerName: c.lead.name || c.lead.phoneNumber,
-            phone: c.lead.phoneNumber,
-            lastMessage: lastMsg?.content || "",
-            lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            hasUnread,
-          };
-        });
+        const mapped = res.data.map(mapApiConversation);
 
         setConversations(mapped);
       } catch (err) {
@@ -817,7 +1501,9 @@ export default function InboxPage() {
 
     const socket = getSocket();
 
-    socket.on("connect", () => {
+    socket.on("connect", async () => {
+      const res = await api.get<ApiConversation[]>("/inbox");
+      setConversations(res.data.map(mapApiConversation));
       console.log("✅ SOCKET CONNECTED:", socket.id);
     });
 
@@ -837,79 +1523,60 @@ export default function InboxPage() {
   }, []);
 
   /* =======================
-     LOAD INBOX (BACKEND)
-  ======================= */
-  useEffect(() => {
-    const loadInbox = async () => {
-      try {
-        const res = await api.get<ApiConversation[]>("/inbox");
-
-        const mapped: Conversation[] = res.data.map((c: any) => {
-          const lastMsg = c.messages?.[c.messages.length - 1];
-
-          const hasUnread = c.messages?.some(
-            (m: any) =>
-              m.direction === "inbound" && (!m.status || m.status !== "read")
-          );
-
-          return {
-            id: c.id,
-            customerName: c.lead.name || c.lead.phoneNumber,
-            phone: c.lead.phoneNumber,
-            lastMessage: lastMsg?.content || "",
-            lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            hasUnread, // 👈 HERE
-            tags: [],
-            businessHoursRemaining: undefined,
-          };
-        });
-
-        setConversations(mapped);
-      } catch (err) {
-        console.error("Failed to load inbox", err);
-        setConversations([]);
-      }
-    };
-
-    loadInbox();
-  }, []);
-
-  /* =======================
      SELECT CONVERSATION
   ======================= */
   const handleSelectConversation = async (id: string) => {
+    readSentRef.current.delete(id);
+
     setMessages([]);
     setSelectedConversation(id);
     setShowChat(true);
 
     try {
-      const res = await api.get<{ messages: ApiMessage[] }>(`/inbox/${id}`);
+      const res = await api.get(`/inbox/${id}`);
 
-      const mappedMessages: Message[] = res.data.messages.map((m: any) => ({
-        id: m.id,
-        whatsappMessageId: m.whatsappMessageId,
-        replyToMessageId: m.replyToMessageId,
-        text: m.content,
-        sender: m.direction === "outbound" ? "executive" : "customer",
-        timestamp: m.createdAt,
-        status: m.status,
-      }));
+      const mappedMessages: Message[] = res.data.messages.map((m: any) => {
+        const media = m.media?.[0]; // WhatsApp = 1 media per message
+
+        return {
+          id: m.id,
+          whatsappMessageId: m.whatsappMessageId,
+          replyToMessageId: m.replyToMessageId,
+
+          // TEXT
+          text: media ? undefined : m.content,
+
+          // MEDIA
+          mediaUrl: media?.mediaUrl,
+          mimeType: media?.mimeType,
+          caption: media?.caption,
+
+          sender: m.direction === "outbound" ? "executive" : "customer",
+          timestamp: m.createdAt,
+          status: m.status ?? "delivered",
+        };
+      });
 
       setMessages((prev) => {
-        const existingIds = new Set(prev.map((m) => m.id));
-        const merged = [...prev];
-
-        mappedMessages.forEach((m) => {
-          if (!existingIds.has(m.id)) {
-            merged.push(m);
-          }
-        });
-
-        return merged;
+        const map = new Map(prev.map((m) => [m.id, m]));
+        mappedMessages.forEach((m) => map.set(m.id, m));
+        return Array.from(map.values()).sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
       });
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                businessHoursRemaining: res.data.businessHoursRemaining,
+                templateRequired: res.data.templateRequired,
+              }
+            : c
+        )
+      );
     } catch (err) {
       console.error("Failed to load conversation", err);
       setMessages([]);
@@ -941,6 +1608,7 @@ export default function InboxPage() {
             conversation={currentConversation}
             messages={messages}
             setMessages={setMessages}
+            readSentRef={readSentRef}
             onBack={() => setShowChat(false)}
           />
         ) : (

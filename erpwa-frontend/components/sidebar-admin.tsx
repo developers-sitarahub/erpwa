@@ -14,9 +14,6 @@ import {
   ChevronRight,
   Menu,
   X,
-  FolderTree,
-  Target,
-  Images,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/context/sidebar-provider"
@@ -41,9 +38,6 @@ export function SidebarAdmin() {
     { href: "/admin/inbox", icon: MessageSquare, label: "Inbox" },
     { href: "/admin/create-template", icon: FileText, label: "Templates" },
     { href: "/admin/add-lead", icon: UserPlus, label: "Add Lead" },
-    { href: "/admin/categories", icon: FolderTree, label: "Categories" },
-    { href: "/admin/leads", icon: Target, label: "Leads" },
-    { href: "/admin/gallery", icon: Images, label: "Gallery" },
     { href: "/admin/manage-team", icon: Users, label: "Manage Team" },
     { href: "/admin/setup", icon: MessageSquare, label: "Setup" },
     { href: "/admin/settings", icon: Settings, label: "Settings" },

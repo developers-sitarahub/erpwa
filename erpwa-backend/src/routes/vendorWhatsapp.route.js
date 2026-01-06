@@ -35,7 +35,7 @@ router.post(
 
     // 2️⃣ Validate credentials with Meta API
     const metaResp = await fetch(
-      `https://graph.facebook.com/v19.0/${whatsappPhoneNumberId}?fields=display_phone_number`,
+      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number`,
       {
         headers: {
           Authorization: `Bearer ${whatsappAccessToken}`,
