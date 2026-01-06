@@ -88,7 +88,7 @@ router.post(
        6️⃣ Send message to WhatsApp
     =============================== */
     const response = await fetch(
-      `https://graph.facebook.com/v19.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
+      `https://graph.facebook.com/v24.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
       {
         method: "POST",
         headers: {

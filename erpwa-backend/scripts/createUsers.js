@@ -22,8 +22,8 @@ async function main() {
       role: "vendor_owner",
     },
     {
-      email: "robotg339@gmail.com",
-      name: "Robot G",
+      email: "pradhanpratik219@gmail.com",
+      name: "Pratik Pradhan",
       role: "vendor_admin",
     },
     {

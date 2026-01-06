@@ -5,7 +5,7 @@ class GalleryService {
    * List gallery images with optional filtering and pagination
    */
   static async list(vendorId, filters = {}, pagination = {}) {
-    const { category_id, subcategory_id } = filters;
+    const { category_id, subcategory_id, sort_by, sort_order, filter_by, filter_value } = filters;
     const { page = 1, limit = 20 } = pagination;
 
     const where = {
@@ -16,6 +16,52 @@ class GalleryService {
       where.subCategoryId = parseInt(subcategory_id);
     } else if (category_id) {
       where.categoryId = parseInt(category_id);
+    }
+
+    // Apply additional filters
+    // Apply additional filters
+    if (filter_by) {
+      if (filter_by === 'price') {
+        if (filter_value) {
+          const price = parseFloat(filter_value);
+          if (!isNaN(price)) {
+            where.price = price;
+          }
+        } else {
+          // Filter for items that have a price (not null)
+          where.price = { not: null };
+        }
+      } else if (filter_by === 'description') {
+        if (filter_value) {
+          where.description = {
+            contains: filter_value,
+            mode: 'insensitive',
+          };
+        } else {
+          // Filter for items that have a description (not null and not empty)
+          where.description = {
+            not: null,
+            // Note: Prisma doesn't support checking for empty string easily in the same query for nullable fields in all DBs,
+            // but usually description is either null or has content.
+            // If needed we can add AND: [{ description: { not: null } }, { description: { not: "" } }]
+          };
+        }
+      }
+    }
+
+    // Determine sorting
+    let orderBy = { createdAt: "desc" }; // Default
+    if (sort_by) {
+      const order = sort_order === 'asc' ? 'asc' : 'desc';
+      if (sort_by === 'price') {
+        orderBy = { price: order };
+      } else if (sort_by === 'name' || sort_by === 'title') {
+        orderBy = { title: order };
+      } else if (sort_by === 'modified' || sort_by === 'updatedAt') {
+        orderBy = { updatedAt: order };
+      } else if (sort_by === 'createdAt') {
+        orderBy = { createdAt: order };
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -37,37 +83,50 @@ class GalleryService {
             },
           },
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy,
         skip,
         take: limit,
       }),
       prisma.galleryImage.count({ where }),
     ]);
 
-    const formattedImages = images.map((img) => ({
-      id: img.id,
-      image_url: img.s3Url,
-      url: img.s3Url,
-      s3_url: img.s3Url,
-      image: { url: img.s3Url },
-      title: img.title,
-      description: img.description,
-      price: img.price,
-      price_currency: img.priceCurrency || "USD",
-      price_display: img.price
-        ? `${img.priceCurrency || "USD"} ${img.price.toFixed(2)}`
-        : null,
-      get_display_price: img.price
-        ? `${img.priceCurrency || "USD"} ${img.price.toFixed(2)}`
-        : null,
-      category: img.categoryId,
-      category_name: img.category?.name,
-      sub_category: img.subCategoryId,
-      sub_category_name: img.subCategory?.name,
-      created_at: img.createdAt.toISOString(),
-      updated_at: img.updatedAt.toISOString(),
+    // Generate presigned URLs for S3 images
+    const { generatePresignedUrl } = await import("../utils/s3.util.js");
+
+    const formattedImages = await Promise.all(images.map(async (img) => {
+      let imageUrl = img.s3Url;
+
+      // If we have an S3 key, generate a presigned URL (valid for 1 hour)
+      if (img.s3Key) {
+        const presignedUrl = await generatePresignedUrl(img.s3Key);
+        if (presignedUrl) {
+          imageUrl = presignedUrl;
+        }
+      }
+
+      return {
+        id: img.id,
+        image_url: imageUrl,
+        url: imageUrl,
+        s3_url: imageUrl,
+        image: { url: imageUrl },
+        title: img.title,
+        description: img.description,
+        price: img.price,
+        price_currency: img.priceCurrency || "USD",
+        price_display: img.price
+          ? `${img.priceCurrency || "USD"} ${img.price.toFixed(2)}`
+          : null,
+        get_display_price: img.price
+          ? `${img.priceCurrency || "USD"} ${img.price.toFixed(2)}`
+          : null,
+        category: img.categoryId,
+        category_name: img.category?.name,
+        sub_category: img.subCategoryId,
+        sub_category_name: img.subCategory?.name,
+        created_at: img.createdAt.toISOString(),
+        updated_at: img.updatedAt.toISOString(),
+      };
     }));
 
     return {
@@ -185,6 +244,7 @@ class GalleryService {
       data: {
         vendorId,
         s3Url: s3_url,
+        s3Key: data.s3_key || null,
         title: title?.trim() || null,
         description: description?.trim() || null,
         price: price ? parseFloat(price) : null,
@@ -359,6 +419,8 @@ class GalleryService {
    * Delete a gallery image
    */
   static async delete(vendorId, id) {
+    console.log('🗑️ GalleryService.delete called with:', { vendorId, id, parsedId: parseInt(id) });
+
     const image = await prisma.galleryImage.findFirst({
       where: {
         id: parseInt(id),
@@ -366,15 +428,28 @@ class GalleryService {
       },
     });
 
+    console.log('🔍 Found image:', image);
+
     if (!image) {
       throw new Error("Gallery image not found");
     }
 
-    await prisma.galleryImage.delete({
+    // Delete from S3 if s3Key exists
+    if (image.s3Key) {
+      console.log('🗑️ Deleting from S3:', image.s3Key);
+      const { deleteFromS3 } = await import("../utils/s3.util.js");
+      await deleteFromS3(image.s3Key);
+    }
+
+    console.log('🗑️ Attempting to delete image from DB with id:', parseInt(id));
+
+    const deleteResult = await prisma.galleryImage.delete({
       where: {
         id: parseInt(id),
       },
     });
+
+    console.log('✅ Delete result:', deleteResult);
 
     return {
       success: true,
@@ -390,6 +465,29 @@ class GalleryService {
       throw new Error("Image IDs are required");
     }
 
+    // First, get all images to retrieve S3 keys
+    const images = await prisma.galleryImage.findMany({
+      where: {
+        id: {
+          in: imageIds.map((id) => parseInt(id)),
+        },
+        vendorId,
+      },
+      select: {
+        id: true,
+        s3Key: true,
+      },
+    });
+
+    // Delete from S3
+    const s3Keys = images.filter(img => img.s3Key).map(img => img.s3Key);
+    if (s3Keys.length > 0) {
+      console.log(`🗑️ Deleting ${s3Keys.length} images from S3`);
+      const { deleteMultipleFromS3 } = await import("../utils/s3.util.js");
+      await deleteMultipleFromS3(s3Keys);
+    }
+
+    // Delete from database
     const result = await prisma.galleryImage.deleteMany({
       where: {
         id: {

@@ -15,24 +15,46 @@ import { categoriesAPI } from "@/lib/categoriesApi"
 import type { Category, Contact } from "@/lib/types"
 import { toast } from "react-toastify"
 
-function StatusBadge({ status }: { status: Contact["status"] }) {
-  const styles: Record<Contact["status"], string> = {
-    pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    active: "bg-green-500/20 text-green-400 border-green-500/30",
-    inactive: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-    closed: "bg-red-500/20 text-red-400 border-red-500/30",
+function StatusBadge({ status, isLead }: { status: string; isLead?: boolean }) {
+  // Lead statuses
+  const leadStyles: Record<string, string> = {
+    new: "bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30",
+    contacted: "bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30",
+    qualified: "bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 border-cyan-500/30",
+    converted: "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30",
+    lost: "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30",
   }
 
-  const labels: Record<Contact["status"], string> = {
+  const leadLabels: Record<string, string> = {
+    new: "New",
+    contacted: "Contacted",
+    qualified: "Qualified",
+    converted: "Converted",
+    lost: "Lost",
+  }
+
+  // Contact statuses
+  const contactStyles: Record<string, string> = {
+    pending: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
+    active: "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30",
+    inactive: "bg-gray-500/20 text-gray-700 dark:text-gray-400 border-gray-500/30",
+    closed: "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30",
+  }
+
+  const contactLabels: Record<string, string> = {
     pending: "Pending",
     active: "Active",
     inactive: "Inactive",
     closed: "Closed",
   }
 
+  const styles = isLead ? leadStyles : contactStyles
+  const labels = isLead ? leadLabels : contactLabels
+  const displayStatus = status || (isLead ? "new" : "pending")
+
   return (
-    <Badge className={`${styles[status]} border`} variant="outline">
-      {labels[status]}
+    <Badge className={`${styles[displayStatus] || styles[isLead ? "new" : "pending"]} border`} variant="outline">
+      {labels[displayStatus] || displayStatus}
     </Badge>
   )
 }
@@ -229,6 +251,20 @@ export default function CategoriesPage() {
     try {
       const response = await categoriesAPI.delete(categoryId, {})
 
+      // Check if cascade delete is required
+      if (response.data.requires_cascade) {
+        setShowCascadeDeleteModal({
+          show: true,
+          categoryId,
+          categoryName,
+          imagesCount: response.data.images_count || 0,
+          contactsCount: response.data.contacts_count || 0,
+          leadsCount: response.data.leads_count || 0,
+          subcategoriesCount: response.data.subcategories_count || 0,
+        })
+        return
+      }
+
       if (response.data.success) {
         toast.success(response.data.message || "Category deleted successfully!")
         await loadCategories()
@@ -236,6 +272,8 @@ export default function CategoriesPage() {
           setSelectedCategory(null)
           setSelectedSubcategory(null)
         }
+      } else {
+        toast.error(response.data.error || "Failed to delete category")
       }
     } catch (error: any) {
       let errorData = error.response?.data
@@ -556,8 +594,7 @@ export default function CategoriesPage() {
                         </div>
                       </div>
                       <p className="text-sm text-muted-foreground mb-3">
-                        {cat.get_subcategories_count || cat.subcategories?.length || 0} subcategories,{" "}
-                        {cat.get_contacts_count || 0} contacts
+                        {cat.get_subcategories_count || cat.subcategories?.length || 0} subcategories
                       </p>
                       {cat.subcategories && cat.subcategories.length > 0 && (
                         <div className="mt-2">
@@ -741,7 +778,7 @@ export default function CategoriesPage() {
                             {contact.sales_person_name || "--"}
                           </td>
                           <td className="py-3 px-4">
-                            <StatusBadge status={contact.status || "pending"} />
+                            <StatusBadge status={contact.status || (contact.is_lead ? "new" : "pending")} isLead={contact.is_lead} />
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex justify-end gap-2">

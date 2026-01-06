@@ -4,10 +4,7 @@ import { decrypt } from "../utils/encryption.js";
 
 export async function syncTemplateStatuses() {
   const pendingTemplates = await prisma.templateLanguage.findMany({
-    where: {
-      metaStatus: "pending",
-      metaId: { not: null },
-    },
+    where: { metaStatus: "pending", metaId: { not: null } },
     include: {
       template: {
         include: { vendor: true },
@@ -17,17 +14,17 @@ export async function syncTemplateStatuses() {
 
   if (!pendingTemplates.length) return;
 
-  // Group by vendor to reduce API calls
+  // Group by vendor (important to reduce API calls)
   const vendorMap = new Map();
 
-  for (const tpl of pendingTemplates) {
-    if (!vendorMap.has(tpl.template.vendorId)) {
-      vendorMap.set(tpl.template.vendorId, {
-        vendor: tpl.template.vendor,
+  for (const t of pendingTemplates) {
+    if (!vendorMap.has(t.template.vendorId)) {
+      vendorMap.set(t.template.vendorId, {
+        vendor: t.template.vendor,
         templates: [],
       });
     }
-    vendorMap.get(tpl.template.vendorId).templates.push(tpl);
+    vendorMap.get(t.template.vendorId).templates.push(t);
   }
 
   for (const { vendor, templates } of vendorMap.values()) {
@@ -38,9 +35,7 @@ export async function syncTemplateStatuses() {
     const resp = await fetch(
       `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates`,
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     );
 
@@ -49,34 +44,26 @@ export async function syncTemplateStatuses() {
     const data = await resp.json();
 
     for (const tpl of templates) {
-      const metaTpl = data.data.find((m) => m.id === tpl.metaId);
+      const metaTpl = data.data.find(m => m.id === tpl.metaId);
       if (!metaTpl) continue;
 
-      const newStatus = metaTpl.status.toLowerCase();
+      if (metaTpl.status !== tpl.metaStatus) {
+        await prisma.templateLanguage.update({
+          where: { id: tpl.id },
+          data: {
+            metaStatus: metaTpl.status.toLowerCase(),
+            metaReason: metaTpl.rejected_reason || null,
+          },
+        });
 
-      // Skip if no status change
-      if (newStatus === tpl.metaStatus) continue;
-
-      await prisma.templateLanguage.update({
-        where: { id: tpl.id },
-        data: {
-          metaStatus: newStatus,
-
-          // ✅ DO NOT overwrite existing reason with null
-          metaReason:
-            metaTpl.rejected_reason ??
-            tpl.metaReason ??
-            null,
-        },
-      });
-
-      // Keep parent template status in sync
-      await prisma.template.update({
-        where: { id: tpl.templateId },
-        data: {
-          status: newStatus,
-        },
-      });
+        // Optional: update parent template status
+        await prisma.template.update({
+          where: { id: tpl.templateId },
+          data: {
+            status: metaTpl.status.toLowerCase(),
+          },
+        });
+      }
     }
   }
 }

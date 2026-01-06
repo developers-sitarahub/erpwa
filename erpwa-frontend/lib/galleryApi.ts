@@ -10,11 +10,19 @@ export const galleryAPI = {
     categoryId?: number,
     subcategoryId?: number,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc',
+    filterBy?: string,
+    filterValue?: string
   ): Promise<ApiResponse<{ images: GalleryImage[]; total: number; page: number; limit: number; hasMore: boolean }>> => {
     const params = new URLSearchParams()
     if (categoryId) params.append('category_id', categoryId.toString())
     if (subcategoryId) params.append('subcategory_id', subcategoryId.toString())
+    if (sortBy) params.append('sort_by', sortBy)
+    if (sortOrder) params.append('sort_order', sortOrder)
+    if (filterBy) params.append('filter_by', filterBy)
+    if (filterValue) params.append('filter_value', filterValue)
     params.append('page', page.toString())
     params.append('limit', limit.toString())
 

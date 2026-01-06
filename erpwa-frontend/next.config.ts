@@ -9,6 +9,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "d2xewl4dlr9aio.cloudfront.net",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.amazonaws.com",
+        pathname: "/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

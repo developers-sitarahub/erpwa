@@ -13,11 +13,11 @@ import { toast } from "react-toastify"
 
 function StatusBadge({ status }: { status: Lead["status"] }) {
   const styles: Record<Lead["status"], string> = {
-    new: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    contacted: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    qualified: "bg-green-500/20 text-green-400 border-green-500/30",
-    converted: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-    lost: "bg-red-500/20 text-red-400 border-red-500/30",
+    new: "bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30",
+    contacted: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
+    qualified: "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30",
+    converted: "bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30",
+    lost: "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/30",
   }
 
   const labels: Record<Lead["status"], string> = {
@@ -148,6 +148,79 @@ function ColumnFilterDropdown({
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Global Filter Dropdown Component
+function GlobalFilterDropdown({
+  leads,
+  onSelect,
+}: {
+  leads: any[]
+  onSelect: (field: string, value: string) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    if (isOpen) document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [isOpen])
+
+  const categories = Array.from(new Set(leads.map((l) => l.category_name).filter(Boolean))).sort()
+  const subcategories = Array.from(new Set(leads.map((l) => l.sub_category_name).filter(Boolean))).sort()
+  const salesPersons = Array.from(new Set(leads.map((l) => l.sales_person_name).filter(Boolean))).sort()
+  const statuses = ["new", "contacted", "qualified", "converted", "lost"]
+
+  const renderGroup = (label: string, items: string[], field: string, prefix: string = "") => {
+    if (items.length === 0) return null
+    return (
+      <div className="py-1">
+        <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {label}
+        </div>
+        {items.map((item) => (
+          <button
+            key={`${field}-${item}`}
+            onClick={() => {
+              onSelect(field, item)
+              setIsOpen(false)
+            }}
+            className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
+          >
+            {prefix} {item}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm min-w-[140px] flex items-center justify-between gap-2"
+      >
+        <span>Filter By...</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-64 bg-secondary border border-border rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-secondary">
+          <div className="py-1 divide-y divide-border/50">
+            {renderGroup("Category", categories, "category_name", "Category:")}
+            {renderGroup("Sub-Category", subcategories, "sub_category_name", "Sub-Cat:")}
+            {renderGroup("Status", statuses, "status", "Status:")}
+            {renderGroup("Sales Person", salesPersons, "sales_person_name", "Sales:")}
           </div>
         </div>
       )}
@@ -665,8 +738,13 @@ export default function LeadsPage() {
       city?: string
       status?: string
       sales_person_name?: string
+      category_id?: string
+      subcategory_id?: string
     }
   }>({})
+  const [editLeadSubcategories, setEditLeadSubcategories] = useState<{ [key: number]: Category[] }>({})
+  const [sortBy, setSortBy] = useState<string>("created_at")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
   useEffect(() => {
     loadInitialData()
@@ -674,7 +752,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     filterAndPaginateLeads()
-  }, [leads, searchQuery, columnFilters, currentPageNum, itemsPerPage])
+  }, [leads, searchQuery, columnFilters, currentPageNum, itemsPerPage, sortBy, sortOrder])
 
   const loadInitialData = async () => {
     try {
@@ -759,17 +837,64 @@ export default function LeadsPage() {
       )
     }
 
-    // Column filters
-    Object.entries(columnFilters).forEach(([column, excludedValues]) => {
-      if (excludedValues.size > 0) {
+    // Column filters (inclusion - show only items that match)
+    Object.entries(columnFilters).forEach(([column, includedValues]) => {
+      if (includedValues.size > 0) {
         result = result.filter((lead: any) => {
           const leadValue = lead[column]?.toString() || "--"
-          return !excludedValues.has(leadValue)
+          return includedValues.has(leadValue)
         })
       }
     })
 
+    // Sorting
+    if (sortBy) {
+      result.sort((a: any, b: any) => {
+        let aValue: any
+        let bValue: any
+
+        // Special handling for status to sort by progression
+        if (sortBy === "status") {
+          const statusOrder = { new: 1, contacted: 2, qualified: 3, converted: 4, lost: 5 }
+          aValue = statusOrder[a.status as keyof typeof statusOrder] || 0
+          bValue = statusOrder[b.status as keyof typeof statusOrder] || 0
+        } else {
+          aValue = a[sortBy]
+          bValue = b[sortBy]
+        }
+
+        // Handle null/undefined values
+        if (aValue == null) return 1
+        if (bValue == null) return -1
+
+        // String comparison
+        if (typeof aValue === "string" && typeof bValue === "string") {
+          return sortOrder === "asc"
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue)
+        }
+
+        // Number comparison
+        return sortOrder === "asc" ? aValue - bValue : bValue - aValue
+      })
+    }
+
     setFilteredLeads(result)
+  }
+
+  const loadEditLeadSubcategories = async (leadId: number, categoryId: number) => {
+    try {
+      const response = await categoriesAPI.detail(categoryId)
+      setEditLeadSubcategories((prev) => ({
+        ...prev,
+        [leadId]: response.data.subcategories || [],
+      }))
+    } catch (error) {
+      setEditLeadSubcategories((prev) => ({
+        ...prev,
+        [leadId]: [],
+      }))
+    }
   }
 
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
@@ -806,7 +931,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("manual")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "manual"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border text-foreground hover:bg-muted"
+              : "bg-secondary border border-border !text-black dark:!text-white hover:bg-muted"
               }`}
           >
             <FileText className="w-4 h-4 mr-2" />
@@ -816,7 +941,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("upload")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "upload"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border text-foreground hover:bg-muted"
+              : "bg-secondary border border-border !text-black dark:!text-white hover:bg-muted"
               }`}
           >
             <Upload className="w-4 h-4 mr-2" />
@@ -854,20 +979,107 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              {/* Search Bar */}
-              <div className="relative max-w-2xl">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search leads..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    setCurrentPageNum(1)
-                  }}
-                  className="w-full pl-10 pr-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                />
+              {/* Search and Filter/Sort Bar */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                {/* Search */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search leads..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setCurrentPageNum(1)
+                    }}
+                    className="w-full pl-10 pr-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                </div>
+
+                {/* Filter By */}
+                <div className="flex gap-2">
+                  <GlobalFilterDropdown
+                    leads={leads}
+                    onSelect={(field, value) => {
+                      setColumnFilters((prev) => {
+                        const newFilters = { ...prev }
+                        const currentFilters = new Set(newFilters[field])
+                        currentFilters.add(value)
+                        newFilters[field] = currentFilters
+                        return newFilters
+                      })
+                      setCurrentPageNum(1)
+                    }}
+                  />
+
+                  {/* Sort By */}
+                  <select
+                    className="px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm min-w-[180px]"
+                    value={`${sortBy}:${sortOrder}`}
+                    onChange={(e) => {
+                      const [field, order] = e.target.value.split(":")
+                      setSortBy(field)
+                      setSortOrder(order as "asc" | "desc")
+                    }}
+                  >
+                    <option value="created_at:desc">Sort: Newest First</option>
+                    <option value="created_at:asc">Sort: Oldest First</option>
+                    <option value="company_name:asc">Sort: Name (A-Z)</option>
+                    <option value="company_name:desc">Sort: Name (Z-A)</option>
+                    <option value="status:asc">Sort: Status (New → Lost)</option>
+                    <option value="status:desc">Sort: Status (Lost → New)</option>
+                    <option value="category_name:asc">Sort: Category (A-Z)</option>
+                    <option value="category_name:desc">Sort: Category (Z-A)</option>
+                  </select>
+                </div>
               </div>
+
+              {/* Active Filters Display */}
+              {Object.entries(columnFilters).some(([_, values]) => values.size > 0) && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-xs text-muted-foreground">Active Filters:</span>
+                  {Object.entries(columnFilters).map(([column, values]) =>
+                    Array.from(values).map((value) => (
+                      <Badge
+                        key={`${column}:${value}`}
+                        variant="outline"
+                        className="bg-primary/10 border-primary/30 text-primary flex items-center gap-1"
+                      >
+                        {value}
+                        <button
+                          onClick={() => {
+                            setColumnFilters((prev) => {
+                              const newFilters = { ...prev }
+                              newFilters[column].delete(value)
+                              return newFilters
+                            })
+                          }}
+                          className="hover:bg-primary/20 rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))
+                  )}
+                  <button
+                    onClick={() => {
+                      setColumnFilters({
+                        company_name: new Set(),
+                        mobile_number: new Set(),
+                        email: new Set(),
+                        city: new Set(),
+                        category_name: new Set(),
+                        sub_category_name: new Set(),
+                        status: new Set(),
+                        sales_person_name: new Set(),
+                      })
+                    }}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              )}
 
               {/* Bulk Operations - Always Show Space */}
               <div className={`transition-all duration-200 ${selectedLeads.size > 0 ? "opacity-100" : "opacity-0 hidden"}`}>
@@ -1017,27 +1229,7 @@ export default function LeadsPage() {
                         </th>
                         {columns.map((col) => (
                           <th key={col.key} className="text-left py-3 px-3 font-medium text-muted-foreground whitespace-nowrap">
-                            <div className={`flex items-center gap-2 relative ${col.key === "company_name" ? "ml-auto" : ""}`}>
-                              <span>{col.label}</span>
-                              {["category_name", "sub_category_name", "status", "sales_person_name"].includes(col.key) && (
-                                <ColumnFilterDropdown
-                                  column={col.key}
-                                  values={col.key === "sales_person_name"
-                                    ? ["sales1", "sales2", "sales3", "sales4"]
-                                    : getColumnValues(col.key)}
-                                  selectedValues={columnFilters[col.key]}
-                                  leads={leads}
-                                  align={col.key === "company_name" ? "left" : "right"}
-                                  onChange={(values) => {
-                                    setColumnFilters((prev) => ({
-                                      ...prev,
-                                      [col.key]: values,
-                                    }))
-                                    setCurrentPageNum(1)
-                                  }}
-                                />
-                              )}
-                            </div>
+                            <span>{col.label}</span>
                           </th>
                         ))}
                         <th className="text-center py-3 px-3 font-medium text-muted-foreground">
@@ -1130,8 +1322,59 @@ export default function LeadsPage() {
                                   className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                               </td>
-                              <td className="py-3 px-3 text-foreground">{lead.category_name}</td>
-                              <td className="py-3 px-3 text-foreground text-sm">{lead.sub_category_name}</td>
+                              <td className="py-3 px-3">
+                                <select
+                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  value={editForm[lead.id]?.category_id || lead.category?.toString() || ""}
+                                  onChange={(e) => {
+                                    const categoryId = e.target.value
+                                    setEditForm((prev) => ({
+                                      ...prev,
+                                      [lead.id]: {
+                                        ...prev[lead.id],
+                                        category_id: categoryId,
+                                        subcategory_id: "",
+                                      },
+                                    }))
+                                    if (categoryId) {
+                                      loadEditLeadSubcategories(lead.id, parseInt(categoryId))
+                                    }
+                                  }}
+                                >
+                                  <option value="">-- Select --</option>
+                                  {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="py-3 px-3">
+                                <select
+                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  value={editForm[lead.id]?.subcategory_id || lead.sub_category?.toString() || ""}
+                                  onChange={(e) =>
+                                    setEditForm((prev) => ({
+                                      ...prev,
+                                      [lead.id]: {
+                                        ...prev[lead.id],
+                                        subcategory_id: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  disabled={!editForm[lead.id]?.category_id && !lead.category}
+                                >
+                                  <option value="">-- Select --</option>
+                                  {(editLeadSubcategories[lead.id] ||
+                                    categories.find((c) => c.id === (editForm[lead.id]?.category_id ? parseInt(editForm[lead.id].category_id!) : lead.category))?.subcategories ||
+                                    []
+                                  ).map((subcat) => (
+                                    <option key={subcat.id} value={subcat.id}>
+                                      {subcat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
                               <td className="py-3 px-3">
                                 <select
                                   className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1197,6 +1440,10 @@ export default function LeadsPage() {
                                           )
                                         if (editForm[lead.id]?.status)
                                           formData.append("status", editForm[lead.id].status!)
+                                        if (editForm[lead.id]?.category_id)
+                                          formData.append("category_id", editForm[lead.id].category_id!)
+                                        if (editForm[lead.id]?.subcategory_id)
+                                          formData.append("subcategory_id", editForm[lead.id].subcategory_id!)
 
                                         await leadsAPI.update(lead.id, formData)
                                         toast.success("Lead updated successfully!")

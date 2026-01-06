@@ -10,6 +10,10 @@ class GalleryController {
       const filters = {
         category_id: req.query.category_id,
         subcategory_id: req.query.subcategory_id,
+        sort_by: req.query.sort_by,
+        sort_order: req.query.sort_order,
+        filter_by: req.query.filter_by,
+        filter_value: req.query.filter_value,
       };
 
       const pagination = {
@@ -159,27 +163,40 @@ class GalleryController {
         return res.status(400).json({ error: "Category is required" });
       }
 
-      // Convert files to base64 data URLs
-      const imageEntries = [];
-      for (const file of req.files) {
-        const base64 = file.buffer.toString("base64");
-        const dataUrl = `data:${file.mimetype};base64,${base64}`;
+      console.log(`📤 Uploading ${req.files.length} images to S3...`);
 
-        imageEntries.push({
-          s3_url: dataUrl, // Using base64 data URL as s3_url for now
-          title: file.originalname.replace(/\.[^/.]+$/, ""), // Remove extension
-          category_id: category_id,
-          subcategory_id: subcategory_id || undefined,
-        });
-      }
+      // Upload files to S3
+      const { uploadMultipleToS3 } = await import("../utils/s3.util.js");
+
+      const filesToUpload = req.files.map(file => ({
+        buffer: file.buffer,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+      }));
+
+      const uploadResults = await uploadMultipleToS3(filesToUpload, "gallery");
+
+      // Create image entries with S3 URLs
+      const imageEntries = uploadResults.map((result) => ({
+        s3_url: result.cloudfrontUrl, // Use CloudFront URL for faster delivery
+        s3_key: result.s3Key, // Store S3 key for deletion
+        title: result.originalName.replace(/\.[^/.]+$/, ""), // Remove extension
+        category_id: category_id,
+        subcategory_id: subcategory_id || undefined,
+      }));
+
+      console.log(`✅ Successfully uploaded ${uploadResults.length} images to S3`);
 
       // Use bulk create to save images
-      const result = await GalleryService.bulkCreate(
+      const dbResult = await GalleryService.bulkCreate(
         req.user.vendorId,
         imageEntries
       );
 
-      res.json(result);
+      res.json({
+        ...dbResult,
+        message: `Successfully uploaded ${uploadResults.length} images`,
+      });
     } catch (err) {
       console.error("Gallery upload error:", err);
       res.status(400).json({ error: err.message || "Failed to upload images" });

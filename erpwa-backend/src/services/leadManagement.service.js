@@ -15,7 +15,6 @@ class LeadManagementService {
 
     const where = {
       vendorId,
-      deletedAt: null, // Only get non-deleted leads
     };
 
     if (subcategory_id && !isNaN(subcategory_id)) {
@@ -94,7 +93,6 @@ class LeadManagementService {
       where: {
         id,
         vendorId,
-        deletedAt: null,
       },
       include: {
         leadCategory: {
@@ -580,29 +578,50 @@ class LeadManagementService {
   }
 
   /**
-   * Delete a lead (soft delete)
+   * Delete a lead (hard delete)
    */
   static async delete(vendorId, id) {
+    console.log('🗑️ LeadManagementService.delete called with:', { vendorId, id });
+
     const lead = await prisma.lead.findFirst({
       where: {
         id,
         vendorId,
-        deletedAt: null,
       },
     });
+
+    console.log('🔍 Found lead:', lead);
 
     if (!lead) {
       throw new Error("Lead not found");
     }
 
-    await prisma.lead.update({
+    console.log('🗑️ Attempting to delete lead with id:', id);
+
+    const deleteResult = await prisma.lead.delete({
       where: {
         id,
       },
-      data: {
-        deletedAt: new Date(),
-      },
     });
+
+    console.log('✅ Lead delete result:', deleteResult);
+
+    // Also delete the corresponding contact if it exists
+    if (lead.phoneNumber) {
+      console.log('🗑️ Attempting to delete corresponding contact with phone:', lead.phoneNumber);
+      try {
+        const contactDeleteResult = await prisma.contact.deleteMany({
+          where: {
+            vendorId,
+            mobileNumber: lead.phoneNumber,
+          },
+        });
+        console.log('✅ Contact delete result:', contactDeleteResult.count, 'contacts deleted');
+      } catch (contactError) {
+        console.error('⚠️ Failed to delete contact:', contactError.message);
+        // Don't fail the lead deletion if contact deletion fails
+      }
+    }
 
     return {
       success: true,
@@ -618,18 +637,53 @@ class LeadManagementService {
       throw new Error("Lead IDs are required");
     }
 
-    const result = await prisma.lead.updateMany({
+    console.log('🗑️ LeadManagementService.bulkDelete called with:', { vendorId, leadIds });
+
+    // First, get the phone numbers of the leads to delete
+    const leadsToDelete = await prisma.lead.findMany({
       where: {
         id: {
           in: leadIds,
         },
         vendorId,
-        deletedAt: null,
       },
-      data: {
-        deletedAt: new Date(),
+      select: {
+        phoneNumber: true,
       },
     });
+
+    const phoneNumbers = leadsToDelete.map(l => l.phoneNumber).filter(Boolean);
+    console.log('📞 Phone numbers to delete contacts for:', phoneNumbers);
+
+    // Delete the leads
+    const result = await prisma.lead.deleteMany({
+      where: {
+        id: {
+          in: leadIds,
+        },
+        vendorId,
+      },
+    });
+
+    console.log('✅ Deleted leads:', result.count);
+
+    // Also delete corresponding contacts
+    if (phoneNumbers.length > 0) {
+      try {
+        const contactDeleteResult = await prisma.contact.deleteMany({
+          where: {
+            vendorId,
+            mobileNumber: {
+              in: phoneNumbers,
+            },
+          },
+        });
+        console.log('✅ Deleted contacts:', contactDeleteResult.count);
+      } catch (contactError) {
+        console.error('⚠️ Failed to delete contacts:', contactError.message);
+        // Don't fail the lead deletion if contact deletion fails
+      }
+    }
 
     return {
       success: true,

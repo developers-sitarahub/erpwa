@@ -298,6 +298,8 @@ class CategoryService {
    * Delete category with cascade options
    */
   static async delete(vendorId, id, options = {}) {
+    console.log('🗑️ CategoryService.delete called with:', { vendorId, id, options });
+
     const category = await prisma.category.findFirst({
       where: {
         id: parseInt(id),
@@ -315,6 +317,8 @@ class CategoryService {
       },
     });
 
+    console.log('🔍 Found category:', category);
+
     if (!category) {
       throw new Error("Category not found");
     }
@@ -326,24 +330,47 @@ class CategoryService {
       delete_leads = false,
     } = options;
 
+    // Check for leads associated with this category
+    const leadsCount = await prisma.lead.count({
+      where: {
+        vendorId,
+        OR: [
+          { categoryId: parseInt(id) },
+          { subCategoryId: parseInt(id) },
+        ],
+      },
+    });
+
+    console.log('📊 Leads count:', leadsCount);
+
     // Check if category has data
     const hasData =
       category._count.children > 0 ||
       category._count.contacts > 0 ||
-      category._count.galleryImages > 0;
+      category._count.galleryImages > 0 ||
+      leadsCount > 0;
 
-    if (hasData && !delete_subcategories && !delete_gallery && !delete_contacts) {
+    console.log('📊 Has data:', hasData, {
+      children: category._count.children,
+      contacts: category._count.contacts,
+      galleryImages: category._count.galleryImages,
+      leads: leadsCount
+    });
+
+    if (hasData && !delete_subcategories && !delete_gallery && !delete_contacts && !delete_leads) {
+      console.log('⚠️ Returning cascade requirement');
       return {
         requires_cascade: true,
         images_count: category._count.galleryImages,
         contacts_count: category._count.contacts,
-        leads_count: 0, // We'll add this when we link leads
+        leads_count: leadsCount,
         subcategories_count: category._count.children,
       };
     }
 
     // Delete subcategories if requested
     if (delete_subcategories && category._count.children > 0) {
+      console.log('🗑️ Deleting subcategories...');
       await prisma.category.deleteMany({
         where: {
           parentId: parseInt(id),
@@ -354,6 +381,28 @@ class CategoryService {
 
     // Delete gallery images if requested
     if (delete_gallery && category._count.galleryImages > 0) {
+      console.log('🗑️ Deleting gallery images...');
+
+      // Fetch images to get S3 keys
+      const imagesToDelete = await prisma.galleryImage.findMany({
+        where: {
+          OR: [
+            { categoryId: parseInt(id) },
+            { subCategoryId: parseInt(id) },
+          ],
+          vendorId,
+        },
+        select: { s3Key: true }
+      });
+
+      // Delete from S3
+      const s3Keys = imagesToDelete.filter(img => img.s3Key).map(img => img.s3Key);
+      if (s3Keys.length > 0) {
+        console.log(`🗑️ Deleting ${s3Keys.length} images from S3`);
+        const { deleteMultipleFromS3 } = await import("../utils/s3.util.js");
+        await deleteMultipleFromS3(s3Keys);
+      }
+
       await prisma.galleryImage.deleteMany({
         where: {
           OR: [
@@ -367,7 +416,24 @@ class CategoryService {
 
     // Delete contacts if requested
     if (delete_contacts && category._count.contacts > 0) {
-      await prisma.contact.deleteMany({
+      console.log('🗑️ Deleting contacts...');
+      // First get the contacts to find their phone numbers
+      const contactsToDelete = await prisma.contact.findMany({
+        where: {
+          OR: [
+            { categoryId: parseInt(id) },
+            { subCategoryId: parseInt(id) },
+          ],
+          vendorId,
+        },
+        select: { mobileNumber: true }
+      });
+
+      const phoneNumbers = contactsToDelete.map(c => c.mobileNumber);
+      console.log('📞 Phone numbers to delete leads for:', phoneNumbers);
+
+      // Delete the contacts
+      const contactDeleteResult = await prisma.contact.deleteMany({
         where: {
           OR: [
             { categoryId: parseInt(id) },
@@ -376,14 +442,43 @@ class CategoryService {
           vendorId,
         },
       });
+      console.log('✅ Deleted contacts:', contactDeleteResult.count);
+
+      // Also delete leads with same phone numbers if delete_contacts is true
+      if (phoneNumbers.length > 0) {
+        const leadDeleteResult = await prisma.lead.deleteMany({
+          where: {
+            vendorId,
+            phoneNumber: { in: phoneNumbers }
+          }
+        });
+        console.log('✅ Deleted leads by phone number:', leadDeleteResult.count);
+      }
+    }
+
+    // Explicitly delete leads if requested (for leads that might not match a contact but match category)
+    if (delete_leads && leadsCount > 0) {
+      console.log('🗑️ Explicitly deleting leads by category...');
+      const leadDeleteResult = await prisma.lead.deleteMany({
+        where: {
+          vendorId,
+          OR: [
+            { categoryId: parseInt(id) },
+            { subCategoryId: parseInt(id) },
+          ],
+        },
+      });
+      console.log('✅ Deleted leads by category:', leadDeleteResult.count);
     }
 
     // Delete the category
-    await prisma.category.delete({
+    console.log('🗑️ Deleting category...');
+    const categoryDeleteResult = await prisma.category.delete({
       where: {
         id: parseInt(id),
       },
     });
+    console.log('✅ Category deleted:', categoryDeleteResult);
 
     return {
       success: true,
@@ -446,7 +541,7 @@ class CategoryService {
 
     // Also get leads with same category/subcategory (non-deleted)
     let leads = [];
-    
+
     if (subcategoryId && !isNaN(subcategoryId)) {
       // If filtering by subcategory, get leads with this specific subcategory
       leads = await prisma.lead.findMany({
@@ -485,7 +580,7 @@ class CategoryService {
         select: { id: true },
       });
       const subcatIds = subcats.map((sub) => sub.id);
-      
+
       // Get leads with this category OR any of its subcategories
       leads = await prisma.lead.findMany({
         where: {
@@ -544,7 +639,7 @@ class CategoryService {
 
     // Combine contacts and leads, avoiding duplicates by mobile number
     const contactMap = new Map();
-    
+
     // Add contacts first
     contacts.forEach((contact) => {
       contactMap.set(contact.mobileNumber, {
@@ -574,7 +669,7 @@ class CategoryService {
         sub_category: lead.subCategoryId,
         sub_category_name: lead.leadSubCategory?.name,
         sales_person_name: lead.salesPersonName,
-        status: lead.status === "converted" ? "active" : lead.status === "lost" ? "closed" : "pending",
+        status: lead.status || "new", // Return actual lead status
         assigned_to: null,
         created_at: lead.createdAt.toISOString(),
         is_lead: true,

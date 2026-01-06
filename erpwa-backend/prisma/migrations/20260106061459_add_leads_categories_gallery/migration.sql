@@ -1,3 +1,20 @@
+/*
+  Warnings:
+
+  - You are about to drop the column `name` on the `Lead` table. All the data in the column will be lost.
+
+*/
+-- AlterTable
+ALTER TABLE "Lead" DROP COLUMN "name",
+ADD COLUMN     "category" TEXT NOT NULL DEFAULT 'standard',
+ADD COLUMN     "categoryId" INTEGER,
+ADD COLUMN     "city" TEXT,
+ADD COLUMN     "companyName" TEXT,
+ADD COLUMN     "email" TEXT,
+ADD COLUMN     "salesPersonName" TEXT,
+ADD COLUMN     "subCategoryId" INTEGER,
+ADD COLUMN     "subcategory" TEXT;
+
 -- CreateTable
 CREATE TABLE "Category" (
     "id" SERIAL NOT NULL,
@@ -77,14 +94,35 @@ CREATE INDEX "GalleryImage_categoryId_idx" ON "GalleryImage"("categoryId");
 -- CreateIndex
 CREATE INDEX "GalleryImage_subCategoryId_idx" ON "GalleryImage"("subCategoryId");
 
+-- CreateIndex
+CREATE INDEX "Lead_email_idx" ON "Lead"("email");
+
+-- CreateIndex
+CREATE INDEX "Lead_category_idx" ON "Lead"("category");
+
+-- CreateIndex
+CREATE INDEX "Lead_subcategory_idx" ON "Lead"("subcategory");
+
+-- CreateIndex
+CREATE INDEX "Lead_categoryId_idx" ON "Lead"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "Lead_subCategoryId_idx" ON "Lead"("subCategoryId");
+
+-- CreateIndex
+CREATE INDEX "Lead_status_idx" ON "Lead"("status");
+
 -- AddForeignKey
-ALTER TABLE "Category" ADD CONSTRAINT "Category_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Lead" ADD CONSTRAINT "Lead_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Lead" ADD CONSTRAINT "Lead_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Category" ADD CONSTRAINT "Category_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Category"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Contact" ADD CONSTRAINT "Contact_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Category" ADD CONSTRAINT "Category_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Contact" ADD CONSTRAINT "Contact_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -93,10 +131,13 @@ ALTER TABLE "Contact" ADD CONSTRAINT "Contact_categoryId_fkey" FOREIGN KEY ("cat
 ALTER TABLE "Contact" ADD CONSTRAINT "Contact_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "GalleryImage" ADD CONSTRAINT "GalleryImage_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Contact" ADD CONSTRAINT "Contact_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "GalleryImage" ADD CONSTRAINT "GalleryImage_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "GalleryImage" ADD CONSTRAINT "GalleryImage_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GalleryImage" ADD CONSTRAINT "GalleryImage_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;

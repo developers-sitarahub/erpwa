@@ -27,12 +27,11 @@ router.use(authenticate);
 
 // Gallery routes
 router.get("/", GalleryController.list);
-router.get("/:id", GalleryController.getById);
 router.post("/", GalleryController.create);
 router.post("/bulk", GalleryController.bulkCreate);
 router.post(
   "/upload",
-  upload.array("images", 500),
+  upload.array("images", 200), // Reduced from 500 to 200 for server stability
   (err, req, res, next) => {
     // Handle multer errors
     if (err instanceof multer.MulterError) {
@@ -40,7 +39,7 @@ router.post(
         return res.status(400).json({ error: "File size too large. Maximum 10MB per file." });
       }
       if (err.code === "LIMIT_FILE_COUNT") {
-        return res.status(400).json({ error: "Too many files. Maximum 500 files allowed." });
+        return res.status(400).json({ error: "Too many files. Maximum 200 files allowed per upload." });
       }
       return res.status(400).json({ error: err.message });
     }
@@ -51,9 +50,10 @@ router.post(
   },
   GalleryController.handleUpload
 );
+router.delete("/bulk", GalleryController.bulkDelete);
+router.get("/:id", GalleryController.getById);
 router.put("/:id", GalleryController.update);
 router.delete("/:id", GalleryController.delete);
-router.delete("/bulk", GalleryController.bulkDelete);
 
 export default router;
 
