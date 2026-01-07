@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { getSocket, connectSocket } from "@/lib/socket";
+import { processMedia } from "@/lib/mediaProcessor";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -263,20 +264,28 @@ function ChatArea({
   } | null>(null);
   const [sendingPreview, setSendingPreview] = useState(false);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
 
-    const files = Array.from(e.target.files);
-    const urls = files.map((f) => URL.createObjectURL(f));
+    try {
+      const processed = await Promise.all(
+        Array.from(e.target.files).map((f) => processMedia(f))
+      );
 
-    setImagePreview({
-      files,
-      urls,
-      caption: "",
-    });
+      const files = processed.map((p) => p.file);
+      const urls = files.map((f) => URL.createObjectURL(f));
 
-    setMediaModal(null);
-    e.target.value = "";
+      setImagePreview({
+        files,
+        urls,
+        caption: "",
+      });
+
+      setMediaModal(null);
+      e.target.value = "";
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   const [copied, setCopied] = useState(false);
@@ -631,9 +640,9 @@ function ChatArea({
           </span>
         </div>
       )}
-      {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto relative">
-        {/* WhatsApp Background Layer */}
+      {/* MESSAGES WRAPPER */}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        {/* FIXED WHATSAPP BACKGROUND */}
         <div
           className="
       absolute inset-0
@@ -646,41 +655,43 @@ function ChatArea({
     "
         />
 
-        {/* Messages Layer */}
-        <div className="relative z-10 p-4 space-y-2">
-          <AnimatePresence>
-            {messages.map((msg, i) => {
-              const showDateSeparator =
-                i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
+        {/* SCROLLABLE MESSAGES */}
+        <div className="relative z-10 h-full overflow-y-auto">
+          <div className="p-4 space-y-2">
+            {/* messages go here */}
+            <AnimatePresence>
+              {messages.map((msg, i) => {
+                const showDateSeparator =
+                  i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
 
-              const repliedMessage =
-                msg.replyTo ??
-                messages.find(
-                  (m) => m.whatsappMessageId === msg.replyToMessageId
-                );
-              return (
-                <div key={msg.id}>
-                  {/* 📅 DATE SEPARATOR (WhatsApp style) */}
-                  {showDateSeparator && (
-                    <div className="flex justify-center my-4">
-                      <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground shadow-sm">
-                        {getDateLabel(msg.timestamp)}
-                      </span>
-                    </div>
-                  )}
+                const repliedMessage =
+                  msg.replyTo ??
+                  messages.find(
+                    (m) => m.whatsappMessageId === msg.replyToMessageId
+                  );
+                return (
+                  <div key={msg.id}>
+                    {/* 📅 DATE SEPARATOR (WhatsApp style) */}
+                    {showDateSeparator && (
+                      <div className="flex justify-center my-4">
+                        <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground shadow-sm">
+                          {getDateLabel(msg.timestamp)}
+                        </span>
+                      </div>
+                    )}
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ delay: i * 0.03 }}
-                    className={`flex items-end gap-2 ${
-                      msg.sender === "executive"
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`group relative
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: i * 0.03 }}
+                      className={`flex items-end gap-2 ${
+                        msg.sender === "executive"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`group relative
                                   max-w-md
                                   px-3 py-2
                                   shadow-sm
@@ -690,180 +701,183 @@ function ChatArea({
                                       : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none"
                                   }
                                 `}
-                    >
-                      {(() => {
-                        const reply = getReplyPreview(
-                          msg.replyTo ?? repliedMessage
-                        );
-                        if (!reply) return null;
+                      >
+                        {(() => {
+                          const reply = getReplyPreview(
+                            msg.replyTo ?? repliedMessage
+                          );
+                          if (!reply) return null;
 
-                        return (
-                          <div className="mb-1 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-[rgba(0,0,0,0.04)] dark:bg-[rgba(255,255,255,0.08)] rounded">
-                            {reply.thumb && (
-                              <div className="relative w-10 h-10 flex-shrink-0">
-                                <Image
-                                  src={reply.thumb}
-                                  alt=""
-                                  fill
-                                  sizes="40px"
-                                  className="rounded object-cover"
-                                />
-                              </div>
-                            )}
+                          return (
+                            <div className="mb-1 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-[rgba(0,0,0,0.04)] dark:bg-[rgba(255,255,255,0.08)] rounded">
+                              {reply.thumb && (
+                                <div className="relative w-10 h-10 flex-shrink-0">
+                                  <Image
+                                    src={reply.thumb}
+                                    alt=""
+                                    fill
+                                    sizes="40px"
+                                    className="rounded object-cover"
+                                  />
+                                </div>
+                              )}
 
-                            <div className="min-w-0">
-                              <div className="text-xs font-medium text-[#25D366] leading-tight">
-                                {reply.title}
-                              </div>
-                              <div className="text-xs text-muted-foreground truncate leading-tight">
-                                {reply.subtitle}
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-[#25D366] leading-tight">
+                                  {reply.title}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate leading-tight">
+                                  {reply.subtitle}
+                                </div>
                               </div>
                             </div>
+                          );
+                        })()}
+
+                        {/* 🖼 IMAGE */}
+                        {/* 🖼 IMAGE (WhatsApp style) */}
+                        {msg.mediaUrl && msg.mimeType?.startsWith("image/") && (
+                          <div className="mb-1">
+                            <div
+                              className="relative w-[320px] max-w-full aspect-[4/3] rounded-lg overflow-hidden cursor-pointer"
+                              onClick={() =>
+                                window.open(msg.mediaUrl, "_blank")
+                              }
+                            >
+                              <Image
+                                src={msg.mediaUrl}
+                                alt="Image"
+                                fill
+                                sizes="(max-width: 768px) 90vw, 320px"
+                                className="object-cover"
+                              />
+                            </div>
+
+                            {msg.caption && (
+                              <p className="mt-1 text-sm text-foreground">
+                                {msg.caption}
+                              </p>
+                            )}
                           </div>
-                        );
-                      })()}
+                        )}
 
-                      {/* 🖼 IMAGE */}
-                      {/* 🖼 IMAGE (WhatsApp style) */}
-                      {msg.mediaUrl && msg.mimeType?.startsWith("image/") && (
-                        <div className="mb-1">
-                          <div
-                            className="relative w-[320px] max-w-full aspect-[4/3] rounded-lg overflow-hidden cursor-pointer"
-                            onClick={() => window.open(msg.mediaUrl, "_blank")}
-                          >
-                            <Image
-                              src={msg.mediaUrl}
-                              alt="Image"
-                              fill
-                              sizes="(max-width: 768px) 90vw, 320px"
-                              className="object-cover"
-                            />
+                        {/* 🎥 VIDEO (WhatsApp style) */}
+                        {msg.mediaUrl && msg.mimeType?.startsWith("video/") && (
+                          <div className="mb-1">
+                            <div className="w-[320px] max-w-full rounded-lg overflow-hidden bg-black">
+                              <video
+                                src={msg.mediaUrl}
+                                controls
+                                className="w-full h-auto"
+                              />
+                            </div>
+
+                            {msg.caption && (
+                              <p className="mt-1 text-sm text-foreground">
+                                {msg.caption}
+                              </p>
+                            )}
                           </div>
+                        )}
 
-                          {msg.caption && (
-                            <p className="mt-1 text-sm text-foreground">
-                              {msg.caption}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* 🎥 VIDEO (WhatsApp style) */}
-                      {msg.mediaUrl && msg.mimeType?.startsWith("video/") && (
-                        <div className="mb-1">
-                          <div className="w-[320px] max-w-full rounded-lg overflow-hidden bg-black">
-                            <video
+                        {/* 🎵 AUDIO (WhatsApp style) */}
+                        {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
+                          <div className="mb-1 w-[260px] max-w-full">
+                            <audio
                               src={msg.mediaUrl}
                               controls
-                              className="w-full h-auto"
+                              className="w-full h-10"
                             />
+
+                            {msg.caption && (
+                              <p className="mt-1 text-sm text-foreground">
+                                {msg.caption}
+                              </p>
+                            )}
                           </div>
-
-                          {msg.caption && (
-                            <p className="mt-1 text-sm text-foreground">
-                              {msg.caption}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* 🎵 AUDIO (WhatsApp style) */}
-                      {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
-                        <div className="mb-1 w-[260px] max-w-full">
-                          <audio
-                            src={msg.mediaUrl}
-                            controls
-                            className="w-full h-10"
-                          />
-
-                          {msg.caption && (
-                            <p className="mt-1 text-sm text-foreground">
-                              {msg.caption}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* 📄 DOCUMENT (WhatsApp style) */}
-                      {msg.mediaUrl &&
-                        msg.mimeType &&
-                        !msg.mimeType.startsWith("image/") &&
-                        !msg.mimeType.startsWith("video/") &&
-                        !msg.mimeType.startsWith("audio/") && (
-                          <a
-                            href={msg.mediaUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-[260px] max-w-full flex items-center gap-3 p-3 rounded-lg border bg-muted hover:bg-muted/70"
-                          >
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                              📄
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {msg.mediaUrl.split("/").pop()}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Document
-                              </p>
-                            </div>
-                          </a>
                         )}
 
-                      {/* 📝 TEXT MESSAGE */}
-                      {msg.text && (
-                        <p className="text-sm leading-[1.35] break-words whitespace-pre-wrap overflow-hidden">
-                          {msg.text}
-                        </p>
-                      )}
+                        {/* 📄 DOCUMENT (WhatsApp style) */}
+                        {msg.mediaUrl &&
+                          msg.mimeType &&
+                          !msg.mimeType.startsWith("image/") &&
+                          !msg.mimeType.startsWith("video/") &&
+                          !msg.mimeType.startsWith("audio/") && (
+                            <a
+                              href={msg.mediaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-[260px] max-w-full flex items-center gap-3 p-3 rounded-lg border bg-muted hover:bg-muted/70"
+                            >
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                                📄
+                              </div>
 
-                      <div className="flex items-center gap-1 mt-1 justify-end">
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {msg.mediaUrl.split("/").pop()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Document
+                                </p>
+                              </div>
+                            </a>
+                          )}
 
-                        {msg.sender === "executive" && (
-                          <span
-                            className={
-                              msg.status === "read"
-                                ? "text-blue-500"
-                                : "text-muted-foreground"
-                            }
-                          >
-                            {getMessageStatusIcon(msg.status)}
+                        {/* 📝 TEXT MESSAGE */}
+                        {msg.text && (
+                          <p className="text-sm leading-[1.35] break-words whitespace-pre-wrap overflow-hidden">
+                            {msg.text}
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-1 mt-1 justify-end">
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </span>
-                        )}
+
+                          {msg.sender === "executive" && (
+                            <span
+                              className={
+                                msg.status === "read"
+                                  ? "text-blue-500"
+                                  : "text-muted-foreground"
+                              }
+                            >
+                              {getMessageStatusIcon(msg.status)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
+
+                              setActionMenu({
+                                message: msg,
+                                rect,
+                              });
+                            }}
+                            className="p-1.5 rounded-full bg-card border shadow hover:bg-muted"
+                          >
+                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        </div>
                       </div>
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </AnimatePresence>
 
-                      <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            const rect =
-                              e.currentTarget.getBoundingClientRect();
-
-                            setActionMenu({
-                              message: msg,
-                              rect,
-                            });
-                          }}
-                          className="p-1.5 rounded-full bg-card border shadow hover:bg-muted"
-                        >
-                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                </div>
-              );
-            })}
-          </AnimatePresence>
-
-          {/* 👇 Auto-scroll anchor */}
-          <div ref={messagesEndRef} />
+            {/* 👇 Auto-scroll anchor */}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
       </div>
 
@@ -1250,17 +1264,21 @@ function ChatArea({
                     onChange={async (e) => {
                       if (!e.target.files?.length) return;
 
-                      const files = Array.from(e.target.files);
+                      try {
+                        for (const rawFile of Array.from(e.target.files)) {
+                          const { file } = await processMedia(rawFile);
 
-                      for (const file of files) {
-                        const form = new FormData();
-                        form.append("conversationId", conversation.id);
-                        form.append("file", file);
+                          const form = new FormData();
+                          form.append("conversationId", conversation.id);
+                          form.append("file", file);
 
-                        await api.post("/vendor/whatsapp/send-media", form);
+                          await api.post("/vendor/whatsapp/send-media", form);
+                        }
+
+                        setMediaModal(null);
+                      } catch (err: any) {
+                        alert(err.message);
                       }
-
-                      setMediaModal(null);
                     }}
                   />
 

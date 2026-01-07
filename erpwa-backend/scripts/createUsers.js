@@ -29,7 +29,7 @@ async function main() {
     {
       email: "pradhanpratik219@gmail.com",
       name: "Pratik Pradhan",
-      role: "vendor_admin",
+      role: "vendor_owner",
     },
     {
       email: "developers@sitarahub.com",

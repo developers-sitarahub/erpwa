@@ -18,6 +18,7 @@ import leadRoutes from "./routes/lead.routes.js";
 import leadManagementRoutes from "./routes/leadManagement.routes.js";
 import galleryRoutes from "./routes/gallery.routes.js";
 import { initSocket } from "./socket.js";
+import testUploadRoute from "./routes/testUpload.route.js";
 
 const app = express();
 
@@ -53,6 +54,8 @@ app.use("/api/leads", leadRoutes);
 app.use("/api/leads-management", leadManagementRoutes);
 app.use("/api/gallery", galleryRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
+app.use("/test", testUploadRoute);
+
 
 /* ================= SERVER START ================= */
 const PORT = process.env.PORT || 5000;

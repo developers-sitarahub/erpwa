@@ -4,8 +4,8 @@ import type React from "react"
 import { motion, type HTMLMotionProps } from "framer-motion"
 
 interface ButtonProps extends HTMLMotionProps<"button"> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger"
-  size?: "sm" | "md" | "lg"
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "link"
+  size?: "sm" | "md" | "lg" | "icon"
 }
 
 export function Button({
@@ -24,12 +24,14 @@ export function Button({
     outline: "border-2 border-border text-foreground hover:bg-secondary/50 active:bg-secondary",
     ghost: "text-foreground hover:bg-muted active:bg-muted/80",
     danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80",
+    link: "text-primary underline-offset-4 hover:underline bg-transparent",
   }
 
   const sizes = {
     sm: "px-3 py-1.5 text-sm",
     md: "px-4 py-2 text-base",
     lg: "px-6 py-3 text-lg",
+    icon: "h-10 w-10",
   }
 
   return (
