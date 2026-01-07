@@ -34,7 +34,7 @@ class CategoryController {
   static async getById(req, res) {
     try {
       const id = req.params.id;
-      
+
       if (!id) {
         return res.status(400).json({ error: "Category ID is required" });
       }
@@ -116,15 +116,8 @@ class CategoryController {
       const categoryId = req.params.id || req.query.category_id;
       const subcategoryId = req.query.subcategory_id;
 
-      // If no category or subcategory provided, return empty result
-      if (!categoryId && !subcategoryId) {
-        return res.json({ 
-          data: {
-            count: 0,
-            contacts: []
-          }
-        });
-      }
+      // If no category or subcategory provided, we'll get ALL contacts (no validation needed here)
+      // The service already handles this logic.
 
       // Validate categoryId and subcategoryId if provided
       let parsedCategoryId = null;
@@ -142,16 +135,6 @@ class CategoryController {
         if (isNaN(parsedSubcategoryId)) {
           return res.status(400).json({ error: "Invalid subcategory ID" });
         }
-      }
-
-      // At least one valid ID must be provided
-      if (!parsedCategoryId && !parsedSubcategoryId) {
-        return res.json({ 
-          data: {
-            count: 0,
-            contacts: []
-          }
-        });
       }
 
       const result = await CategoryService.getContacts(

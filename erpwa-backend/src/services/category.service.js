@@ -491,31 +491,17 @@ class CategoryService {
    * Also includes leads with the same category/subcategory
    */
   static async getContacts(vendorId, categoryId = null, subcategoryId = null) {
-    // If no category or subcategory is provided, return empty result
-    // (We don't want to return all contacts without a filter)
-    if ((!categoryId || isNaN(categoryId)) && (!subcategoryId || isNaN(subcategoryId))) {
-      return {
-        count: 0,
-        contacts: [],
-      };
-    }
-
     const where = {
       vendorId,
     };
 
-    // Only add category filters if valid IDs are provided
+    // Add category filters if valid IDs are provided
     if (subcategoryId && !isNaN(subcategoryId)) {
       where.subCategoryId = parseInt(subcategoryId);
     } else if (categoryId && !isNaN(categoryId)) {
       where.categoryId = parseInt(categoryId);
-    } else {
-      // Invalid IDs provided
-      return {
-        count: 0,
-        contacts: [],
-      };
     }
+    // If no filters provided, we'll get ALL contacts (no additional where clause needed)
 
     // Get contacts
     const contacts = await prisma.contact.findMany({
@@ -610,7 +596,7 @@ class CategoryService {
         },
       });
     } else {
-      // No filter - get all leads for this vendor
+      // No filter - get ALL leads for this vendor
       leads = await prisma.lead.findMany({
         where: {
           vendorId,

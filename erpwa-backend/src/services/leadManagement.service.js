@@ -458,6 +458,8 @@ class LeadManagementService {
         id: updated.id,
         company_name: updated.companyName || "",
         mobile_number: updated.phoneNumber,
+        email: updated.email || "",
+        city: updated.city || "",
         category: updated.categoryId,
         category_name: updated.leadCategory?.name,
         sub_category: updated.subCategoryId,
