@@ -480,7 +480,7 @@ export default function CategoriesPage() {
         </div>
 
         {/* Breadcrumb */}
-        {(selectedCategory || selectedSubcategory) && (
+        {/* {(selectedCategory || selectedSubcategory) && (
           <div className="bg-secondary/50 border border-border rounded-lg p-3">
             <div className="flex items-center gap-2 text-sm">
               <button
@@ -513,7 +513,7 @@ export default function CategoriesPage() {
               )}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Category Management */}
         <Card className="bg-card border-border">
