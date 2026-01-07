@@ -39,7 +39,7 @@ export function SidebarAdmin() {
   const menuItems = [
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/inbox", icon: MessageSquare, label: "Inbox" },
-    { href: "/admin/create-template", icon: FileText, label: "Templates" },
+    { href: "/admin/templates", icon: FileText, label: "Templates" },
 
     { href: "/admin/leads", icon: Database, label: "Leads" },
     { href: "/admin/categories", icon: Folder, label: "Categories" },

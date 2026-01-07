@@ -46,7 +46,7 @@ interface Message {
   caption?: string;
   sender: "customer" | "executive";
   timestamp: string;
-  status?: "sent" | "delivered" | "read" | "failed";
+  status?: "sent" | "delivered" | "read" | "failed" | "received";
 }
 
 interface Conversation {
@@ -58,12 +58,13 @@ interface Conversation {
 
   // ✅ NEW (required)
   lastMessageDirection?: "inbound" | "outbound";
-  lastMessageStatus?: "sent" | "delivered" | "read" | "failed";
+  lastMessageStatus?: "sent" | "delivered" | "read" | "received" | "failed";
   unreadCount?: number;
 
   hasUnread?: boolean;
   isPinned?: boolean;
   businessHoursRemaining?: string;
+  templateRequired?: boolean;
 }
 
 /* =======================
@@ -101,7 +102,7 @@ interface ApiMessage {
 
 const getConversationTick = (
   direction?: "inbound" | "outbound",
-  status?: "sent" | "delivered" | "read" | "failed"
+  status?: "sent" | "delivered" | "read" | "failed" | "received"
 ) => {
   // 🔒 HARD RULE: ticks ONLY for outbound
   if (direction !== "outbound") return null;
@@ -115,6 +116,8 @@ const getConversationTick = (
       return <CheckCheck className="w-4 h-4 text-blue-500" />;
     case "failed":
       return <AlertCircle className="w-4 h-4 text-destructive" />;
+    case "received":
+      return <CheckCheck className="w-4 h-4 text-muted-foreground" />;
     default:
       return null;
   }
@@ -277,6 +280,17 @@ function ChatArea({
   };
 
   const [copied, setCopied] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+
+  type ImageMode = "single" | "bulk";
+  const [imageMode, setImageMode] = useState<ImageMode>("single");
+
+  const [mediaModal, setMediaModal] = useState<{
+    type: "image" | "video" | "audio" | "document" | "template";
+  } | null>(null);
+
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const genericInputRef = useRef<HTMLInputElement | null>(null);
 
   const copyMessage = async (message: Message): Promise<boolean> => {
     try {
@@ -410,6 +424,7 @@ function ChatArea({
       sent: 1,
       delivered: 2,
       read: 3,
+      received: 2,
     };
 
     const handleStatusUpdate = ({
@@ -616,9 +631,9 @@ function ChatArea({
           </span>
         </div>
       )}
-      {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto relative">
-        {/* WhatsApp Background Layer */}
+      {/* MESSAGES WRAPPER */}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        {/* FIXED WHATSAPP BACKGROUND */}
         <div
           className="
       absolute inset-0
@@ -631,216 +646,234 @@ function ChatArea({
     "
         />
 
-        {/* Messages Layer */}
-        <div className="relative z-10 p-4 space-y-2">
-          <AnimatePresence>
-            {messages.map((msg, i) => {
-              const showDateSeparator =
-                i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
+        {/* SCROLLABLE MESSAGES */}
+        <div className="relative z-10 h-full overflow-y-auto">
+          <div className="p-4 space-y-2">
+            {/* messages go here */}
+            <AnimatePresence>
+              {messages.map((msg, i) => {
+                const showDateSeparator =
+                  i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
 
-            const repliedMessage =
-              msg.replyTo ??
-              messages.find(
-                (m) => m.whatsappMessageId === msg.replyToMessageId
-              );
-
-            return (
-              <div key={msg.id}>
-                {/* 📅 DATE SEPARATOR (WhatsApp style) */}
-                {showDateSeparator && (
-                  <div className="flex justify-center my-4">
-                    <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground shadow-sm">
-                      {getDateLabel(msg.timestamp)}
-                    </span>
-                  </div>
-                )}
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: i * 0.03 }}
-                  className={`flex items-end gap-2 ${
-                    msg.sender === "executive" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`group relative max-w-md px-3 py-2 shadow-sm ${
-                      msg.sender === "executive"
-                        ? "bg-primary/10 border border-primary/20 rounded-lg rounded-br-none"
-                        : "bg-card border border-border rounded-lg rounded-bl-none"
-                    }`}
-                  >
-                    {(msg.replyTo || repliedMessage) && (
-                      <div className="mb-1 px-2 py-1 border-l-4 border-primary bg-muted/50 rounded text-xs text-muted-foreground">
-                        <div className="font-medium">
-                          {(msg.replyTo ?? repliedMessage)?.sender ===
-                          "executive"
-                            ? "You"
-                            : conversation.customerName}
-                        </div>
-                        <div className="truncate">
-                          {(msg.replyTo ?? repliedMessage)?.text ||
-                            ((msg.replyTo ?? repliedMessage)?.mediaUrl
-                              ? "Media message"
-                              : "")}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 🖼 IMAGE */}
-                    {/* 🖼 IMAGE (WhatsApp style) */}
-                    {msg.mediaUrl && msg.mimeType?.startsWith("image/") && (
-                      <div className="mb-1">
-                        <div
-                          className="relative w-[320px] max-w-full aspect-[4/3] rounded-lg overflow-hidden cursor-pointer"
-                          onClick={() => window.open(msg.mediaUrl, "_blank")}
-                        >
-                          <Image
-                            src={msg.mediaUrl}
-                            alt="Image"
-                            fill
-                            sizes="(max-width: 768px) 90vw, 320px"
-                            className="object-cover"
-                          />
-                        </div>
-
-                        {msg.caption && (
-                          <p className="mt-1 text-sm text-foreground">
-                            {msg.caption}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 🎥 VIDEO (WhatsApp style) */}
-                    {msg.mediaUrl && msg.mimeType?.startsWith("video/") && (
-                      <div className="mb-1">
-                        <div className="w-[320px] max-w-full rounded-lg overflow-hidden bg-black">
-                          <video
-                            src={msg.mediaUrl}
-                            controls
-                            className="w-full h-auto"
-                          />
-                        </div>
-
-                        {msg.caption && (
-                          <p className="mt-1 text-sm text-foreground">
-                            {msg.caption}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 🎵 AUDIO (WhatsApp style) */}
-                    {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
-                      <div className="mb-1 w-[260px] max-w-full">
-                        <audio
-                          src={msg.mediaUrl}
-                          controls
-                          className="w-full h-10"
-                        />
-
-                        {msg.caption && (
-                          <p className="mt-1 text-sm text-foreground">
-                            {msg.caption}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 📄 DOCUMENT (WhatsApp style) */}
-                    {msg.mediaUrl &&
-                      msg.mimeType &&
-                      !msg.mimeType.startsWith("image/") &&
-                      !msg.mimeType.startsWith("video/") &&
-                      !msg.mimeType.startsWith("audio/") && (
-                        <a
-                          href={msg.mediaUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-[260px] max-w-full flex items-center gap-3 p-3 rounded-lg border bg-muted hover:bg-muted/70"
-                        >
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                            📄
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {msg.mediaUrl.split("/").pop()}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Document
-                            </p>
-                          </div>
-                        </a>
-                      )}
-
-                    {/* 📝 TEXT MESSAGE */}
-                    {msg.text && (
-                      <p className="text-sm text-foreground break-words leading-relaxed">
-                        {msg.text}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-1 mt-1 justify-end">
-                      <span className="text-[10px] text-muted-foreground">
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-
-                      {msg.sender === "executive" && (
-                        <span
-                          className={
-                            msg.status === "read"
-                              ? "text-blue-500"
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {getMessageStatusIcon(msg.status)}
+                const repliedMessage =
+                  msg.replyTo ??
+                  messages.find(
+                    (m) => m.whatsappMessageId === msg.replyToMessageId
+                  );
+                return (
+                  <div key={msg.id}>
+                    {/* 📅 DATE SEPARATOR (WhatsApp style) */}
+                    {showDateSeparator && (
+                      <div className="flex justify-center my-4">
+                        <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground shadow-sm">
+                          {getDateLabel(msg.timestamp)}
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-
-                          setActionMenu({
-                            message: msg,
-                            rect,
-                          });
-                        }}
-                        className="p-1.5 rounded-full bg-card border shadow hover:bg-muted"
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: i * 0.03 }}
+                      className={`flex items-end gap-2 ${
+                        msg.sender === "executive"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`group relative
+                                  max-w-md
+                                  px-3 py-2
+                                  shadow-sm
+                                  ${
+                                    msg.sender === "executive"
+                                      ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none"
+                                      : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none"
+                                  }
+                                `}
                       >
-                        <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            );
-          })}
-        </AnimatePresence>
+                        {(() => {
+                          const reply = getReplyPreview(
+                            msg.replyTo ?? repliedMessage
+                          );
+                          if (!reply) return null;
 
-        {/* 👇 Auto-scroll anchor */}
-        <div ref={messagesEndRef} />
+                          return (
+                            <div className="mb-1 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-[rgba(0,0,0,0.04)] dark:bg-[rgba(255,255,255,0.08)] rounded">
+                              {reply.thumb && (
+                                <div className="relative w-10 h-10 flex-shrink-0">
+                                  <Image
+                                    src={reply.thumb}
+                                    alt=""
+                                    fill
+                                    sizes="40px"
+                                    className="rounded object-cover"
+                                  />
+                                </div>
+                              )}
+
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-[#25D366] leading-tight">
+                                  {reply.title}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate leading-tight">
+                                  {reply.subtitle}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 🖼 IMAGE */}
+                        {/* 🖼 IMAGE (WhatsApp style) */}
+                        {msg.mediaUrl && msg.mimeType?.startsWith("image/") && (
+                          <div className="mb-1">
+                            <div
+                              className="relative w-[320px] max-w-full aspect-[4/3] rounded-lg overflow-hidden cursor-pointer"
+                              onClick={() =>
+                                window.open(msg.mediaUrl, "_blank")
+                              }
+                            >
+                              <Image
+                                src={msg.mediaUrl}
+                                alt="Image"
+                                fill
+                                sizes="(max-width: 768px) 90vw, 320px"
+                                className="object-cover"
+                              />
+                            </div>
+
+                            {msg.caption && (
+                              <p className="mt-1 text-sm text-foreground">
+                                {msg.caption}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 🎥 VIDEO (WhatsApp style) */}
+                        {msg.mediaUrl && msg.mimeType?.startsWith("video/") && (
+                          <div className="mb-1">
+                            <div className="w-[320px] max-w-full rounded-lg overflow-hidden bg-black">
+                              <video
+                                src={msg.mediaUrl}
+                                controls
+                                className="w-full h-auto"
+                              />
+                            </div>
+
+                            {msg.caption && (
+                              <p className="mt-1 text-sm text-foreground">
+                                {msg.caption}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 🎵 AUDIO (WhatsApp style) */}
+                        {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
+                          <div className="mb-1 w-[260px] max-w-full">
+                            <audio
+                              src={msg.mediaUrl}
+                              controls
+                              className="w-full h-10"
+                            />
+
+                            {msg.caption && (
+                              <p className="mt-1 text-sm text-foreground">
+                                {msg.caption}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 📄 DOCUMENT (WhatsApp style) */}
+                        {msg.mediaUrl &&
+                          msg.mimeType &&
+                          !msg.mimeType.startsWith("image/") &&
+                          !msg.mimeType.startsWith("video/") &&
+                          !msg.mimeType.startsWith("audio/") && (
+                            <a
+                              href={msg.mediaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-[260px] max-w-full flex items-center gap-3 p-3 rounded-lg border bg-muted hover:bg-muted/70"
+                            >
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                                📄
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {msg.mediaUrl.split("/").pop()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Document
+                                </p>
+                              </div>
+                            </a>
+                          )}
+
+                        {/* 📝 TEXT MESSAGE */}
+                        {msg.text && (
+                          <p className="text-sm leading-[1.35] break-words whitespace-pre-wrap overflow-hidden">
+                            {msg.text}
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-1 mt-1 justify-end">
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+
+                          {msg.sender === "executive" && (
+                            <span
+                              className={
+                                msg.status === "read"
+                                  ? "text-blue-500"
+                                  : "text-muted-foreground"
+                              }
+                            >
+                              {getMessageStatusIcon(msg.status)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
+
+                              setActionMenu({
+                                message: msg,
+                                rect,
+                              });
+                            }}
+                            className="p-1.5 rounded-full bg-card border shadow hover:bg-muted"
+                          >
+                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </AnimatePresence>
+
+            {/* 👇 Auto-scroll anchor */}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
       <div className="relative z-10 flex-shrink-0 bg-card border-t border-border">
-        {conversation.businessHoursRemaining && (
-          <div className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-yellow-600" />
-            <span className="text-xs text-yellow-700">
-              24-hour message window expires in{" "}
-              {conversation.businessHoursRemaining}
-            </span>
-          </div>
-        )}
-
         {replyTo && (
           <div className="px-4 py-2 bg-muted/50 border-l-4 border-primary flex justify-between items-center">
             <div className="text-xs">
@@ -866,7 +899,10 @@ function ChatArea({
               <motion.button className="p-2 rounded-full hover:bg-muted">
                 <Smile className="w-5 h-5 text-muted-foreground" />
               </motion.button>
-              <motion.button className="p-2 rounded-full hover:bg-muted">
+              <motion.button
+                onClick={() => setShowAttachMenu((v) => !v)}
+                className="p-2 rounded-full hover:bg-muted"
+              >
                 <Paperclip className="w-5 h-5 text-muted-foreground" />
               </motion.button>
             </div>
@@ -875,11 +911,20 @@ function ChatArea({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Type a message"
+                disabled={conversation.templateRequired}
+                placeholder={
+                  conversation.templateRequired
+                    ? "Template message required"
+                    : "Type a message"
+                }
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  if (
+                    e.key === "Enter" &&
+                    !e.nativeEvent.isComposing &&
+                    !conversation.templateRequired
+                  ) {
                     e.preventDefault();
                     sendMessage();
                   }
@@ -888,7 +933,17 @@ function ChatArea({
               />
             </div>
 
-            {inputValue.trim() ? (
+            {conversation.templateRequired ? (
+              <motion.button
+                className="bg-primary text-white px-4 py-2 rounded-lg"
+                onClick={() => {
+                  // TODO: open template picker modal
+                  alert("Open template picker");
+                }}
+              >
+                Send Template
+              </motion.button>
+            ) : inputValue.trim() ? (
               <motion.button
                 onClick={sendMessage}
                 className="bg-primary text-white p-2.5 rounded-full"
@@ -903,6 +958,83 @@ function ChatArea({
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {showAttachMenu && (
+          <>
+            {/* Click outside */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowAttachMenu(false)}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.96 }}
+              transition={{ duration: 0.15 }}
+              className="
+              absolute bottom-20 left-4 z-50
+              w-48
+              rounded-xl
+              shadow-2xl
+              py-2
+            bg-[#1f1f1f]
+            "
+            >
+              <AttachItem
+                icon={<span className="text-md">📝</span>}
+                label="Template"
+                color="#8b5cf6"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "template" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">🖼️</span>}
+                label="Photos"
+                color="#22c55e"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "image" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">📷</span>}
+                label="Videos"
+                color="#ef4444"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "video" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">🎧</span>}
+                label="Audio"
+                color="#f97316"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "audio" });
+                }}
+              />
+
+              <AttachItem
+                icon={<span className="text-md">📄</span>}
+                label="Document"
+                color="#3b82f6"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setMediaModal({ type: "document" });
+                }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {actionMenu && (
           <>
@@ -1281,6 +1413,40 @@ function ActionButton({
     </button>
   );
 }
+function AttachItem({
+  icon,
+  label,
+  color,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="
+        w-full flex items-center gap-4
+        px-4 py-2
+        text-sm
+        text-white
+        hover:bg-white/10
+        transition-colors
+      "
+    >
+      <div
+        className="w-9 h-9 rounded-full flex items-center justify-center text-white"
+        style={{ backgroundColor: color }}
+      >
+        {icon}
+      </div>
+
+      <span className="font-normal">{label}</span>
+    </button>
+  );
+}
 
 const mapApiConversation = (c: ApiConversation): Conversation => {
   const lastMsg = c.messages?.[c.messages.length - 1];
@@ -1320,6 +1486,19 @@ export default function InboxPage() {
   const readSentRef = useRef<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+
+  useEffect(() => {
+    const loadInbox = async () => {
+      try {
+        const res = await api.get<ApiConversation[]>("/inbox");
+        setConversations(res.data.map(mapApiConversation));
+      } catch (err) {
+        console.error("❌ Failed to load inbox", err);
+      }
+    };
+
+    loadInbox();
+  }, []);
 
   // 🔥 2️⃣ THEN LISTEN FOR INBOX UPDATES
   useEffect(() => {
@@ -1381,7 +1560,7 @@ export default function InboxPage() {
     setShowChat(true);
 
     try {
-      const res = await api.get<{ messages: ApiMessage[] }>(`/inbox/${id}`);
+      const res = await api.get(`/inbox/${id}`);
 
       const mappedMessages: Message[] = res.data.messages.map((m: any) => {
         const media = m.media?.[0]; // WhatsApp = 1 media per message
@@ -1413,6 +1592,18 @@ export default function InboxPage() {
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
       });
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                businessHoursRemaining: res.data.businessHoursRemaining,
+                templateRequired: res.data.templateRequired,
+              }
+            : c
+        )
+      );
     } catch (err) {
       console.error("Failed to load conversation", err);
       setMessages([]);
