@@ -14,6 +14,9 @@ import {
   ChevronRight,
   Menu,
   X,
+  Database,
+  Folder,
+  Image,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/context/sidebar-provider"
@@ -36,8 +39,11 @@ export function SidebarAdmin() {
   const menuItems = [
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/inbox", icon: MessageSquare, label: "Inbox" },
-    { href: "/admin/templates", icon: FileText, label: "Templates" },
-    { href: "/admin/add-lead", icon: UserPlus, label: "Add Lead" },
+    { href: "/admin/create-template", icon: FileText, label: "Templates" },
+
+    { href: "/admin/leads", icon: Database, label: "Leads" },
+    { href: "/admin/categories", icon: Folder, label: "Categories" },
+    { href: "/admin/gallery", icon: Image, label: "Gallery" },
     { href: "/admin/manage-team", icon: Users, label: "Manage Team" },
     { href: "/admin/setup", icon: MessageSquare, label: "Setup" },
     { href: "/admin/settings", icon: Settings, label: "Settings" },

@@ -30,7 +30,7 @@ router.get(
           select: {
             id: true,
             phoneNumber: true,
-            name: true,
+            companyName: true,
           },
         },
         messages: {
@@ -72,7 +72,7 @@ router.get(
           select: {
             id: true,
             phoneNumber: true,
-            name: true,
+            companyName: true,
           },
         },
         messages: {

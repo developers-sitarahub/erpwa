@@ -51,7 +51,7 @@ interface Message {
 
 interface Conversation {
   id: string;
-  customerName: string;
+  companyName: string;
   phone: string;
   lastMessage: string;
   lastActivity: string;
@@ -73,7 +73,7 @@ interface Conversation {
 interface ApiConversation {
   id: string;
   lead: {
-    name: string | null;
+    companyName: string | null;
     phoneNumber: string;
   };
   messages: {
@@ -174,7 +174,7 @@ function ConversationList({
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-semibold text-lg">
-                  {conv.customerName?.charAt(0)?.toUpperCase() || "?"}
+                  {conv.companyName?.charAt(0)?.toUpperCase() || "?"}
                 </div>
               </div>
 
@@ -187,7 +187,7 @@ function ConversationList({
                         : "font-medium text-foreground"
                     }`}
                   >
-                    {conv.customerName}
+                    {conv.companyName}
                   </p>
 
                   <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
@@ -253,6 +253,29 @@ function ChatArea({
     rect: DOMRect;
   } | null>(null);
 
+  const [imagePreview, setImagePreview] = useState<{
+    files: File[];
+    urls: string[];
+    caption: string;
+  } | null>(null);
+  const [sendingPreview, setSendingPreview] = useState(false);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+
+    const files = Array.from(e.target.files);
+    const urls = files.map((f) => URL.createObjectURL(f));
+
+    setImagePreview({
+      files,
+      urls,
+      caption: "",
+    });
+
+    setMediaModal(null);
+    e.target.value = "";
+  };
+
   const [copied, setCopied] = useState(false);
 
   const copyMessage = async (message: Message): Promise<boolean> => {
@@ -275,6 +298,33 @@ function ChatArea({
       return false;
     } catch {
       return false;
+    }
+  };
+
+  const sendImageFromPreview = async () => {
+    if (!imagePreview || sendingPreview) return;
+
+    setSendingPreview(true);
+
+    try {
+      for (const file of imagePreview.files) {
+        const form = new FormData();
+        form.append("conversationId", conversation.id);
+        form.append("file", file);
+
+        if (imagePreview.caption) {
+          form.append("caption", imagePreview.caption);
+        }
+
+        await api.post("/vendor/whatsapp/send-media", form);
+      }
+
+      setImagePreview(null);
+    } catch (err) {
+      console.error("Image send failed", err);
+      alert("Failed to send image");
+    } finally {
+      setSendingPreview(false);
     }
   };
 
@@ -465,6 +515,55 @@ function ChatArea({
   const isNewDay = (a: string, b: string) =>
     new Date(a).toDateString() !== new Date(b).toDateString();
 
+  const getReplyPreview = (m?: Message | Message["replyTo"]) => {
+    if (!m) return null;
+
+    // TEXT
+    if (m.text) {
+      return {
+        type: "text",
+        title: m.sender === "executive" ? "You" : conversation.companyName,
+        subtitle: m.text,
+      };
+    }
+
+    // IMAGE
+    if (m.mimeType?.startsWith("image/")) {
+      return {
+        type: "image",
+        title: m.sender === "executive" ? "You" : conversation.companyName,
+        subtitle: "Photo",
+        thumb: m.mediaUrl,
+      };
+    }
+
+    // VIDEO
+    if (m.mimeType?.startsWith("video/")) {
+      return {
+        type: "video",
+        title: m.sender === "executive" ? "You" : conversation.companyName,
+        subtitle: "Video",
+        thumb: m.mediaUrl,
+      };
+    }
+
+    // AUDIO
+    if (m.mimeType?.startsWith("audio/")) {
+      return {
+        type: "audio",
+        title: m.sender === "executive" ? "You" : conversation.companyName,
+        subtitle: "Voice message",
+      };
+    }
+
+    // DOCUMENT
+    return {
+      type: "document",
+      title: m.sender === "executive" ? "You" : conversation.companyName,
+      subtitle: "Document",
+    };
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-muted/20 relative h-full overflow-hidden">
       {/* Header */}
@@ -476,12 +575,12 @@ function ChatArea({
         )}
 
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white font-semibold">
-          {conversation.customerName?.charAt(0)?.toUpperCase() || "?"}
+          {conversation.companyName?.charAt(0)?.toUpperCase() || "?"}
         </div>
 
         <div>
           <h3 className="font-medium text-foreground">
-            {conversation.customerName}
+            {conversation.companyName}
           </h3>
           <p className="text-xs text-muted-foreground">{conversation.phone}</p>
         </div>
@@ -498,13 +597,46 @@ function ChatArea({
           </motion.button>
         </div>
       </div>
-
+      {conversation.businessHoursRemaining &&
+        !conversation.templateRequired && (
+          <div className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-yellow-600" />
+            <span className="text-xs text-yellow-700">
+              24-hour message window expires in{" "}
+              {conversation.businessHoursRemaining}
+            </span>
+          </div>
+        )}
+      {conversation.templateRequired && (
+        <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600" />
+          <span className="text-xs text-red-700">
+            24-hour window closed. Send a template message to start the
+            conversation.
+          </span>
+        </div>
+      )}
       {/* Messages */}
-      <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-2">
-        <AnimatePresence>
-          {messages.map((msg, i) => {
-            const showDateSeparator =
-              i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
+      <div className="flex-1 min-h-0 overflow-y-auto relative">
+        {/* WhatsApp Background Layer */}
+        <div
+          className="
+      absolute inset-0
+      bg-[#ECE5DD] dark:bg-[#0B141A]
+      bg-[url('/chat-bg.png')]
+      bg-repeat
+      bg-center
+      opacity-100 dark:opacity-[0.5]
+      pointer-events-none
+    "
+        />
+
+        {/* Messages Layer */}
+        <div className="relative z-10 p-4 space-y-2">
+          <AnimatePresence>
+            {messages.map((msg, i) => {
+              const showDateSeparator =
+                i === 0 || isNewDay(messages[i - 1].timestamp, msg.timestamp);
 
             const repliedMessage =
               msg.replyTo ??
@@ -715,7 +847,7 @@ function ChatArea({
               <div className="font-medium">
                 {replyTo.sender === "executive"
                   ? "You"
-                  : conversation.customerName}
+                  : conversation.companyName}
               </div>
               <div className="truncate max-w-xs">{replyTo.text}</div>
             </div>
@@ -851,6 +983,276 @@ function ChatArea({
           Copied
         </motion.div>
       )}
+      <AnimatePresence>
+        {mediaModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              className="fixed inset-0 z-50 bg-black/60"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMediaModal(null)}
+            />
+
+            {/* Center Modal */}
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="
+          fixed z-50
+          top-1/2 left-1/2
+          -translate-x-1/2 -translate-y-1/2
+          w-105 max-w-[90vw]
+          bg-card
+          rounded-xl
+          shadow-2xl
+          p-6
+        "
+            >
+              <h3 className="text-lg font-semibold mb-2">
+                {mediaModal.type === "template"
+                  ? "Send Template"
+                  : "Send Media"}
+              </h3>
+
+              {/* IMAGE */}
+              {mediaModal.type === "image" && (
+                <div className="mt-4 space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold">Send Photos</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose how you want to send images
+                    </p>
+                  </div>
+
+                  {/* SEND MODE */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Send mode
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setImageMode("single")}
+                        className={`flex-1 py-2.5 rounded-lg ${
+                          imageMode === "single"
+                            ? "bg-primary text-white"
+                            : "bg-muted"
+                        }`}
+                      >
+                        Single
+                      </button>
+                      <button
+                        onClick={() => setImageMode("bulk")}
+                        className={`flex-1 py-2.5 rounded-lg ${
+                          imageMode === "bulk"
+                            ? "bg-primary text-white"
+                            : "bg-muted"
+                        }`}
+                      >
+                        Bulk
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* DEVICE */}
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="rounded-xl border p-5 hover:bg-muted text-left"
+                  >
+                    <div className="text-3xl mb-2">📁</div>
+                    <p className="font-medium text-sm">Device</p>
+                  </button>
+
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple={imageMode === "bulk"}
+                    className="hidden"
+                    onChange={handleImageSelect}
+                  />
+                </div>
+              )}
+
+              {/* VIDEO */}
+              {mediaModal.type === "video" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Select videos
+                </p>
+              )}
+
+              {/* AUDIO */}
+              {mediaModal.type === "audio" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Select audio files
+                </p>
+              )}
+
+              {/* DOCUMENT */}
+              {mediaModal.type === "document" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Select documents
+                </p>
+              )}
+
+              {/* TEMPLATE */}
+              {mediaModal.type === "template" && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Choose a WhatsApp template
+                </p>
+              )}
+
+              {/* Hidden file input */}
+              {mediaModal.type !== "template" && (
+                <>
+                  <input
+                    ref={genericInputRef}
+                    type="file"
+                    multiple
+                    accept={
+                      mediaModal.type === "video"
+                        ? "video/*"
+                        : mediaModal.type === "audio"
+                        ? "audio/*"
+                        : "*"
+                    }
+                    className="hidden"
+                    onChange={async (e) => {
+                      if (!e.target.files?.length) return;
+
+                      const files = Array.from(e.target.files);
+
+                      for (const file of files) {
+                        const form = new FormData();
+                        form.append("conversationId", conversation.id);
+                        form.append("file", file);
+
+                        await api.post("/vendor/whatsapp/send-media", form);
+                      }
+
+                      setMediaModal(null);
+                    }}
+                  />
+
+                  <button
+                    onClick={() => genericInputRef.current?.click()}
+                    className="w-full bg-primary text-white py-2 rounded-lg"
+                  >
+                    Choose Files
+                  </button>
+                </>
+              )}
+
+              {/* Template placeholder */}
+              {mediaModal.type === "template" && (
+                <button
+                  onClick={() => {
+                    alert("Template picker coming next");
+                    setMediaModal(null);
+                  }}
+                  className="w-full bg-primary text-white py-2 rounded-lg"
+                >
+                  Open Template Picker
+                </button>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {imagePreview && (
+          <>
+            {/* BACKDROP (ChatArea only) */}
+            <motion.div
+              className="absolute inset-0 z-40 bg-black"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+
+            {/* PREVIEW SCREEN */}
+            <motion.div
+              className="absolute inset-0 z-50 flex flex-col bg-black text-white"
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+            >
+              {/* HEADER */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <button
+                  disabled={sendingPreview}
+                  onClick={() => setImagePreview(null)}
+                  className={
+                    sendingPreview ? "opacity-40 cursor-not-allowed" : ""
+                  }
+                >
+                  ✕
+                </button>
+                <span className="text-sm">
+                  {imagePreview.files.length} photo
+                  {imagePreview.files.length > 1 ? "s" : ""}
+                </span>
+              </div>
+
+              {/* MAIN IMAGE */}
+              <div className="flex-1 flex items-center justify-center">
+                <img
+                  src={imagePreview.urls[0]}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+
+              {/* THUMBNAILS */}
+              {imagePreview.urls.length > 1 && (
+                <div className="flex gap-2 px-4 py-2 overflow-x-auto">
+                  {imagePreview.urls.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      className="w-16 h-16 rounded object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* CAPTION + SEND */}
+              <div className="flex items-center gap-3 p-4">
+                <input
+                  placeholder="Add a caption…"
+                  value={imagePreview.caption}
+                  onChange={(e) =>
+                    setImagePreview((p) =>
+                      p ? { ...p, caption: e.target.value } : p
+                    )
+                  }
+                  className="flex-1 bg-white/10 px-4 py-2 rounded-full outline-none"
+                />
+
+                <button
+                  disabled={sendingPreview}
+                  onClick={sendImageFromPreview}
+                  className={`bg-primary w-12 h-12 rounded-full flex items-center justify-center
+                  ${sendingPreview ? "opacity-60 cursor-not-allowed" : ""}
+                  `}
+                >
+                  <Send className="w-5 h-5 text-white" />
+                </button>
+              </div>
+              {sendingPreview && (
+                <div className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center gap-4">
+                  <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="text-sm text-white/90 tracking-wide">
+                    Sending…
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -889,7 +1291,7 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
 
   return {
     id: c.id,
-    customerName: c.lead.name || c.lead.phoneNumber,
+    companyName: c.lead.companyName || c.lead.phoneNumber,
     phone: c.lead.phoneNumber,
     lastMessage: (() => {
       if (!lastMsg) return "";

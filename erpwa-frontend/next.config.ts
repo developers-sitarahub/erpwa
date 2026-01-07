@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
         hostname: "d2xewl4dlr9aio.cloudfront.net",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.amazonaws.com",
+        pathname: "/**",
+      },
     ],
   },
 };

@@ -13,6 +13,10 @@ import whatsappTestRoutes from "./routes/whatsappTest.route.js";
 import vendorTemplateRoutes from "./routes/vendorTemplate.route.js";
 import vendorWhatsappTemplateSendRoutes from "./routes/vendorWhatsappTemplateSend.route.js";
 import inboxRoutes from "./routes/inbox.route.js";
+import categoryRoutes from "./routes/category.routes.js";
+import leadRoutes from "./routes/lead.routes.js";
+import leadManagementRoutes from "./routes/leadManagement.routes.js";
+import galleryRoutes from "./routes/gallery.routes.js";
 import { initSocket } from "./socket.js";
 import testUploadRoute from "./routes/testUpload.route.js";
 
@@ -45,6 +49,10 @@ app.use("/api/vendor/whatsapp", vendorWhatsappMessageRoutes);
 app.use("/api/vendor/templates", vendorTemplateRoutes);
 app.use("/api/vendor/whatsapp/template", vendorWhatsappTemplateSendRoutes);
 app.use("/api/inbox", inboxRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/leads", leadRoutes);
+app.use("/api/leads-management", leadManagementRoutes);
+app.use("/api/gallery", galleryRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
 app.use("/test", testUploadRoute);
 
