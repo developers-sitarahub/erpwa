@@ -90,19 +90,8 @@ class GalleryService {
       prisma.galleryImage.count({ where }),
     ]);
 
-    // Generate presigned URLs for S3 images
-    const { generatePresignedUrl } = await import("../utils/s3.util.js");
-
-    const formattedImages = await Promise.all(images.map(async (img) => {
-      let imageUrl = img.s3Url;
-
-      // If we have an S3 key, generate a presigned URL (valid for 1 hour)
-      if (img.s3Key) {
-        const presignedUrl = await generatePresignedUrl(img.s3Key);
-        if (presignedUrl) {
-          imageUrl = presignedUrl;
-        }
-      }
+    const formattedImages = images.map((img) => {
+      const imageUrl = img.s3Url;
 
       return {
         id: img.id,
@@ -127,7 +116,7 @@ class GalleryService {
         created_at: img.createdAt.toISOString(),
         updated_at: img.updatedAt.toISOString(),
       };
-    }));
+    });
 
     return {
       images: formattedImages,

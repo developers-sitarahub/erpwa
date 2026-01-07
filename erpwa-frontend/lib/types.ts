@@ -32,6 +32,8 @@ export interface Lead {
     id: number
     company_name: string
     mobile_number: string
+    email?: string
+    city?: string
     category?: number
     category_name?: string
     sub_category?: number

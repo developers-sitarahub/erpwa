@@ -10,7 +10,7 @@ import {
   CardContent,
 } from "@/components/card"
 import { Badge } from "@/components/badge"
-import { Plus, Edit2, Trash2, Eye, EyeOff, X, FolderOpen, Check, AlertTriangle } from "lucide-react"
+import { Plus, Edit2, Trash2, Eye, EyeOff, X, FolderOpen, Check, AlertTriangle, Search, Filter, ChevronDown } from "lucide-react"
 import { categoriesAPI } from "@/lib/categoriesApi"
 import type { Category, Contact } from "@/lib/types"
 import { toast } from "react-toastify"
@@ -65,8 +65,14 @@ export default function CategoriesPage() {
   const [selectedSubcategory, setSelectedSubcategory] = useState<number | null>(null)
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactCount, setContactCount] = useState(0)
-  const [showDetails, setShowDetails] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Search, filter, sort, and pagination states
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState<string>("created_at")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   // Category form states
   const [categoryName, setCategoryName] = useState("")
@@ -83,36 +89,25 @@ export default function CategoriesPage() {
     subcategoriesCount: number
   } | null>(null)
 
-  // Add Contact Modal states
-  const [showAddContactModal, setShowAddContactModal] = useState(false)
-  const [contactForm, setContactForm] = useState({
-    company_name: "",
-    mobile_number: "",
-    category_id: "",
-    subcategory_id: "",
-    sales_person_name: "",
-    status: "pending" as Contact["status"],
-  })
-  const [contactSubcategories, setContactSubcategories] = useState<Category[]>([])
+  // Confirmation State
+  const [deleteConf, setDeleteConf] = useState<{
+    isOpen: boolean;
+    type: 'category' | 'contact';
+    id?: number;
+    title?: string;
+  }>({ isOpen: false, type: 'category' });
+
+
 
   useEffect(() => {
     loadCategories()
+    // Load all contacts on initial page load
+    loadContactDetails()
   }, [])
 
   useEffect(() => {
-    // Only load count if we have a valid category or subcategory selected
-    const hasValidCategory = selectedCategory !== null && !isNaN(selectedCategory) && selectedCategory > 0
-    const hasValidSubcategory = selectedSubcategory !== null && !isNaN(selectedSubcategory) && selectedSubcategory > 0
-
-    if (hasValidCategory || hasValidSubcategory) {
-      loadContactCount()
-      setShowDetails(false)
-    } else {
-      // Reset count when no valid category is selected
-      setContactCount(0)
-      setShowDetails(false)
-      setContacts([])
-    }
+    // Load contacts whenever category/subcategory selection changes
+    loadContactDetails()
   }, [selectedCategory, selectedSubcategory])
 
   const loadCategories = async () => {
@@ -152,37 +147,31 @@ export default function CategoriesPage() {
   }
 
   const loadContactDetails = async () => {
-    // Only call API if we have at least one valid category/subcategory ID
     const hasValidCategory = selectedCategory !== null && !isNaN(selectedCategory) && selectedCategory > 0
     const hasValidSubcategory = selectedSubcategory !== null && !isNaN(selectedSubcategory) && selectedSubcategory > 0
 
-    if (!hasValidCategory && !hasValidSubcategory) {
-      setContacts([])
-      toast.error("Please select a category or subcategory first")
-      return
-    }
-
     try {
+      // If no category/subcategory selected, pass undefined to get ALL contacts
       const response = await categoriesAPI.getContacts(
         hasValidCategory ? selectedCategory : undefined,
         hasValidSubcategory ? selectedSubcategory : undefined
       )
       // API returns { data: { count, contacts } }
       const contacts = response.data?.contacts ?? []
+      const count = response.data?.count ?? contacts.length
       setContacts(contacts)
-      setShowDetails(true)
+      setContactCount(count)
     } catch (error: any) {
       // API wrapper now never throws, but just in case
       console.error("Failed to load contacts:", error)
       setContacts([])
-      toast.error("Failed to load contacts")
+      setContactCount(0)
     }
   }
 
   const handleCategoryClick = (categoryId: number) => {
     setSelectedCategory(categoryId)
     setSelectedSubcategory(null)
-    setShowDetails(false)
     loadSubcategories(categoryId)
   }
 
@@ -205,7 +194,6 @@ export default function CategoriesPage() {
 
   const handleSubcategoryClick = (subcategoryId: number) => {
     setSelectedSubcategory(subcategoryId)
-    setShowDetails(false)
   }
 
   const handleCreateCategory = async (e: React.FormEvent) => {
@@ -247,7 +235,26 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleDeleteCategory = async (categoryId: number, categoryName: string) => {
+  const handleDeleteCategory = (categoryId: number, categoryName: string) => {
+    setDeleteConf({ isOpen: true, type: 'category', id: categoryId, title: categoryName });
+  }
+
+  const handleDeleteContact = (contactId: number, contactName: string) => {
+    setDeleteConf({ isOpen: true, type: 'contact', id: contactId, title: contactName });
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConf.id) return;
+
+    if (deleteConf.type === 'category') {
+      await executeDeleteCategory(deleteConf.id, deleteConf.title || "");
+    } else {
+      await executeDeleteContact(deleteConf.id);
+    }
+    setDeleteConf({ ...deleteConf, isOpen: false });
+  }
+
+  const executeDeleteCategory = async (categoryId: number, categoryName: string) => {
     try {
       const response = await categoriesAPI.delete(categoryId, {})
 
@@ -346,11 +353,7 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleDeleteContact = async (contactId: number, contactName: string) => {
-    if (!confirm(`Are you sure you want to delete contact "${contactName}"?`)) {
-      return
-    }
-
+  const executeDeleteContact = async (contactId: number) => {
     try {
       await categoriesAPI.deleteContact(contactId)
       toast.success("Contact deleted successfully!")
@@ -386,80 +389,7 @@ export default function CategoriesPage() {
     }
   }
 
-  const loadContactSubcategories = async (categoryId: number) => {
-    try {
-      const response = await categoriesAPI.detail(categoryId)
-      setContactSubcategories(response.data.subcategories || [])
-    } catch (error) {
-      setContactSubcategories([])
-    }
-  }
 
-  const handleContactCategoryChange = (categoryId: string) => {
-    setContactForm({ ...contactForm, category_id: categoryId, subcategory_id: "" })
-    if (categoryId) {
-      loadContactSubcategories(parseInt(categoryId))
-    } else {
-      setContactSubcategories([])
-    }
-  }
-
-  const handleCreateContact = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!contactForm.company_name.trim()) {
-      toast.error("Company name is required")
-      return
-    }
-    if (!contactForm.mobile_number.trim()) {
-      toast.error("Mobile number is required")
-      return
-    }
-    if (!contactForm.category_id) {
-      toast.error("Category is required")
-      return
-    }
-
-    try {
-      const formData = new FormData()
-      formData.append("company_name", contactForm.company_name.trim())
-      formData.append("mobile_number", contactForm.mobile_number.trim())
-      formData.append("category_id", contactForm.category_id)
-      if (contactForm.subcategory_id) {
-        formData.append("subcategory_id", contactForm.subcategory_id)
-      }
-      formData.append("sales_person_name", contactForm.sales_person_name.trim())
-      formData.append("status", contactForm.status)
-
-      const response = await categoriesAPI.createContact(formData)
-
-      if (response.data?.success !== false) {
-        toast.success("Contact created successfully!")
-        setShowAddContactModal(false)
-        setContactForm({
-          company_name: "",
-          mobile_number: "",
-          category_id: selectedCategory?.toString() || "",
-          subcategory_id: selectedSubcategory?.toString() || "",
-          sales_person_name: "",
-          status: "pending",
-        })
-        setContactSubcategories([])
-        await loadContactDetails()
-        await loadContactCount()
-      } else {
-        toast.error("Failed to create contact")
-      }
-    } catch (error: any) {
-      const errorMsg =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to create contact"
-      toast.error(errorMsg)
-      console.error("Contact creation error:", error)
-    }
-  }
 
   const selectedCategoryData = categories.find((c) => c.id === selectedCategory)
   const subcategories = selectedCategoryData?.subcategories || []
@@ -644,32 +574,13 @@ export default function CategoriesPage() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <h3 className="text-lg font-semibold text-foreground">Contacts</h3>
-            <Button
-              onClick={() => {
-                setContactForm({
-                  company_name: "",
-                  mobile_number: "",
-                  category_id: selectedCategory?.toString() || "",
-                  subcategory_id: selectedSubcategory?.toString() || "",
-                  sales_person_name: "",
-                  status: "pending",
-                })
-                if (selectedCategory) {
-                  loadContactSubcategories(selectedCategory)
-                }
-                setShowAddContactModal(true)
-              }}
-              className="bg-primary hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Contact
-            </Button>
+
           </CardHeader>
           <CardContent>
             {/* Filter by Category */}
             {categories.length > 0 && (
-              <div className="mb-4">
-                <label className="text-sm font-medium text-foreground block mb-2">
+              <div className="mb-6 p-4 bg-card border border-border rounded-lg">
+                <label className="text-sm font-medium text-foreground block mb-3">
                   Filter by Category:
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -680,147 +591,351 @@ export default function CategoriesPage() {
                         ? "bg-primary text-white"
                         : "bg-secondary text-foreground hover:bg-primary/20"
                         }`}
-                      onClick={() => handleCategoryClick(cat.id)}
+                      onClick={() => {
+                        // Toggle: if already selected, deselect it
+                        if (selectedCategory === cat.id) {
+                          setSelectedCategory(null)
+                          setSelectedSubcategory(null)
+                          setContacts([])
+                          setContactCount(0)
+                        } else {
+                          handleCategoryClick(cat.id)
+                        }
+                      }}
                     >
                       {cat.name}
                     </button>
                   ))}
                 </div>
 
-                {/* Subcategories */}
-                {selectedCategory && subcategories.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <label className="text-sm font-medium text-foreground block mb-2">
-                      Sub-Category :-
-                    </label>
-                    <div className="flex flex-wrap gap-3">
-                      {subcategories.map((subcat) => (
-                        <button
-                          key={subcat.id}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${selectedSubcategory === subcat.id
-                            ? "bg-primary text-white shadow-md"
-                            : "bg-secondary border border-border text-foreground hover:bg-muted/70"
-                            }`}
-                          onClick={() => handleSubcategoryClick(subcat.id)}
-                        >
-                          <span>•</span>
-                          {subcat.name}
-                        </button>
-                      ))}
-                    </div>
+                {/* Subcategories - Always visible */}
+                <div className="mt-4 pt-4 border-t border-border">
+                  <label className="text-sm font-medium text-foreground block mb-3">
+                    Sub-Category
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => setSelectedSubcategory(null)}
+                      disabled={!selectedCategory}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${!selectedSubcategory
+                        ? "bg-primary text-white shadow-md"
+                        : "bg-secondary border border-border text-foreground hover:bg-muted/70"
+                        } ${!selectedCategory ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      <span>-</span>
+                      All
+                    </button>
+                    {subcategories.map((subcat) => (
+                      <button
+                        key={subcat.id}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${selectedSubcategory === subcat.id
+                          ? "bg-primary text-white shadow-md"
+                          : "bg-secondary border border-border text-foreground hover:bg-muted/70"
+                          }`}
+                        onClick={() => {
+                          // Toggle: if already selected, deselect it
+                          if (selectedSubcategory === subcat.id) {
+                            setSelectedSubcategory(null)
+                          } else {
+                            handleSubcategoryClick(subcat.id)
+                          }
+                        }}
+                      >
+                        <span>•</span>
+                        {subcat.name}
+                      </button>
+                    ))}
+                    {selectedCategory && subcategories.length === 0 && (
+                      <span className="text-xs text-muted-foreground self-center ml-2">No subcategories</span>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             )}
 
-            {/* Contact Count and Show Details */}
-            {(selectedCategory || selectedSubcategory) && (
-              <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-lg flex justify-between items-center">
+            {/* Contact Count, Search, and Filters - Always show */}
+            <div className="space-y-4 mb-6">
+              {/* Total Count and Search Bar */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-card border border-border rounded-lg">
                 <div>
-                  <strong className="text-foreground">Total Contacts:</strong>{" "}
-                  <span className="text-primary font-semibold">{contactCount}</span>
-                  {selectedCategoryData && (
-                    <>
-                      <br />
-                      <small className="text-muted-foreground">
-                        in {selectedCategoryData.name}
-                        {selectedSubcategory &&
-                          ` > ${subcategories.find((s) => s.id === selectedSubcategory)?.name}`}
-                      </small>
-                    </>
+                  <div className="flex items-baseline gap-2">
+                    <strong className="text-foreground">
+                      {selectedCategory || selectedSubcategory ? "Filtered" : "Total"} Contacts:
+                    </strong>
+                    <span className="text-primary font-semibold text-2xl">{contactCount}</span>
+                  </div>
+                  {selectedCategoryData && (selectedCategory || selectedSubcategory) && (
+                    <small className="text-muted-foreground block mt-1">
+                      in {selectedCategoryData.name}
+                      {selectedSubcategory &&
+                        ` > ${subcategories.find((s) => s.id === selectedSubcategory)?.name}`}
+                    </small>
+                  )}
+                  {!selectedCategory && !selectedSubcategory && (
+                    <small className="text-muted-foreground block mt-1">
+                      Across all categories
+                    </small>
                   )}
                 </div>
-                <Button onClick={loadContactDetails} className="bg-primary hover:bg-primary/90">
-                  <Eye className="w-4 h-4 mr-2" />
-                  Show Details
-                </Button>
-              </div>
-            )}
 
-            {/* Contacts Table */}
-            {showDetails && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-secondary/30">
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                        Company Name
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                        Mobile Number
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                        Category
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                        Sub-Category
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                        Sales Person
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-                      <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contacts && contacts.length > 0 ? (
-                      contacts.map((contact: any) => (
-                        <tr key={contact.id || `${contact.mobile_number}-${contact.company_name}`} className="border-b border-border hover:bg-muted/30">
-                          <td className="py-3 px-4 text-foreground">{contact.company_name || "--"}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{contact.mobile_number || "--"}</td>
-                          <td className="py-3 px-4 text-foreground">
-                            {contact.category_name || "--"}
-                          </td>
-                          <td className="py-3 px-4 text-foreground">
-                            {contact.sub_category_name || "--"}
-                          </td>
-                          <td className="py-3 px-4 text-foreground">
-                            {contact.sales_person_name || "--"}
-                          </td>
-                          <td className="py-3 px-4">
-                            <StatusBadge status={contact.status || (contact.is_lead ? "new" : "pending")} isLead={contact.is_lead} />
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <div className="flex justify-end gap-2">
-                              {contact.is_lead ? (
-                                <span className="text-xs text-muted-foreground px-2 py-1 bg-blue-500/10 rounded">
-                                  Lead
-                                </span>
-                              ) : (
-                                <button
-                                  className="p-1 hover:bg-destructive/10 rounded transition-colors"
-                                  onClick={() => {
-                                    if (contact.id) {
-                                      handleDeleteContact(contact.id, contact.company_name || "contact")
-                                    } else {
-                                      toast.error("Cannot delete lead from here. Please use the Leads page.")
-                                    }
-                                  }}
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={7} className="text-center py-6 text-muted-foreground">
-                          No contacts found for this category{selectedSubcategory ? " / subcategory" : ""}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                {/* Search */}
+                <div className="relative flex-1 max-w-md w-full">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search contacts..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="w-full pl-10 pr-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                </div>
               </div>
-            )}
+
+              {/* Sort and Clear Filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                {/* Sort */}
+                <select
+                  className="px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  value={`${sortBy}:${sortOrder}`}
+                  onChange={(e) => {
+                    const [field, order] = e.target.value.split(":")
+                    setSortBy(field)
+                    setSortOrder(order as "asc" | "desc")
+                  }}
+                >
+                  <option value="created_at:desc">Sort: Latest First</option>
+                  <option value="created_at:asc">Sort: Oldest First</option>
+                  <option value="company_name:asc">Sort: Name (A-Z)</option>
+                  <option value="company_name:desc">Sort: Name (Z-A)</option>
+                  <option value="category_name:asc">Sort: Category (A-Z)</option>
+                  <option value="category_name:desc">Sort: Category (Z-A)</option>
+                  <option value="status:asc">Sort: Status (A-Z)</option>
+                  <option value="status:desc">Sort: Status (Z-A)</option>
+                </select>
+
+                {/* Clear Search */}
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery("")
+                      setCurrentPage(1)
+                    }}
+                    className="text-xs text-destructive hover:underline px-3 py-2 bg-destructive/10 rounded-lg"
+                  >
+                    Clear Search
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Contacts Table - Always visible */}
+            {(() => {
+              // Filter contacts
+              let filteredContacts = [...contacts]
+
+              // Search filter
+              if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase()
+                filteredContacts = filteredContacts.filter(
+                  (contact) =>
+                    contact.company_name?.toLowerCase().includes(query) ||
+                    contact.mobile_number?.toString().includes(query) ||
+                    contact.category_name?.toLowerCase().includes(query) ||
+                    contact.sub_category_name?.toLowerCase().includes(query) ||
+                    contact.sales_person_name?.toLowerCase().includes(query)
+                )
+              }
+
+              // Sort contacts
+              filteredContacts.sort((a: any, b: any) => {
+                const aValue = a[sortBy] || ""
+                const bValue = b[sortBy] || ""
+
+                // Handle date sorting for created_at
+                if (sortBy === "created_at") {
+                  const aDate = aValue ? new Date(aValue).getTime() : 0
+                  const bDate = bValue ? new Date(bValue).getTime() : 0
+                  return sortOrder === "asc" ? aDate - bDate : bDate - aDate
+                }
+
+                // Handle string sorting
+                if (typeof aValue === "string" && typeof bValue === "string") {
+                  return sortOrder === "asc"
+                    ? aValue.localeCompare(bValue)
+                    : bValue.localeCompare(aValue)
+                }
+
+                // Handle numeric sorting
+                return sortOrder === "asc" ? aValue - bValue : bValue - aValue
+              })
+
+              // Pagination
+              const totalPages = Math.ceil(filteredContacts.length / itemsPerPage)
+              const startIndex = (currentPage - 1) * itemsPerPage
+              const paginatedContacts = filteredContacts.slice(startIndex, startIndex + itemsPerPage)
+
+              return (
+                <div className="mt-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-secondary/30">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            Company Name
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            Mobile Number
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            Category
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            Sub-Category
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            Sales Person
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedContacts && paginatedContacts.length > 0 ? (
+                          paginatedContacts.map((contact: any) => (
+                            <tr key={contact.id || `${contact.mobile_number}-${contact.company_name}`} className="border-b border-border hover:bg-muted/30">
+                              <td className="py-3 px-4 text-foreground">{contact.company_name || "--"}</td>
+                              <td className="py-3 px-4 text-muted-foreground">{contact.mobile_number || "--"}</td>
+                              <td className="py-3 px-4 text-foreground">
+                                {contact.category_name || "--"}
+                              </td>
+                              <td className="py-3 px-4 text-foreground">
+                                {contact.sub_category_name || "--"}
+                              </td>
+                              <td className="py-3 px-4 text-foreground">
+                                {contact.sales_person_name || "--"}
+                              </td>
+                              <td className="py-3 px-4">
+                                <StatusBadge status={contact.status || (contact.is_lead ? "new" : "pending")} isLead={contact.is_lead} />
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <div className="flex justify-end gap-2">
+                                  {contact.is_lead ? (
+                                    <span className="text-xs text-muted-foreground px-2 py-1 bg-blue-500/10 rounded">
+                                      Lead
+                                    </span>
+                                  ) : (
+                                    <button
+                                      className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                                      onClick={() => {
+                                        if (contact.id) {
+                                          handleDeleteContact(contact.id, contact.company_name || "contact")
+                                        } else {
+                                          toast.error("Cannot delete lead from here. Please use the Leads page.")
+                                        }
+                                      }}
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-4 h-4 text-destructive" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={7} className="text-center py-6 text-muted-foreground">
+                              {searchQuery
+                                ? "No contacts match your search"
+                                : "No contacts found for this category" + (selectedSubcategory ? " / subcategory" : "")}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 0 && (
+                    <div className="flex justify-center items-center gap-3 mt-6 pt-4 border-t border-border">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="bg-secondary border-border text-foreground hover:bg-muted"
+                      >
+                        ← Previous
+                      </Button>
+
+                      <div className="flex gap-2">
+                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                          let pageNum
+                          if (totalPages <= 5) {
+                            pageNum = i + 1
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i
+                          } else {
+                            pageNum = currentPage - 2 + i
+                          }
+
+                          return (
+                            <Button
+                              key={pageNum}
+                              size="sm"
+                              onClick={() => setCurrentPage(pageNum)}
+                              className={`min-w-10 ${pageNum === currentPage
+                                ? "bg-primary hover:bg-primary/90 text-white"
+                                : "bg-secondary border-border text-foreground hover:bg-muted"
+                                }`}
+                            >
+                              {pageNum}
+                            </Button>
+                          )
+                        })}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="bg-secondary border-border text-foreground hover:bg-muted"
+                      >
+                        Next →
+                      </Button>
+
+                      <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+                        <span className="text-sm text-muted-foreground">Rows:</span>
+                        <select
+                          className="px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          value={itemsPerPage}
+                          onChange={(e) => {
+                            setItemsPerPage(Number(e.target.value))
+                            setCurrentPage(1)
+                          }}
+                        >
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={30}>30</option>
+                          <option value={50}>50</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {!selectedCategory && !selectedSubcategory && (
               <div className="text-center py-8 text-muted-foreground">
                 <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>Select a category or sub-category above to view contact count and details.</p>
+                <p>Select a category above to view contacts.</p>
               </div>
             )}
           </CardContent>
@@ -828,345 +943,252 @@ export default function CategoriesPage() {
       </div>
 
       {/* Edit Category Modal */}
-      {showEditModal && editingCategory && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <h2 className="text-xl font-semibold text-foreground">Edit Category</h2>
-              <button
-                onClick={() => {
-                  setShowEditModal(false)
-                  setEditingCategory(null)
-                  setCategoryName("")
-                }}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </CardHeader>
-            <CardContent>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault()
+      {
+        showEditModal && editingCategory && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <h2 className="text-xl font-semibold text-foreground">Edit Category</h2>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setEditingCategory(null)
+                    setCategoryName("")
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault()
 
-                  if (!categoryName.trim()) {
-                    toast.error("Category name is required")
-                    return
-                  }
-
-                  try {
-                    const formData = new FormData()
-                    formData.append("name", categoryName.trim())
-
-                    const response = await categoriesAPI.update(editingCategory.id, formData)
-
-                    if (response.data?.success !== false) {
-                      toast.success("Category updated successfully!")
-                      setShowEditModal(false)
-                      setEditingCategory(null)
-                      setCategoryName("")
-                      await loadCategories()
-                    } else {
-                      toast.error("Failed to update category")
+                    if (!categoryName.trim()) {
+                      toast.error("Category name is required")
+                      return
                     }
-                  } catch (error: any) {
-                    const errorMsg =
-                      error.response?.data?.error ||
-                      error.response?.data?.message ||
-                      error.message ||
-                      "Failed to update category"
-                    toast.error(errorMsg)
-                    console.error("Category update error:", error)
-                  }
-                }}
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Category Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    value={categoryName}
-                    onChange={(e) => setCategoryName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-                    Update Category
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
-                    onClick={() => {
-                      setShowEditModal(false)
-                      setEditingCategory(null)
-                      setCategoryName("")
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+
+                    try {
+                      const formData = new FormData()
+                      formData.append("name", categoryName.trim())
+
+                      const response = await categoriesAPI.update(editingCategory.id, formData)
+
+                      if (response.data?.success !== false) {
+                        toast.success("Category updated successfully!")
+                        setShowEditModal(false)
+                        setEditingCategory(null)
+                        setCategoryName("")
+                        await loadCategories()
+                      } else {
+                        toast.error("Failed to update category")
+                      }
+                    } catch (error: any) {
+                      const errorMsg =
+                        error.response?.data?.error ||
+                        error.response?.data?.message ||
+                        error.message ||
+                        "Failed to update category"
+                      toast.error(errorMsg)
+                      console.error("Category update error:", error)
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Category Name</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                      value={categoryName}
+                      onChange={(e) => setCategoryName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
+                      Update Category
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                      onClick={() => {
+                        setShowEditModal(false)
+                        setEditingCategory(null)
+                        setCategoryName("")
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )
+      }
 
       {/* Cascade Delete Modal */}
-      {cascadeDeleteModal && (
+      {
+        cascadeDeleteModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <h2 className="text-xl font-semibold text-foreground">Delete Category Options</h2>
+                <button
+                  onClick={() => setShowCascadeDeleteModal(null)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-foreground">
+                    Category "{cascadeDeleteModal.categoryName}" has:
+                    {cascadeDeleteModal.subcategoriesCount > 0 && (
+                      <>
+                        <br />- {cascadeDeleteModal.subcategoriesCount} subcategory(ies)
+                      </>
+                    )}
+                    {cascadeDeleteModal.imagesCount > 0 && (
+                      <>
+                        <br />- {cascadeDeleteModal.imagesCount} image(s)
+                      </>
+                    )}
+                    {cascadeDeleteModal.contactsCount > 0 && (
+                      <>
+                        <br />- {cascadeDeleteModal.contactsCount} contact(s)
+                      </>
+                    )}
+                    {cascadeDeleteModal.leadsCount > 0 && (
+                      <>
+                        <br />- {cascadeDeleteModal.leadsCount} lead(s)
+                      </>
+                    )}
+                    <br />
+                    <br />
+                    What would you like to delete?
+                    <br />
+                    <br />
+                    <strong className="text-destructive">⚠️ WARNING: This action cannot be undone!</strong>
+                  </p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="deleteSubcategories"
+                        disabled={cascadeDeleteModal.subcategoriesCount === 0}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <span className="text-sm text-foreground">
+                        Delete {cascadeDeleteModal.subcategoriesCount} subcategory(ies)
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="deleteGallery"
+                        disabled={cascadeDeleteModal.imagesCount === 0}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <span className="text-sm text-foreground">
+                        Delete {cascadeDeleteModal.imagesCount} image(s)
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="deleteContacts"
+                        disabled={cascadeDeleteModal.contactsCount === 0}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <span className="text-sm text-foreground">
+                        Delete {cascadeDeleteModal.contactsCount} contact(s)
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="deleteLeads"
+                        disabled={cascadeDeleteModal.leadsCount === 0}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <span className="text-sm text-foreground">
+                        Delete {cascadeDeleteModal.leadsCount} lead(s)
+                      </span>
+                    </label>
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                      onClick={() => setShowCascadeDeleteModal(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      className="flex-1 bg-destructive hover:bg-destructive/90"
+                      onClick={handleConfirmCascadeDelete}
+                    >
+                      Delete Category
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )
+      }
+
+
+      {/* Confirmation Modal */}
+      {deleteConf.isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <h2 className="text-xl font-semibold text-foreground">Delete Category Options</h2>
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                <h2 className="text-xl font-semibold text-foreground">Confirm Deletion</h2>
+              </div>
               <button
-                onClick={() => setShowCascadeDeleteModal(null)}
+                onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <p className="text-foreground">
-                  Category "{cascadeDeleteModal.categoryName}" has:
-                  {cascadeDeleteModal.subcategoriesCount > 0 && (
-                    <>
-                      <br />- {cascadeDeleteModal.subcategoriesCount} subcategory(ies)
-                    </>
-                  )}
-                  {cascadeDeleteModal.imagesCount > 0 && (
-                    <>
-                      <br />- {cascadeDeleteModal.imagesCount} image(s)
-                    </>
-                  )}
-                  {cascadeDeleteModal.contactsCount > 0 && (
-                    <>
-                      <br />- {cascadeDeleteModal.contactsCount} contact(s)
-                    </>
-                  )}
-                  {cascadeDeleteModal.leadsCount > 0 && (
-                    <>
-                      <br />- {cascadeDeleteModal.leadsCount} lead(s)
-                    </>
-                  )}
-                  <br />
-                  <br />
-                  What would you like to delete?
-                  <br />
-                  <br />
-                  <strong className="text-destructive">⚠️ WARNING: This action cannot be undone!</strong>
-                </p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      id="deleteSubcategories"
-                      disabled={cascadeDeleteModal.subcategoriesCount === 0}
-                      className="w-4 h-4 rounded border-border"
-                    />
-                    <span className="text-sm text-foreground">
-                      Delete {cascadeDeleteModal.subcategoriesCount} subcategory(ies)
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      id="deleteGallery"
-                      disabled={cascadeDeleteModal.imagesCount === 0}
-                      className="w-4 h-4 rounded border-border"
-                    />
-                    <span className="text-sm text-foreground">
-                      Delete {cascadeDeleteModal.imagesCount} image(s)
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      id="deleteContacts"
-                      disabled={cascadeDeleteModal.contactsCount === 0}
-                      className="w-4 h-4 rounded border-border"
-                    />
-                    <span className="text-sm text-foreground">
-                      Delete {cascadeDeleteModal.contactsCount} contact(s)
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      id="deleteLeads"
-                      disabled={cascadeDeleteModal.leadsCount === 0}
-                      className="w-4 h-4 rounded border-border"
-                    />
-                    <span className="text-sm text-foreground">
-                      Delete {cascadeDeleteModal.leadsCount} lead(s)
-                    </span>
-                  </label>
-                </div>
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
-                    onClick={() => setShowCascadeDeleteModal(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    className="flex-1 bg-destructive hover:bg-destructive/90"
-                    onClick={handleConfirmCascadeDelete}
-                  >
-                    Delete Category
-                  </Button>
-                </div>
+              <p className="text-foreground mb-6">
+                Are you sure you want to delete {deleteConf.type === 'category' ? 'category' : 'contact'} "{deleteConf.title}"?
+                <br />
+                <span className="text-sm text-muted-foreground mt-2 block">This action cannot be undone.</span>
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                  onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-destructive hover:bg-destructive/90"
+                  onClick={handleConfirmDelete}
+                >
+                  Delete
+                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
-
-      {/* Add Contact Modal */}
-      {showAddContactModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 max-h-screen overflow-y-auto">
-          <Card className="w-full max-w-md bg-card border-border my-4">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <h2 className="text-xl font-semibold text-foreground">Add New Contact</h2>
-              <button
-                onClick={() => setShowAddContactModal(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateContact} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Company Name <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    value={contactForm.company_name}
-                    onChange={(e) =>
-                      setContactForm({ ...contactForm, company_name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Mobile Number (with country code) <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    value={contactForm.mobile_number}
-                    onChange={(e) =>
-                      setContactForm({ ...contactForm, mobile_number: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Category <span className="text-destructive">*</span>
-                  </label>
-                  <select
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    value={contactForm.category_id}
-                    onChange={(e) => handleContactCategoryChange(e.target.value)}
-                    required
-                  >
-                    <option value="">-- Select Category --</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Sub-Category</label>
-                  <select
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm disabled:opacity-50"
-                    value={contactForm.subcategory_id}
-                    onChange={(e) =>
-                      setContactForm({ ...contactForm, subcategory_id: e.target.value })
-                    }
-                    disabled={!contactForm.category_id || contactSubcategories.length === 0}
-                  >
-                    <option value="">
-                      --{" "}
-                      {contactForm.category_id
-                        ? "Select Sub-Category (Optional)"
-                        : "Select Category First"}{" "}
-                      --
-                    </option>
-                    {contactSubcategories.map((subcat) => (
-                      <option key={subcat.id} value={subcat.id}>
-                        {subcat.name}
-                      </option>
-                    ))}
-                  </select>
-                  <small className="text-xs text-muted-foreground">
-                    Select a category first to see subcategories
-                  </small>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Sales Person Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    value={contactForm.sales_person_name}
-                    onChange={(e) =>
-                      setContactForm({ ...contactForm, sales_person_name: e.target.value })
-                    }
-                    placeholder="Enter sales person name manually"
-                  />
-                  <small className="text-xs text-muted-foreground">
-                    Manually enter the sales person name
-                  </small>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Status</label>
-                  <select
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    value={contactForm.status}
-                    onChange={(e) =>
-                      setContactForm({
-                        ...contactForm,
-                        status: e.target.value as Contact["status"],
-                      })
-                    }
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="closed">Closed</option>
-                  </select>
-                </div>
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90">
-                    Add Contact
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
-                    onClick={() => setShowAddContactModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </div>
+    </div >
   )
 }
 

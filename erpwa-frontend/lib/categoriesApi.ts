@@ -85,30 +85,15 @@ export const categoriesAPI = {
         categoryId?: number,
         subcategoryId?: number
     ): Promise<ApiResponse<{ count: number; contacts: Contact[] }>> => {
-        // Don't call API if no valid IDs provided
-        if (!categoryId && !subcategoryId) {
-            return { data: { count: 0, contacts: [] } }
-        }
+        const params = new URLSearchParams()
 
-        // Validate IDs
         const validCategoryId = categoryId && !isNaN(categoryId) && categoryId > 0 ? categoryId : undefined
         const validSubcategoryId = subcategoryId && !isNaN(subcategoryId) && subcategoryId > 0 ? subcategoryId : undefined
 
-        // If no valid IDs after validation, return empty
-        if (!validCategoryId && !validSubcategoryId) {
-            return { data: { count: 0, contacts: [] } }
-        }
-
-        const params = new URLSearchParams()
         if (validCategoryId) params.append('category_id', validCategoryId.toString())
         if (validSubcategoryId) params.append('subcategory_id', validSubcategoryId.toString())
 
         const queryString = params.toString()
-        if (!queryString) {
-            // No valid params, return empty
-            return { data: { count: 0, contacts: [] } }
-        }
-
         const url = `/categories/contacts?${queryString}`
 
         try {
