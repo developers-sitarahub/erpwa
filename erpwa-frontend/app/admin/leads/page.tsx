@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/card"
 import { Badge } from "@/components/badge"
-import { Plus, Edit2, Trash2, Upload, X, FileText, Check, Save, Search, Filter, ChevronDown } from "lucide-react"
+import { Plus, Edit2, Trash2, Upload, X, FileText, Check, Save, Search, Filter, ChevronDown, AlertTriangle } from "lucide-react"
 import { categoriesAPI } from "@/lib/categoriesApi"
 import { leadsAPI } from "@/lib/leadsApi"
 import type { Category, Lead } from "@/lib/types"
@@ -334,7 +334,7 @@ function ManualEntryComponent({
 
           {/* Right Side - Leads Textarea */}
           <div className="space-y-2 flex flex-col">
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col" style={{ minHeight: "280px" }}>
               <label className="text-sm font-medium text-foreground block mb-2">
                 Leads <span className="text-destructive">*</span>
               </label>
@@ -346,6 +346,7 @@ function ManualEntryComponent({
                 value={manualForm.leads_text}
                 onChange={(e) => setManualForm({ ...manualForm, leads_text: e.target.value })}
                 className="flex-1 px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm resize-none overflow-y-auto"
+                style={{ minHeight: "200px" }}
                 required
               />
             </div>
@@ -448,18 +449,149 @@ function UploadFileComponent({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Side - File Upload */}
           <div className="space-y-4 flex flex-col">
-            <div className="flex-1 flex flex-col">
-              <label className="text-sm font-medium text-foreground block mb-2">
-                Choose File <span className="text-destructive">*</span>
-              </label>
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:text-white file:cursor-pointer"
-                required
-              />
-              <p className="text-xs text-muted-foreground mt-2">
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <style jsx>{`
+                .upload-container {
+                  height: 300px;
+                  width: 100%;
+                  max-width: 300px;
+                  border-radius: 10px;
+                  box-shadow: 4px 4px 30px rgba(0, 0, 0, 0.2);
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 10px;
+                  gap: 5px;
+                  background-color: rgba(0, 110, 255, 0.041);
+                }
+                .upload-header {
+                  flex: 1;
+                  width: 100%;
+                  border: 2px dashed royalblue;
+                  border-radius: 10px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  flex-direction: column;
+                  cursor: pointer;
+                  transition: all 0.3s ease;
+                }
+                .upload-header:hover {
+                  background-color: rgba(0, 110, 255, 0.05);
+                  border-color: #4169e1;
+                }
+                .upload-header svg {
+                  height: 100px;
+                  stroke: #000;
+                }
+                .upload-header p {
+                  text-align: center;
+                  color: var(--foreground);
+                  margin-top: 10px;
+                  font-weight: 500;
+                }
+                .upload-footer {
+                  background-color: rgba(0, 110, 255, 0.075);
+                  width: 100%;
+                  height: 40px;
+                  padding: 8px;
+                  border-radius: 10px;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: flex-end;
+                  color: var(--foreground);
+                  border: none;
+                  transition: all 0.3s ease;
+                }
+                .upload-footer:hover {
+                  background-color: rgba(0, 110, 255, 0.15);
+                }
+                .upload-footer svg {
+                  height: 130%;
+                  fill: royalblue;
+                  background-color: rgba(70, 66, 66, 0.103);
+                  border-radius: 50%;
+                  padding: 2px;
+                  cursor: pointer;
+                  box-shadow: 0 2px 30px rgba(0, 0, 0, 0.205);
+                  transition: transform 0.2s ease;
+                }
+                .upload-footer svg:hover {
+                  transform: scale(1.1);
+                }
+                .upload-footer p {
+                  flex: 1;
+                  text-align: center;
+                  font-size: 0.9em;
+                }
+              `}</style>
+              <div className="upload-container">
+                <label htmlFor="file-upload" className="upload-header">
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g strokeWidth={0} />
+                    <g strokeLinecap="round" strokeLinejoin="round" />
+                    <g>
+                      <path
+                        d="M7 10V9C7 6.23858 9.23858 4 12 4C14.7614 4 17 6.23858 17 9V10C19.2091 10 21 11.7909 21 14C21 15.4806 20.1956 16.8084 19 17.5M7 10C4.79086 10 3 11.7909 3 14C3 15.4806 3.8044 16.8084 5 17.5M7 10C7.43285 10 7.84965 10.0688 8.24006 10.1959M12 12V21M12 12L15 15M12 12L9 15"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </g>
+                  </svg>
+                  <p>Browse File to upload!</p>
+                </label>
+                <label htmlFor="file-upload" className="upload-footer">
+                  <svg fill="currentColor" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                    <g strokeWidth={0} />
+                    <g strokeLinecap="round" strokeLinejoin="round" />
+                    <g>
+                      <path d="M15.331 6H8.5v20h15V14.154h-8.169z" />
+                      <path d="M18.153 6h-.009v5.342H23.5v-.002z" />
+                    </g>
+                  </svg>
+                  <p>{selectedFile ? selectedFile.name : "Not selected file"}</p>
+                  {selectedFile && (
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setSelectedFile(null)
+                      }}
+                    >
+                      <g strokeWidth={0} />
+                      <g strokeLinecap="round" strokeLinejoin="round" />
+                      <g>
+                        <path
+                          d="M5.16565 10.1534C5.07629 8.99181 5.99473 8 7.15975 8H16.8402C18.0053 8 18.9237 8.9918 18.8344 10.1534L18.142 19.1534C18.0619 20.1954 17.193 21 16.1479 21H7.85206C6.80699 21 5.93811 20.1954 5.85795 19.1534L5.16565 10.1534Z"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        />
+                        <path d="M19.5 5H4.5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                        <path
+                          d="M10 3C10 2.44772 10.4477 2 11 2H13C13.5523 2 14 2.44772 14 3V5H10V3Z"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        />
+                      </g>
+                    </svg>
+                  )}
+                </label>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  style={{ display: "none" }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-4 text-center">
                 CSV or Excel file with columns: Company Name, Mobile Number, Email, City
               </p>
             </div>
@@ -495,9 +627,9 @@ function UploadFileComponent({
           {/* Right Side - Preview */}
           <div className="space-y-4 flex flex-col">
             <p className="text-sm font-medium text-foreground">Preview</p>
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col" style={{ minHeight: "280px" }}>
               {previewData.length > 0 ? (
-                <div className="border border-border rounded-lg p-3 bg-secondary/30 overflow-y-auto flex-1">
+                <div className="border border-border rounded-lg p-3 bg-secondary/30 overflow-y-auto flex-1" style={{ minHeight: "200px" }}>
                   <div className="flex justify-between items-center mb-3 sticky top-0 bg-secondary/50 p-2 -m-3 mb-2">
                     <p className="text-sm font-medium text-foreground">
                       {previewData.length} of {previewTotal} records
@@ -543,7 +675,7 @@ function UploadFileComponent({
                   </table>
                 </div>
               ) : (
-                <div className="border border-border rounded-lg p-8 bg-secondary/30 text-center flex-1 flex items-center justify-center">
+                <div className="border border-border rounded-lg p-8 bg-secondary/30 text-center flex-1 flex items-center justify-center" style={{ minHeight: "200px" }}>
                   <p className="text-sm text-muted-foreground">Upload a file to see preview</p>
                 </div>
               )}
@@ -716,6 +848,13 @@ export default function LeadsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10)
   const [currentPageNum, setCurrentPageNum] = useState(1)
   const [editingLeadId, setEditingLeadId] = useState<number | null>(null)
+
+  // Delete confirm state
+  const [deleteConf, setDeleteConf] = useState<{
+    isOpen: boolean;
+    id?: number;
+    title?: string;
+  }>({ isOpen: false });
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedLeads, setSelectedLeads] = useState<Set<number>>(new Set())
   const [columnFilters, setColumnFilters] = useState<{ [key: string]: Set<string> }>({
@@ -745,6 +884,8 @@ export default function LeadsPage() {
   const [editLeadSubcategories, setEditLeadSubcategories] = useState<{ [key: number]: Category[] }>({})
   const [sortBy, setSortBy] = useState<string>("created_at")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
+  const [showManualEntry, setShowManualEntry] = useState(true)
+  const [showUploadFile, setShowUploadFile] = useState(true)
 
   useEffect(() => {
     loadInitialData()
@@ -897,6 +1038,28 @@ export default function LeadsPage() {
     }
   }
 
+  const handleDeleteLead = (leadId: number, companyName: string) => {
+    setDeleteConf({ isOpen: true, id: leadId, title: companyName });
+  }
+
+  const executeDeleteLead = async (leadId: number) => {
+    try {
+      await leadsAPI.delete(leadId)
+      toast.success("Lead deleted successfully!")
+      await loadLeads()
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.error || "Failed to delete lead"
+      )
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConf.id) return;
+    await executeDeleteLead(deleteConf.id);
+    setDeleteConf({ ...deleteConf, isOpen: false });
+  }
+
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
   const startIndex = (currentPageNum - 1) * itemsPerPage
   const paginatedLeads = filteredLeads.slice(startIndex, startIndex + itemsPerPage)
@@ -950,19 +1113,47 @@ export default function LeadsPage() {
         </div>
 
         {/* Form Section */}
-        {currentMode === "manual" ? (
-          <ManualEntryComponent
-            categories={categories}
-            teamMembers={teamMembers}
-            onLeadsAdded={loadLeads}
-          />
-        ) : (
-          <UploadFileComponent
-            categories={categories}
-            teamMembers={teamMembers}
-            onLeadsAdded={loadLeads}
-          />
-        )}
+        <div>
+          {currentMode === "manual" ? (
+            <div>
+              <div
+                className="flex justify-between items-center mb-4 cursor-pointer bg-card border border-border rounded-lg p-4"
+                onClick={() => setShowManualEntry(!showManualEntry)}
+              >
+                <h3 className="text-lg font-semibold text-foreground">Manual Entry</h3>
+                <button className="text-2xl text-muted-foreground hover:text-foreground transition-colors">
+                  {showManualEntry ? "−" : "+"}
+                </button>
+              </div>
+              {showManualEntry && (
+                <ManualEntryComponent
+                  categories={categories}
+                  teamMembers={teamMembers}
+                  onLeadsAdded={loadLeads}
+                />
+              )}
+            </div>
+          ) : (
+            <div>
+              <div
+                className="flex justify-between items-center mb-4 cursor-pointer bg-card border border-border rounded-lg p-4"
+                onClick={() => setShowUploadFile(!showUploadFile)}
+              >
+                <h3 className="text-lg font-semibold text-foreground">Upload File</h3>
+                <button className="text-2xl text-muted-foreground hover:text-foreground transition-colors">
+                  {showUploadFile ? "−" : "+"}
+                </button>
+              </div>
+              {showUploadFile && (
+                <UploadFileComponent
+                  categories={categories}
+                  teamMembers={teamMembers}
+                  onLeadsAdded={loadLeads}
+                />
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Leads List Section - Below Forms */}
         <Card className="bg-card border-border">
@@ -1293,7 +1484,7 @@ export default function LeadsPage() {
                               <td className="py-3 px-3">
                                 <input
                                   type="text"
-                                  value={editForm[lead.id]?.email || (lead as any).email || ""}
+                                  value={editForm[lead.id]?.email || lead.email || ""}
                                   onChange={(e) =>
                                     setEditForm((prev) => ({
                                       ...prev,
@@ -1309,7 +1500,7 @@ export default function LeadsPage() {
                               <td className="py-3 px-3">
                                 <input
                                   type="text"
-                                  value={editForm[lead.id]?.city || (lead as any).city || ""}
+                                  value={editForm[lead.id]?.city || lead.city || ""}
                                   onChange={(e) =>
                                     setEditForm((prev) => ({
                                       ...prev,
@@ -1425,29 +1616,52 @@ export default function LeadsPage() {
                                     onClick={async () => {
                                       try {
                                         const formData = new FormData()
-                                        if (editForm[lead.id]?.company_name)
-                                          formData.append("company_name", editForm[lead.id].company_name!)
-                                        if (editForm[lead.id]?.mobile_number)
-                                          formData.append("mobile_number", editForm[lead.id].mobile_number!)
-                                        if (editForm[lead.id]?.email)
-                                          formData.append("email", editForm[lead.id].email!)
-                                        if (editForm[lead.id]?.city)
-                                          formData.append("city", editForm[lead.id].city!)
-                                        if (editForm[lead.id]?.sales_person_name)
+                                        // Always send all fields, use editForm value or original lead value
+                                        formData.append(
+                                          "company_name",
+                                          editForm[lead.id]?.company_name ?? lead.company_name ?? ""
+                                        )
+                                        formData.append(
+                                          "mobile_number",
+                                          editForm[lead.id]?.mobile_number ?? lead.mobile_number ?? ""
+                                        )
+                                        formData.append(
+                                          "email",
+                                          editForm[lead.id]?.email ?? lead.email ?? ""
+                                        )
+                                        formData.append(
+                                          "city",
+                                          editForm[lead.id]?.city ?? lead.city ?? ""
+                                        )
+                                        formData.append(
+                                          "sales_person_name",
+                                          editForm[lead.id]?.sales_person_name ?? lead.sales_person_name ?? ""
+                                        )
+                                        formData.append(
+                                          "status",
+                                          editForm[lead.id]?.status ?? lead.status ?? "new"
+                                        )
+                                        if (editForm[lead.id]?.category_id || lead.category) {
                                           formData.append(
-                                            "sales_person_name",
-                                            editForm[lead.id].sales_person_name!
+                                            "category_id",
+                                            editForm[lead.id]?.category_id ?? lead.category?.toString() ?? ""
                                           )
-                                        if (editForm[lead.id]?.status)
-                                          formData.append("status", editForm[lead.id].status!)
-                                        if (editForm[lead.id]?.category_id)
-                                          formData.append("category_id", editForm[lead.id].category_id!)
-                                        if (editForm[lead.id]?.subcategory_id)
-                                          formData.append("subcategory_id", editForm[lead.id].subcategory_id!)
+                                        }
+                                        if (editForm[lead.id]?.subcategory_id || lead.sub_category) {
+                                          formData.append(
+                                            "subcategory_id",
+                                            editForm[lead.id]?.subcategory_id ?? lead.sub_category?.toString() ?? ""
+                                          )
+                                        }
 
                                         await leadsAPI.update(lead.id, formData)
                                         toast.success("Lead updated successfully!")
                                         setEditingLeadId(null)
+                                        setEditForm((prev) => {
+                                          const newForm = { ...prev }
+                                          delete newForm[lead.id]
+                                          return newForm
+                                        })
                                         await loadLeads()
                                       } catch (error: any) {
                                         toast.error(
@@ -1478,10 +1692,10 @@ export default function LeadsPage() {
                                 {lead.mobile_number || "--"}
                               </td>
                               <td className="py-3 px-3 text-muted-foreground">
-                                {(lead as any).email || "--"}
+                                {lead.email || "--"}
                               </td>
                               <td className="py-3 px-3 text-muted-foreground">
-                                {(lead as any).city || "--"}
+                                {lead.city || "--"}
                               </td>
                               <td className="py-3 px-3 text-foreground text-sm">
                                 {lead.category_name || "--"}
@@ -1506,12 +1720,18 @@ export default function LeadsPage() {
                                         [lead.id]: {
                                           company_name: lead.company_name,
                                           mobile_number: lead.mobile_number,
-                                          email: (lead as any).email,
-                                          city: (lead as any).city,
+                                          email: lead.email,
+                                          city: lead.city,
                                           sales_person_name: lead.sales_person_name || "",
                                           status: lead.status,
+                                          category_id: lead.category?.toString() || "",
+                                          subcategory_id: lead.sub_category?.toString() || "",
                                         },
                                       }))
+                                      // Load subcategories if category exists
+                                      if (lead.category) {
+                                        loadEditLeadSubcategories(lead.id, lead.category)
+                                      }
                                     }}
                                     title="Edit"
                                   >
@@ -1519,21 +1739,7 @@ export default function LeadsPage() {
                                   </button>
                                   <button
                                     className="p-1 hover:bg-destructive/10 rounded transition-colors"
-                                    onClick={async () => {
-                                      if (
-                                        confirm(`Are you sure you want to delete "${lead.company_name}"?`)
-                                      ) {
-                                        try {
-                                          await leadsAPI.delete(lead.id)
-                                          toast.success("Lead deleted successfully!")
-                                          await loadLeads()
-                                        } catch (error: any) {
-                                          toast.error(
-                                            error.response?.data?.error || "Failed to delete lead"
-                                          )
-                                        }
-                                      }
-                                    }}
+                                    onClick={() => handleDeleteLead(lead.id, lead.company_name || "Lead")}
                                     title="Delete"
                                   >
                                     <Trash2 className="w-4 h-4 text-destructive" />
@@ -1645,7 +1851,48 @@ export default function LeadsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirmation Modal */}
+      {deleteConf.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                <h2 className="text-xl font-semibold text-foreground">Confirm Deletion</h2>
+              </div>
+              <button
+                onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground mb-6">
+                Are you sure you want to delete lead "{deleteConf.title}"?
+                <br />
+                <span className="text-sm text-muted-foreground mt-2 block">This action cannot be undone.</span>
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                  onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-destructive hover:bg-destructive/90"
+                  onClick={handleConfirmDelete}
+                >
+                  Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
-
