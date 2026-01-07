@@ -1,0 +1,62 @@
+PORT=5000
+
+DB_USER=postgres
+DB_PASSWORD=1234
+
+FRONTEND_URL=http://localhost:3000
+
+
+JWT_SECRET=614c687caab95e15db8f595bbf3d9df0c7a942e4a048207b134d793842a507599437844c40b8bfcbe8c3c85bba3c112c9527f03738740a15a1248214b8b529b7
+ACCESS_TOKEN_SECRET=b08f25eb1bedfeb26a0e2bd2986568f83bc3f65cd37a4022a22a2a1b14387b2dda43ec369676457d7b9ab0d4c549d9acda8a0c900d0f490535f9239e2bdfb225
+PASSWORD_RESET_TOKEN_SECRET=df234d24ed2562956adda86eadb70ab34cb5119f4dd8052a4533165e02c160fe4b9b6d49977250ee33be2c6bbc7499868b0fce1351e91a3ad627f52abbd32426
+ENCRYPTION_KEY=ef313e4d42596ee2611f16c506cc3e023c67a4ecebfc62269f809a3d2e87c64e
+# This was inserted by `prisma init`:
+# Environment variables declared in this file are NOT automatically loaded by Prisma.
+# Please add `import "dotenv/config";` to your `prisma.config.ts` file, or use the Prisma CLI with Bun
+# to load environment variables from .env files: https://pris.ly/prisma-config-env-vars.
+
+# Prisma supports the native connection string format for PostgreSQL, MySQL, SQLite, SQL Server, MongoDB and CockroachDB.
+# See the documentation for all the connection string options: https://pris.ly/d/connection-strings
+
+# The following `prisma+postgres` URL is similar to the URL produced by running a local Prisma Postgres
+# server with the `prisma dev` CLI command, when not choosing any non-default ports or settings. The API key, unlike the
+# one found in a remote Prisma Postgres URL, does not contain any sensitive information.
+
+DATABASE_URL="postgresql://postgres:1234@localhost:5432/whatsapp_backend"
+
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=developer.sitarahub@gmail.com
+SMTP_PASS=vyou tulj fwsp sgxg
+MAIL_FROM="ERPWA Support <developer.sitarahub@gmail.com>"
+
+
+# WHATSAPP_TEST_ACCESS_TOKEN=EAAQvMTIiClABQY4qDMBYPJ43Pl1JP5yltG6njPIVIGkJ1WQO3uZAhRaoivZCR4QiiALu3ZBQtF6ByVOVYFIuw5CDAnxsKjv3xJxjtm9RFhIvQb6F8DBcvdUZCNX17cJZAhKvsqt0pzmdFIu2jjASUIYSxeVYaQAsWPo5RUCXzuQexT0hcD3ZC9QuvGRhdHUHZC1DW6zrNZCbQ9B0H37T2huusbxYcM48g0b0OVVJOHCnUOPjYGADxWKGcxYzQSIzuGtiI7suAf6yZB5BzTrK6w1UPOk6zJwZDZD
+# WHATSAPP_TEST_PHONE_NUMBER_ID=833750296498490
+# WHATSAPP_TEST_WABA_ID=839983112163798
+WHATSAPP_VERIFY_TOKEN=erpwa_whatsapp_verify_token_12345
+
+
+AWS_ACCESS_KEY_ID=AKIAWZMI7U6SWOA4IVPK
+AWS_SECRET_ACCESS_KEY=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
+AWS_REGION=us-east-2
+S3_BUCKET_NAME=erp-devmedia
+CLOUDFRONT_BASE_URL=https://d2xewl4dlr9aio.cloudfront.net
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

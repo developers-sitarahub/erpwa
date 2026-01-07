@@ -14,6 +14,7 @@ import vendorTemplateRoutes from "./routes/vendorTemplate.route.js";
 import vendorWhatsappTemplateSendRoutes from "./routes/vendorWhatsappTemplateSend.route.js";
 import inboxRoutes from "./routes/inbox.route.js";
 import { initSocket } from "./socket.js";
+import testUploadRoute from "./routes/testUpload.route.js";
 
 const app = express();
 
@@ -45,6 +46,8 @@ app.use("/api/vendor/templates", vendorTemplateRoutes);
 app.use("/api/vendor/whatsapp/template", vendorWhatsappTemplateSendRoutes);
 app.use("/api/inbox", inboxRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
+app.use("/test", testUploadRoute);
+
 
 /* ================= SERVER START ================= */
 const PORT = process.env.PORT || 5000;

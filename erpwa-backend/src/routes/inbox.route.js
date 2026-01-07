@@ -96,35 +96,11 @@ router.get(
       conversation.sessionExpiresAt &&
       new Date(conversation.sessionExpiresAt) > now;
 
-    // ===============================
-    // 24-hour window calculation
-    // ===============================
-    let businessHoursRemaining = null;
-    let templateRequired = true;
-
-    if (sessionActive && conversation.sessionExpiresAt) {
-      const diffMs =
-        new Date(conversation.sessionExpiresAt).getTime() - Date.now();
-
-      const minutes = Math.ceil(diffMs / (1000 * 60));
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-
-      businessHoursRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-
-      templateRequired = false;
-    }
-
     res.json({
       conversationId: conversation.id,
       lead: conversation.lead,
-
-      // 🔥 SESSION STATE (FOR UI)
       sessionActive,
       sessionExpiresAt: conversation.sessionExpiresAt,
-      businessHoursRemaining,
-      templateRequired,
-
       messages: conversation.messages,
     });
   })

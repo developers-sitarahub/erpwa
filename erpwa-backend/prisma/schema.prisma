@@ -143,22 +143,22 @@ model Conversation {
 }
 
 model Template {
-  id       String @id @default(uuid())
-  vendorId String
+  id               String @id @default(uuid())
+  vendorId         String
 
   metaTemplateName String
   displayName      String
   category         String
   status           String @default("draft")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  vendor    Vendor             @relation(fields: [vendorId], references: [id])
-  languages TemplateLanguage[]
-  buttons   TemplateButton[]
-  media     TemplateMedia[]
-  campaigns Campaign[]
+  vendor           Vendor             @relation(fields: [vendorId], references: [id])
+  languages        TemplateLanguage[]
+  buttons          TemplateButton[]
+  media            TemplateMedia[]
+  campaigns        Campaign[]
 
   @@unique([vendorId, metaTemplateName])
   @@index([vendorId])
@@ -179,15 +179,16 @@ model TemplateButton {
 }
 
 model TemplateMedia {
-  id         String @id @default(uuid())
-  templateId String
+  id              String @id @default(uuid())
+  templateId      String
 
   // 🔑 Important additions
-  language String // en_US, hi_IN
-  position Int    @default(0) // always 0 for header (future-proof)
+  language        String // en_US, hi_IN
+  position        Int    @default(0) // always 0 for header (future-proof)
 
   mediaType       String // image | video | document
   s3Url           String
+  mimeType        String
   whatsappMediaId String?
 
   uploadStatus String @default("pending")
@@ -211,6 +212,8 @@ model TemplateLanguage {
 
   headerType String?
   headerText String?
+  headerExampleUrl String?
+  headerFilename  String?
 
   metaStatus String  @default("draft")
   metaReason String?
