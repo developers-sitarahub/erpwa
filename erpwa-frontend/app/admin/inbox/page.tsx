@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { getSocket, connectSocket } from "@/lib/socket";
+import { processMedia } from "@/lib/mediaProcessor";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -263,20 +264,28 @@ function ChatArea({
   } | null>(null);
   const [sendingPreview, setSendingPreview] = useState(false);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
 
-    const files = Array.from(e.target.files);
-    const urls = files.map((f) => URL.createObjectURL(f));
+    try {
+      const processed = await Promise.all(
+        Array.from(e.target.files).map((f) => processMedia(f))
+      );
 
-    setImagePreview({
-      files,
-      urls,
-      caption: "",
-    });
+      const files = processed.map((p) => p.file);
+      const urls = files.map((f) => URL.createObjectURL(f));
 
-    setMediaModal(null);
-    e.target.value = "";
+      setImagePreview({
+        files,
+        urls,
+        caption: "",
+      });
+
+      setMediaModal(null);
+      e.target.value = "";
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   const [copied, setCopied] = useState(false);
@@ -1255,17 +1264,21 @@ function ChatArea({
                     onChange={async (e) => {
                       if (!e.target.files?.length) return;
 
-                      const files = Array.from(e.target.files);
+                      try {
+                        for (const rawFile of Array.from(e.target.files)) {
+                          const { file } = await processMedia(rawFile);
 
-                      for (const file of files) {
-                        const form = new FormData();
-                        form.append("conversationId", conversation.id);
-                        form.append("file", file);
+                          const form = new FormData();
+                          form.append("conversationId", conversation.id);
+                          form.append("file", file);
 
-                        await api.post("/vendor/whatsapp/send-media", form);
+                          await api.post("/vendor/whatsapp/send-media", form);
+                        }
+
+                        setMediaModal(null);
+                      } catch (err: any) {
+                        alert(err.message);
                       }
-
-                      setMediaModal(null);
                     }}
                   />
 
