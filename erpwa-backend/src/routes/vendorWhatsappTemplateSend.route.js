@@ -8,48 +8,36 @@ import { decrypt } from "../utils/encryption.js";
 
 const router = express.Router();
 
-/**
- * ===============================
- * SEND APPROVED TEMPLATE
- * ===============================
- */
 router.post(
   "/send-template",
   authenticate,
   requireRoles(["vendor_owner", "vendor_admin", "sales"]),
   asyncHandler(async (req, res) => {
-    const { to, templateId } = req.body;
+    const {
+      recipients = [],
+      templateId,
+      bodyVariables = [],
+      buttonVariables = [],
+    } = req.body;
 
-    if (!to || !templateId) {
-      return res.status(400).json({
-        message: "to and templateId are required",
-      });
+    if (!recipients.length || !templateId) {
+      return res.status(400).json({ message: "Invalid request" });
     }
 
-    /* ===============================
-       1️⃣ Load vendor + WhatsApp config
-       =============================== */
+    /** 1️⃣ Vendor */
     const vendor = await prisma.vendor.findUnique({
       where: { id: req.user.vendorId },
     });
 
-    if (!vendor?.whatsappAccessToken || !vendor.whatsappPhoneNumberId) {
-      return res.status(400).json({
-        message: "WhatsApp is not configured for this vendor",
-      });
+    if (!vendor?.whatsappPhoneNumberId || !vendor?.whatsappAccessToken) {
+      return res.status(400).json({ message: "WhatsApp not configured" });
     }
 
     const accessToken = decrypt(vendor.whatsappAccessToken);
 
-    /* ===============================
-       2️⃣ Load approved template + language
-       =============================== */
+    /** 2️⃣ Template */
     const template = await prisma.template.findFirst({
-      where: {
-        id: templateId,
-        vendorId: vendor.id,
-        status: "approved",
-      },
+      where: { id: templateId, status: "approved" },
       include: {
         languages: {
           where: { metaStatus: "approved" },
@@ -58,125 +46,113 @@ router.post(
       },
     });
 
-    if (!template || template.languages.length === 0) {
-      return res.status(400).json({
-        message: "Template is not approved or not found",
-      });
+    if (!template || !template.languages.length) {
+      return res.status(404).json({ message: "Approved template not found" });
     }
 
     const language = template.languages[0];
 
-    /* ===============================
-       3️⃣ Find or create Lead + Conversation
-       =============================== */
-    const now = new Date();
+    /** 3️⃣ Load header media (if any) */
+    let media = null;
 
-    const lead = await prisma.lead.upsert({
-      where: {
-        vendorId_phoneNumber: {
-          vendorId: vendor.id,
-          phoneNumber: to,
+    if (language.headerType && language.headerType !== "TEXT") {
+      media = await prisma.templateMedia.findFirst({
+        where: {
+          templateId: template.id,
+          language: language.language,
         },
-      },
-      update: {
-        lastContactedAt: now,
-      },
-      create: {
-        vendorId: vendor.id,
-        phoneNumber: to,
-        whatsappOptIn: true,
-        optInSource: "template",
-        optInAt: now,
-      },
-    });
-
-    const sessionExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-    const conversation = await prisma.conversation.upsert({
-      where: {
-        vendorId_leadId: {
-          vendorId: vendor.id,
-          leadId: lead.id,
-        },
-      },
-      update: {
-        lastMessageAt: now,
-        sessionExpiresAt,
-        isOpen: true,
-      },
-      create: {
-        vendorId: vendor.id,
-        leadId: lead.id,
-        channel: "whatsapp",
-        sessionStartedAt: now,
-        lastMessageAt: now,
-        sessionExpiresAt,
-        isOpen: true,
-      },
-    });
-
-    /* ===============================
-       4️⃣ Send template to Meta
-       =============================== */
-    const metaResp = await fetch(
-      `https://graph.facebook.com/v24.0/${vendor.whatsappPhoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to,
-          type: "template",
-          template: {
-            name: template.metaTemplateName,
-            language: {
-              code: language.language,
-            },
-          },
-        }),
-      }
-    );
-
-    const metaData = await metaResp.json();
-
-    if (!metaResp.ok) {
-      return res.status(400).json({
-        message: "Failed to send WhatsApp template",
-        metaError: metaData,
       });
+
+      if (!media?.s3Url) {
+        return res.status(400).json({
+          message:
+            "Template media URL not found. Please re-upload the template.",
+        });
+      }
     }
 
-    /* ===============================
-       5️⃣ Store outbound message
-       =============================== */
-    const message = await prisma.message.create({
-      data: {
-        vendor: {
-          connect: { id: vendor.id },
-        },
-        conversation: {
-          connect: { id: conversation.id },
-        },
-        direction: "outbound",
-        channel: "whatsapp",
-        messageType: "template",
-        content: template.displayName,
-        whatsappMessageId: metaData.messages?.[0]?.id,
-        status: "sent",
-        outboundPayload: metaData,
-      },
-    });
+    const results = [];
 
-    res.json({
-      success: true,
-      messageId: message.id,
-      whatsappMessageId: metaData.messages?.[0]?.id,
-      conversationId: conversation.id,
-      leadId: lead.id,
-    });
+    /** 4️⃣ Send to recipients */
+    for (const to of recipients) {
+      try {
+        const components = [];
+
+        /** 🔹 HEADER (MEDIA ONLY) */
+        if (media) {
+          // Use the S3 URL (link) for sending - NOT the resumable upload handle
+          // The whatsappMediaId from template creation is a resumable upload handle,
+          // which is not valid for sending messages. We use the public S3 URL instead.
+          components.push({
+            type: "header",
+            parameters: [
+              {
+                type: media.mediaType, // image | video | document
+                [media.mediaType]: {
+                  link: media.s3Url, // ✅ Use public URL instead of ID
+                },
+              },
+            ],
+          });
+        }
+
+        /** 🔹 BODY */
+        if (bodyVariables.length) {
+          components.push({
+            type: "body",
+            parameters: bodyVariables.map((v) => ({
+              type: "text",
+              text: String(v),
+            })),
+          });
+        }
+
+        /** 🔹 BUTTONS (URL buttons only) */
+        buttonVariables.forEach((v, index) => {
+          components.push({
+            type: "button",
+            sub_type: "url",
+            index: String(index),
+            parameters: [{ type: "text", text: String(v) }],
+          });
+        });
+
+        /** 🔹 SEND TO WHATSAPP */
+        const metaResp = await fetch(
+          `https://graph.facebook.com/v24.0/${vendor.whatsappPhoneNumberId}/messages`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              messaging_product: "whatsapp",
+              to,
+              type: "template",
+              template: {
+                name: template.metaTemplateName,
+                language: { code: language.language },
+                components,
+              },
+            }),
+          }
+        );
+
+        const metaData = await metaResp.json();
+        if (!metaResp.ok) throw metaData;
+
+        results.push({ to, success: true });
+      } catch (err) {
+        results.push({
+          to,
+          success: false,
+          error: err?.error?.message || err,
+        });
+      }
+    }
+
+    res.json({ success: true, results });
   })
 );
 
