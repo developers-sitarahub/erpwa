@@ -93,8 +93,13 @@ interface ApiMessage {
   replyToMessageId?: string;
   content: string;
   direction: "inbound" | "outbound";
-  status?: "sent" | "delivered" | "read" | "failed";
+  status?: "sent" | "delivered" | "read" | "failed" | "received";
   createdAt: string;
+  media?: Array<{
+    mediaUrl: string;
+    mimeType: string;
+    caption?: string;
+  }>;
 }
 
 /* =======================
@@ -283,8 +288,9 @@ function ChatArea({
 
       setMediaModal(null);
       e.target.value = "";
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      alert(message);
     }
   };
 
@@ -1276,8 +1282,12 @@ function ChatArea({
                         }
 
                         setMediaModal(null);
-                      } catch (err: any) {
-                        alert(err.message);
+                      } catch (err) {
+                        const message =
+                          err instanceof Error
+                            ? err.message
+                            : "An error occurred";
+                        alert(message);
                       }
                     }}
                   />
@@ -1575,27 +1585,29 @@ export default function InboxPage() {
     try {
       const res = await api.get(`/inbox/${id}`);
 
-      const mappedMessages: Message[] = res.data.messages.map((m: any) => {
-        const media = m.media?.[0]; // WhatsApp = 1 media per message
+      const mappedMessages: Message[] = res.data.messages.map(
+        (m: ApiMessage) => {
+          const media = m.media?.[0]; // WhatsApp = 1 media per message
 
-        return {
-          id: m.id,
-          whatsappMessageId: m.whatsappMessageId,
-          replyToMessageId: m.replyToMessageId,
+          return {
+            id: m.id,
+            whatsappMessageId: m.whatsappMessageId,
+            replyToMessageId: m.replyToMessageId,
 
-          // TEXT
-          text: media ? undefined : m.content,
+            // TEXT
+            text: media ? undefined : m.content,
 
-          // MEDIA
-          mediaUrl: media?.mediaUrl,
-          mimeType: media?.mimeType,
-          caption: media?.caption,
+            // MEDIA
+            mediaUrl: media?.mediaUrl,
+            mimeType: media?.mimeType,
+            caption: media?.caption,
 
-          sender: m.direction === "outbound" ? "executive" : "customer",
-          timestamp: m.createdAt,
-          status: m.status ?? "delivered",
-        };
-      });
+            sender: m.direction === "outbound" ? "executive" : "customer",
+            timestamp: m.createdAt,
+            status: m.status ?? "delivered",
+          };
+        }
+      );
 
       setMessages((prev) => {
         const map = new Map(prev.map((m) => [m.id, m]));
