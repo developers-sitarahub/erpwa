@@ -113,7 +113,7 @@ router.post(
         body,
         footerText,
         headerType,
-        headerText: headerType === "TEXT" ? header?.text : null,
+        headerText: headerType === "TEXT" ? (req.body["header.text"] || req.body.headerText) : null,
         metaStatus: "draft",
       },
     });
@@ -616,7 +616,7 @@ router.post(
 
     // Fetch all templates from Meta
     const metaResp = await fetch(
-      `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`,
+      `https://graph.facebook.com/v19.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
