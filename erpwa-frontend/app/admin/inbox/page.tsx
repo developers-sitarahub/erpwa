@@ -631,25 +631,23 @@ function ChatArea({
           </span>
         </div>
       )}
-      <div
-        className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 relative"
-        style={{
-          backgroundImage: "url('/chat-bg.png')",
-          backgroundRepeat: "repeat",
-          backgroundSize: "auto",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* Messages */}
+      {/* Messages */}
+      <div className="flex-1 min-h-0 overflow-y-auto relative">
+        {/* WhatsApp Background Layer */}
         <div
-          className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2 relative"
-          style={{
-            backgroundImage: "url('/chat-bg.png')",
-            backgroundRepeat: "repeat",
-            backgroundSize: "auto",
-            backgroundPosition: "center",
-          }}
-        >
+          className="
+      absolute inset-0
+      bg-[#ECE5DD] dark:bg-[#0B141A]
+      bg-[url('/chat-bg.png')]
+      bg-repeat
+      bg-center
+      opacity-100 dark:opacity-[0.5]
+      pointer-events-none
+    "
+        />
+
+        {/* Messages Layer */}
+        <div className="relative z-10 p-4 space-y-2">
           <AnimatePresence>
             {messages.map((msg, i) => {
               const showDateSeparator =
