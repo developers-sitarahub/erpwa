@@ -10,7 +10,7 @@ import { Input } from "@/components/input";
 
 import {
     RefreshCw, CheckCircle, XCircle, Clock, Trash2, Search, X, Plus, Paperclip,
-    Image as ImageIcon, Video, FileText, Loader2, Send, MoreVertical, Phone, Globe
+    Image as ImageIcon, Video, FileText, Loader2, Send, MoreVertical, Phone, Globe, Upload
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
@@ -31,6 +31,7 @@ type Template = {
         media?: any;
         metaReason?: string;
         footerText?: string;
+        headerText?: string;
     }[];
     buttons: {
         type: string;
@@ -45,6 +46,7 @@ export default function TemplatesPage() {
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState<string | null>(null);
 
     // --- Create/Edit Modal State ---
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -59,6 +61,7 @@ export default function TemplatesPage() {
         headerType: "TEXT",
         body: "",
         footerText: "",
+        headerText: "",
     });
 
     const [headerFile, setHeaderFile] = useState<File | null>(null);
@@ -99,6 +102,7 @@ export default function TemplatesPage() {
             headerType: "TEXT",
             body: "",
             footerText: "",
+            headerText: "",
         });
         setHeaderFile(null);
         setHeaderPreview(null);
@@ -112,14 +116,15 @@ export default function TemplatesPage() {
     };
 
     const openEditModal = (template: Template) => {
-        const lang = template.languages[0];
+        const lang = template.languages?.[0];
         setFormData({
             displayName: template.displayName,
             category: template.category,
-            language: lang.language,
-            headerType: lang.headerType || "TEXT",
-            body: lang.body || "",
-            footerText: lang.footerText || "",
+            language: lang?.language || "en_US",
+            headerType: lang?.headerType || "TEXT",
+            body: lang?.body || "",
+            footerText: lang?.footerText || "",
+            headerText: lang?.headerText || "",
         });
 
         if (template.buttons) {
@@ -207,6 +212,10 @@ export default function TemplatesPage() {
                 data.append("footerText", formData.footerText);
             }
 
+            if (formData.headerType === "TEXT" && formData.headerText) {
+                data.append("header.text", formData.headerText);
+            }
+
             if (formData.headerType !== "TEXT" && headerFile) {
                 data.append("header.file", headerFile);
             }
@@ -247,6 +256,22 @@ export default function TemplatesPage() {
     };
 
     // --- List Item Handlers ---
+
+    const handleSubmitToMeta = async (template: Template, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (submitting) return;
+
+        setSubmitting(template.id);
+        try {
+            await api.post(`/vendor/templates/${template.id}/submit`);
+            toast.success("Template submitted to Meta successfully!");
+            fetchTemplates();
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "Failed to submit template");
+        } finally {
+            setSubmitting(null);
+        }
+    };
 
     const handleSyncStatus = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -447,12 +472,29 @@ export default function TemplatesPage() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="flex-1 h-8 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                                                onClick={(e) => handleSyncStatus(t.id, e)}
-                                                disabled={!!syncing}
+                                                className={cn(
+                                                    "flex-1 h-8 text-xs hover:bg-muted/60",
+                                                    t.status === "draft"
+                                                        ? "text-blue-600 hover:text-blue-700 bg-blue-50/50"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                )}
+                                                onClick={(e) => {
+                                                    if (t.status === "draft") {
+                                                        handleSubmitToMeta(t, e);
+                                                    } else {
+                                                        handleSyncStatus(t.id, e);
+                                                    }
+                                                }}
+                                                disabled={!!syncing || !!submitting}
                                             >
-                                                {syncing === t.id ? <RefreshCw className="w-3 h-3 animate-spin mr-1.5" /> : <RefreshCw className="w-3 h-3 mr-1.5" />}
-                                                Sync
+                                                {(syncing === t.id || submitting === t.id) ? (
+                                                    <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
+                                                ) : t.status === "draft" ? (
+                                                    <Upload className="w-3 h-3 mr-1.5" />
+                                                ) : (
+                                                    <RefreshCw className="w-3 h-3 mr-1.5" />
+                                                )}
+                                                {t.status === "draft" ? "Submit" : "Sync"}
                                             </Button>
                                             <div className="w-px h-4 bg-border/60"></div>
                                             <Button
@@ -728,6 +770,19 @@ export default function TemplatesPage() {
                                                             </div>
                                                         ))}
                                                     </div>
+
+                                                    {formData.headerType === "TEXT" && (
+                                                        <div className="mt-2 space-y-1.5">
+                                                            <label className="text-xs font-medium">Header Text</label>
+                                                            <Input
+                                                                placeholder="e.g. Special Offer"
+                                                                className="bg-background"
+                                                                value={formData.headerText}
+                                                                onChange={e => setFormData({ ...formData, headerText: e.target.value })}
+                                                            />
+                                                            <p className="text-[10px] text-muted-foreground">Text to appear in the header (optional, simpler than body)</p>
+                                                        </div>
+                                                    )}
 
                                                     {formData.headerType !== "TEXT" && (
                                                         <div className="mt-2 border border-dashed border-primary/20 rounded-lg p-6 flex flex-col items-center justify-center bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
