@@ -14,6 +14,7 @@ import { Plus, Edit2, Trash2, Eye, EyeOff, X, FolderOpen, Check, AlertTriangle, 
 import { categoriesAPI } from "@/lib/categoriesApi"
 import type { Category, Contact } from "@/lib/types"
 import { toast } from "react-toastify"
+import { Checkbox } from "@/components/checkbox"
 
 function StatusBadge({ status, isLead }: { status: string; isLead?: boolean }) {
   // Lead statuses
@@ -235,8 +236,9 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleDeleteCategory = (categoryId: number, categoryName: string) => {
-    setDeleteConf({ isOpen: true, type: 'category', id: categoryId, title: categoryName });
+  const handleDeleteCategory = async (categoryId: number, categoryName: string) => {
+    // Directly attempt deletion to check for cascade requirements
+    await executeDeleteCategory(categoryId, categoryName);
   }
 
   const handleDeleteContact = (contactId: number, contactName: string) => {
@@ -932,12 +934,7 @@ export default function CategoriesPage() {
               )
             })()}
 
-            {!selectedCategory && !selectedSubcategory && (
-              <div className="text-center py-8 text-muted-foreground">
-                <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>Select a category above to view contacts.</p>
-              </div>
-            )}
+
           </CardContent>
         </Card>
       </div>
@@ -1076,50 +1073,60 @@ export default function CategoriesPage() {
                     <br />
                     <strong className="text-destructive">⚠️ WARNING: This action cannot be undone!</strong>
                   </p>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-3">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         id="deleteSubcategories"
+                        className="cascade-checkbox"
                         disabled={cascadeDeleteModal.subcategoriesCount === 0}
-                        className="w-4 h-4 rounded border-border"
                       />
                       <span className="text-sm text-foreground">
                         Delete {cascadeDeleteModal.subcategoriesCount} subcategory(ies)
                       </span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         id="deleteGallery"
+                        className="cascade-checkbox"
                         disabled={cascadeDeleteModal.imagesCount === 0}
-                        className="w-4 h-4 rounded border-border"
                       />
                       <span className="text-sm text-foreground">
                         Delete {cascadeDeleteModal.imagesCount} image(s)
                       </span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         id="deleteContacts"
+                        className="cascade-checkbox"
                         disabled={cascadeDeleteModal.contactsCount === 0}
-                        className="w-4 h-4 rounded border-border"
                       />
                       <span className="text-sm text-foreground">
                         Delete {cascadeDeleteModal.contactsCount} contact(s)
                       </span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         id="deleteLeads"
+                        className="cascade-checkbox"
                         disabled={cascadeDeleteModal.leadsCount === 0}
-                        className="w-4 h-4 rounded border-border"
                       />
                       <span className="text-sm text-foreground">
                         Delete {cascadeDeleteModal.leadsCount} lead(s)
                       </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer font-semibold pt-2 border-t border-border">
+                      <Checkbox
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          // Target the inputs INSIDE the wrapper divs that have the class
+                          const checkboxes = document.querySelectorAll('.cascade-checkbox input[type="checkbox"]');
+                          checkboxes.forEach((cb: any) => {
+                            // Only check if enabled
+                            if (!cb.disabled) cb.checked = checked;
+                          });
+                        }}
+                      />
+                      <span className="text-sm text-foreground">Select All</span>
                     </label>
                   </div>
                   <div className="flex gap-2 pt-4">

@@ -246,6 +246,7 @@ function ManualEntryComponent({
     separator: "|",
   })
   const [manualSubcategories, setManualSubcategories] = useState<Category[]>([])
+  const [actionErrors, setActionErrors] = useState<string[]>([])
 
   const loadSubcategories = async (categoryId: number) => {
     try {
@@ -351,8 +352,26 @@ function ManualEntryComponent({
               />
             </div>
 
+            {/* Error Actions Box */}
+            {actionErrors.length > 0 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 my-2 animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <p className="text-sm font-semibold text-destructive">Errors Found ({actionErrors.length})</p>
+                </div>
+                <div className="max-h-24 overflow-y-auto pr-1">
+                  <ul className="text-xs text-destructive/90 list-disc pl-4 space-y-1">
+                    {actionErrors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             <Button
               onClick={async () => {
+                setActionErrors([])
                 if (!manualForm.category_id) {
                   toast.error("Category is required")
                   return
@@ -376,7 +395,9 @@ function ManualEntryComponent({
 
                   const response = await leadsAPI.createManual(formData)
 
-                  if (response.data?.success !== false) {
+                  const { success, created, failed, errors } = response.data
+
+                  if (success && failed === 0) {
                     toast.success("Leads added successfully!")
                     setManualForm({
                       category_id: "",
@@ -387,6 +408,38 @@ function ManualEntryComponent({
                     })
                     setManualSubcategories([])
                     onLeadsAdded()
+                  } else if (success && failed > 0) {
+                    if (created > 0) {
+                      toast.success(`${created} leads added successfully!`)
+                      onLeadsAdded()
+                      // Clear form only if we want to force re-entry, but maybe better to keep it? 
+                      // For now, let's clear it to match previous behavior but alert on errors.
+                      setManualForm({
+                        category_id: "",
+                        subcategory_id: "",
+                        sales_person_name: "",
+                        leads_text: "",
+                        separator: "|",
+                      })
+                      setManualSubcategories([])
+                    }
+
+                    if (errors && errors.length > 0) {
+                      const newErrList: string[] = []
+                      errors.forEach((err: any) => {
+                        const num = err.data?.mobile_number || 'Lead'
+                        let msg = ''
+                        if (err.error?.includes('already exists')) {
+                          msg = `Lead with number ${num} already exists`
+                          toast.error(msg, { autoClose: 5000 })
+                        } else {
+                          msg = `Failed to add ${num}: ${err.error}`
+                          toast.error(msg, { autoClose: 5000 })
+                        }
+                        newErrList.push(msg)
+                      })
+                      setActionErrors(newErrList)
+                    }
                   } else {
                     toast.error("Failed to add leads")
                   }
