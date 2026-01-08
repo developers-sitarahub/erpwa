@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/button"
 import {
@@ -13,11 +13,12 @@ import {
 import { Badge } from "@/components/badge"
 import { Select, SelectOption } from "@/components/select"
 import { Input } from "@/components/input"
-import { Plus, Edit2, Trash2, Upload, X, Images as ImagesIcon, FolderOpen, Loader2, ChevronDown, Search, AlertTriangle, CheckSquare, Square } from "lucide-react"
+import { Plus, Edit2, Trash2, Upload, X, FileText, Check, Save, Search, Filter, FolderOpen, MoreVertical, LayoutGrid, List, CheckSquare, Square, Loader2, ImagesIcon, AlertTriangle, ArrowRight, Lock, ChevronDown, ChevronUp } from "lucide-react"
 import { categoriesAPI } from "@/lib/categoriesApi"
 import { galleryAPI } from "@/lib/galleryApi"
 import type { Category, GalleryImage } from "@/lib/types"
 import { toast } from "react-toastify"
+import { processMedia } from "@/lib/mediaProcessor"
 
 export default function GalleryPage() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -32,6 +33,7 @@ export default function GalleryPage() {
   const [sortBy, setSortBy] = useState<string>("createdAt")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [filterBy, setFilterBy] = useState<string>("")
+  const [isImagesExpanded, setIsImagesExpanded] = useState(false)
 
   // Upload form states
   const [uploadForm, setUploadForm] = useState({
@@ -64,15 +66,25 @@ export default function GalleryPage() {
   }>({ isOpen: false, type: 'single' });
 
   // Upload State
-  // Upload State
-  const [uploadStatus, setUploadStatus] = useState<{
-    isUploading: boolean;
-    current: number;
-    total: number;
-    filename: string;
-    success: number;
-    failed: number;
-  }>({ isUploading: false, current: 0, total: 0, filename: "", success: 0, failed: 0 });
+  // Batch Type
+  interface UploadBatch {
+    id: string
+    files: { file: File; status: "pending" | "processing" | "success" | "error"; error?: string }[]
+    categoryId: string
+    subcategoryId: string
+    categoryName: string
+    subcategoryName: string // Added to store name instead of ID
+    status: "pending" | "processing" | "completed" | "partial_error"
+    progress: number // 0-100 batch completion
+    processedCount: number
+    totalCount: number
+    successCount: number
+    failedCount: number
+  }
+
+  // Upload Queue State (now Batches)
+  const [uploadBatches, setUploadBatches] = useState<UploadBatch[]>([])
+  const isProcessing = useRef(false)
 
   useEffect(() => {
     loadCategories()
@@ -140,7 +152,6 @@ export default function GalleryPage() {
   }
 
   const handleCategoryClick = async (categoryId: number) => {
-    // Toggle logic: if already selected, deselect
     if (selectedCategory === categoryId) {
       setSelectedCategory(null)
       setSelectedSubcategory(null)
@@ -149,8 +160,8 @@ export default function GalleryPage() {
 
     setSelectedCategory(categoryId)
     setSelectedSubcategory(null)
+    setIsImagesExpanded(true) // Auto-expand when category is clicked
 
-    // Load subcategories for the selected category
     const response = await categoriesAPI.detail(categoryId)
     const category = categories.find((c) => c.id === categoryId)
     if (category) {
@@ -160,7 +171,6 @@ export default function GalleryPage() {
   }
 
   const handleSubcategoryClick = (subcategoryId: number) => {
-    // Toggle logic for subcategory as well
     if (selectedSubcategory === subcategoryId) {
       setSelectedSubcategory(null)
     } else {
@@ -168,84 +178,188 @@ export default function GalleryPage() {
     }
   }
 
-  const handleUpload = async (e: React.FormEvent) => {
+  // Process Batches
+  useEffect(() => {
+    const processNextBatch = async () => {
+      if (isProcessing.current) return
+
+      // Find first pending batch
+      const batchIndex = uploadBatches.findIndex((b) => b.status === "pending" || b.status === "processing")
+      if (batchIndex === -1) return
+
+      const batch = uploadBatches[batchIndex]
+      // If batch is marked processing but we are here, it implies we are continuing (or recovering state, though local state is simpler)
+      // Actually, we usually take 'pending'. 'processing' implies it's already running in a parallel loop, but our effect is simple sequential.
+      // Let's assume we pick up where we left off or start new.
+
+      // If the batch is already completed in state, skip (shouldn't happen with findIndex)
+      if (batch.processedCount >= batch.totalCount && batch.files.every(f => f.status !== 'pending')) {
+        // Just marks as completed if not
+        if (batch.status !== 'completed' && batch.status !== 'partial_error') {
+          setUploadBatches(prev => prev.map((b, i) => i === batchIndex ? { ...b, status: 'completed', progress: 100 } : b))
+        }
+        return
+      }
+
+      isProcessing.current = true
+
+      // Mark batch processing if not already
+      if (batch.status === "pending") {
+        setUploadBatches((prev) =>
+          prev.map((b, i) => (i === batchIndex ? { ...b, status: "processing" } : b))
+        )
+      }
+
+      // Find next pending file in this batch
+      const fileIndex = batch.files.findIndex(f => f.status === 'pending')
+      if (fileIndex === -1) {
+        // Batch done
+        const isError = batch.failedCount > 0
+        setUploadBatches(prev => prev.map((b, i) => i === batchIndex ? { ...b, status: isError ? 'partial_error' : 'completed', progress: 100 } : b))
+        isProcessing.current = false
+        return
+      }
+
+      const fileItem = batch.files[fileIndex]
+
+      // Update file status to processing
+      setUploadBatches(prev => prev.map((b, i) => {
+        if (i !== batchIndex) return b
+        const newFiles = [...b.files]
+        newFiles[fileIndex] = { ...newFiles[fileIndex], status: 'processing' }
+        return { ...b, files: newFiles }
+      }))
+
+      try {
+        const { file: compressedFile } = await processMedia(fileItem.file)
+
+        const formData = new FormData()
+        formData.append("category_id", batch.categoryId)
+        if (batch.subcategoryId) {
+          formData.append("subcategory_id", batch.subcategoryId)
+        }
+        formData.append("images", compressedFile)
+
+        const response = await galleryAPI.upload(formData)
+        const success = response.data?.success !== false
+
+        setUploadBatches(prev => prev.map((b, i) => {
+          if (i !== batchIndex) return b
+          const newFiles = [...b.files]
+          newFiles[fileIndex] = { ...newFiles[fileIndex], status: success ? 'success' : 'error', error: success ? undefined : 'Upload rejected' }
+          const newProcessed = b.processedCount + 1
+          const newSuccess = b.successCount + (success ? 1 : 0)
+          const newFailed = b.failedCount + (success ? 0 : 1)
+          const newProgress = Math.round((newProcessed / b.totalCount) * 100)
+          return {
+            ...b,
+            files: newFiles,
+            processedCount: newProcessed,
+            successCount: newSuccess,
+            failedCount: newFailed,
+            progress: newProgress
+          }
+        }))
+
+        if (success) {
+          loadImages(currentPage, false)
+        }
+
+      } catch (error: any) {
+        setUploadBatches(prev => prev.map((b, i) => {
+          if (i !== batchIndex) return b
+          const newFiles = [...b.files]
+          newFiles[fileIndex] = { ...newFiles[fileIndex], status: 'error', error: error.message || "Failed" }
+          const newProcessed = b.processedCount + 1
+          const newFailed = b.failedCount + 1
+          const newProgress = Math.round((newProcessed / b.totalCount) * 100)
+          return {
+            ...b,
+            files: newFiles,
+            processedCount: newProcessed,
+            failedCount: newFailed,
+            progress: newProgress
+          }
+        }))
+      } finally {
+        // Recursive step or next loop
+        isProcessing.current = false
+        // Trigger next effect run
+      }
+    }
+
+    processNextBatch()
+  }, [uploadBatches, currentPage])
+
+  const handleAddToQueue = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedImages.length || !uploadForm.category_id) {
       toast.error("Please select category and images")
       return
     }
 
-    if (selectedImages.length > 200) {
-      toast.error("Maximum 200 images allowed per upload")
+    // Validation
+    const validImages: File[] = []
+    const invalidFiles: string[] = []
+
+    selectedImages.forEach((file) => {
+      if (!file.type.startsWith("image/")) {
+        invalidFiles.push(file.name)
+      } else {
+        validImages.push(file)
+      }
+    })
+
+    if (invalidFiles.length > 0) {
+      toast.error(`Ignored ${invalidFiles.length} non-image file(s)`)
+    }
+
+    if (validImages.length === 0) return
+
+    const selectedCat = categories.find(c => c.id.toString() === uploadForm.category_id)
+    const categoryName = selectedCat?.name || "Unknown"
+
+    // Find subcategory name
+    const selectedSub = uploadSubcategories.find(s => s.id.toString() === uploadForm.subcategory_id)
+    const subcategoryName = selectedSub?.name || (uploadForm.subcategory_id ? "Unknown Sub-cat" : "All")
+
+    // Check if a batch with same destination is already active
+    const isDuplicateBatch = uploadBatches.some(b =>
+      (b.status === 'pending' || b.status === 'processing') &&
+      b.categoryId === uploadForm.category_id &&
+      b.subcategoryId === uploadForm.subcategory_id
+    )
+
+    if (isDuplicateBatch) {
+      toast.warning("A batch is already processing for this destination. Please wait.")
       return
     }
 
-    setUploadStatus({
-      isUploading: true,
-      current: 0,
-      total: selectedImages.length,
-      filename: "",
-      success: 0,
-      failed: 0
-    });
-
-    let successCount = 0;
-    let failedCount = 0;
-    const errors: string[] = [];
-
-    // Process sequentially
-    for (let i = 0; i < selectedImages.length; i++) {
-      const file = selectedImages[i];
-
-      setUploadStatus(prev => ({
-        ...prev,
-        current: i + 1,
-        filename: file.name
-      }));
-
-      try {
-        const formData = new FormData()
-        formData.append("category_id", uploadForm.category_id)
-        if (uploadForm.subcategory_id) {
-          formData.append("subcategory_id", uploadForm.subcategory_id)
-        }
-        formData.append("images", file) // Send single file
-
-        const response = await galleryAPI.upload(formData)
-
-        if (response.data?.success !== false) {
-          successCount++;
-          setUploadStatus(prev => ({ ...prev, success: prev.success + 1 }));
-        } else {
-          failedCount++;
-          errors.push(file.name);
-          setUploadStatus(prev => ({ ...prev, failed: prev.failed + 1 }));
-        }
-      } catch (error: any) {
-        failedCount++;
-        errors.push(file.name);
-        setUploadStatus(prev => ({ ...prev, failed: prev.failed + 1 }));
-        console.error(`Failed to upload ${file.name}:`, error);
-      }
+    // Create a NEW BATCH
+    const newBatch: UploadBatch = {
+      id: Math.random().toString(36).substring(7),
+      files: validImages.map(f => ({ file: f, status: 'pending' })),
+      categoryId: uploadForm.category_id,
+      subcategoryId: uploadForm.subcategory_id,
+      categoryName,
+      subcategoryName,
+      status: "pending",
+      progress: 0,
+      processedCount: 0,
+      totalCount: validImages.length,
+      successCount: 0,
+      failedCount: 0
     }
 
-    setUploadStatus(prev => ({ ...prev, isUploading: false }));
+    setUploadBatches((prev) => [...prev, newBatch])
 
-    if (successCount > 0) {
-      toast.success(`Successfully uploaded ${successCount} image(s)!`)
-      // Reset form if all successful? Or keep form? 
-      // User wants to see progress. If mixed results, maybe keep form?
-      // Standard behavior: clear if at least one success to show update.
-      setSelectedImages([])
-      setUploadForm({ category_id: "", subcategory_id: "" })
-      setUploadSubcategories([])
-      setCurrentPage(1)
-      await loadImages(1, false)
-    }
+    setSelectedImages([])
+    // Do NOT reset category/subcategory as requested
+    toast.info(`Added batch of ${validImages.length} image(s) to queue`)
+  }
 
-    if (errors.length > 0) {
-      toast.error(`Failed to upload ${errors.length} image(s). Check console for details.`)
-    }
+  const clearCompleted = () => {
+    setUploadBatches(prev => prev.filter(b => b.status === 'pending' || b.status === 'processing'))
   }
 
   const handleDeleteImage = (imageId: number, imageTitle: string) => {
@@ -347,6 +461,10 @@ export default function GalleryPage() {
   const selectedCategoryData = categories.find((c) => c.id === selectedCategory)
   const subcategories = selectedCategoryData?.subcategories || []
 
+  // Logic to lock queue if busy
+  // No global lock anymore, we lock specifically per subcategory in logic
+  const isGlobalLock = false // We disabled the UI lock to allow other subcat selections
+
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6">
       <div className="space-y-6">
@@ -361,64 +479,74 @@ export default function GalleryPage() {
         </div>
 
         {/* Upload Section */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <h3 className="text-lg font-semibold text-foreground">Upload Images</h3>
+        <Card className="bg-card border-border overflow-hidden">
+          <CardHeader className="pb-4">
+            <div className="grid grid-cols-[40%_60%] gap-0 relative">
+              <h3 className="text-lg font-semibold text-foreground pr-6">
+                Upload Images
+              </h3>
+              <h3 className="text-lg font-semibold text-foreground pl-6 border-l-[3px] border-border">
+                Upload Status
+              </h3>
+            </div>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpload} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground block mb-2">Category</label>
-                  <select
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    value={uploadForm.category_id}
-                    onChange={(e) => {
-                      setUploadForm({ ...uploadForm, category_id: e.target.value, subcategory_id: "" })
-                      if (e.target.value) {
-                        loadSubcategories(parseInt(e.target.value))
-                      } else {
-                        setUploadSubcategories([])
-                      }
-                    }}
-                    required
-                  >
-                    <option value="">-- Select Category --</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-[40%_60%] gap-0">
+              {/* Left Column (40%): Controls */}
+              <div className="pr-6 space-y-4 flex flex-col">
 
-                {uploadSubcategories.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-foreground block mb-2">
-                      Sub-Category (Optional)
+                {/* Top Row: Category | Sub-Category */}
+                <div className="flex gap-4">
+                  <div className="w-1/2">
+                    <label className="text-xs font-medium text-muted-foreground block mb-1.5">Category</label>
+                    <Select
+                      value={uploadForm.category_id}
+                      disabled={false}
+                      onChange={(e) => {
+                        setUploadForm({ ...uploadForm, category_id: e.target.value, subcategory_id: "" })
+                        if (e.target.value) {
+                          loadSubcategories(parseInt(e.target.value))
+                        } else {
+                          setUploadSubcategories([])
+                        }
+                      }}
+                    >
+                      <SelectOption value="">Select Category</SelectOption>
+                      {categories.map((cat) => (
+                        <SelectOption key={cat.id} value={cat.id.toString()}>
+                          {cat.name}
+                        </SelectOption>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="w-1/2">
+                    <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                      Sub-Category
                     </label>
-                    <select
-                      className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    <Select
                       value={uploadForm.subcategory_id}
+                      disabled={!uploadForm.category_id || uploadSubcategories.length === 0}
                       onChange={(e) =>
                         setUploadForm({ ...uploadForm, subcategory_id: e.target.value })
                       }
                     >
-                      <option value="">All sub-categories</option>
+                      <SelectOption value="">All</SelectOption>
                       {uploadSubcategories.map((subcat) => (
-                        <option key={subcat.id} value={subcat.id}>
+                        <SelectOption key={subcat.id} value={subcat.id.toString()}>
                           {subcat.name}
-                        </option>
+                        </SelectOption>
                       ))}
-                    </select>
+                    </Select>
                   </div>
-                )}
+                </div>
 
-                <div>
-                  <label className="text-sm font-medium text-foreground block mb-2">
-                    Images (Max 200)
-                  </label>
+                {/* Image Selection Area */}
+                <div className="relative border-2 border-dashed border-border rounded-lg h-[200px] flex flex-col items-center justify-center hover:bg-secondary/20 transition-colors text-center">
                   <input
+                    ref={(ref) => {
+                      if (ref && selectedImages.length === 0) ref.value = "";
+                    }}
                     type="file"
                     multiple
                     accept="image/*"
@@ -431,45 +559,64 @@ export default function GalleryPage() {
                       setSelectedImages(files)
                     }}
                     disabled={!uploadForm.category_id}
-                    className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:text-white file:cursor-pointer disabled:opacity-50"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {selectedImages.length > 0
-                      ? `${selectedImages.length} file(s) selected`
-                      : "Select category first"}
-                  </p>
-                </div>
-              </div>
 
-              <div className="flex gap-2">
+                  <div className="p-4 bg-secondary rounded-full mb-3">
+                    <Upload className="w-6 h-6 text-primary" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedImages.length > 0
+                        ? `${selectedImages.length} images selected`
+                        : "Upload Image"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground px-4">
+                      {!uploadForm.category_id
+                        ? "Select category first"
+                        : "Drag & drop or click to upload"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Upload Button */}
                 <Button
-                  type="submit"
-                  className="bg-primary hover:bg-primary/90 w-full md:w-auto min-w-[200px]"
-                  disabled={!uploadForm.category_id || selectedImages.length === 0 || uploadStatus.isUploading}
+                  onClick={handleAddToQueue}
+                  className="w-full bg-primary hover:bg-primary/90 h-10"
+                  disabled={!uploadForm.category_id || selectedImages.length === 0}
                 >
-                  {uploadStatus.isUploading ? (
-                    <div className="flex flex-col w-full py-1">
-                      <div className="flex items-center justify-center mb-1">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        <span>Uploading {uploadStatus.current}/{uploadStatus.total}</span>
-                      </div>
-                      <div className="w-full bg-primary-foreground/30 rounded-full h-1.5 mb-1 overflow-hidden">
-                        <div
-                          className="bg-white h-full transition-all duration-300 ease-in-out"
-                          style={{ width: `${(uploadStatus.current / uploadStatus.total) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs opacity-90 truncate max-w-[180px] mx-auto">{uploadStatus.filename}</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Images
-                    </>
-                  )}
+                  <Plus className="w-4 h-4 mr-2" />
+                  Upload Image
                 </Button>
               </div>
-            </form>
+
+              {/* Right Column (60%): Queue Status */}
+              <div className="pl-6 border-l-[3px] border-border flex flex-col">
+                <div className="flex items-center justify-end pb-4 mb-4">
+                  {uploadBatches.some(b => b.status === 'completed' || b.status === 'partial_error') && (
+                    <button onClick={clearCompleted} className="text-xs flex items-center gap-1 text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="w-3 h-3" /> Clear History
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3 h-[320px] overflow-y-auto pr-2 custom-scrollbar">
+                  {uploadBatches.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-3 opacity-60">
+                      <ImagesIcon className="w-12 h-12 stroke-1" />
+                      <p className="text-sm">No active uploads</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {uploadBatches.map((batch) => (
+                        <BatchCard key={batch.id} batch={batch} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -540,286 +687,292 @@ export default function GalleryPage() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-col gap-4 space-y-0">
             <div className="flex flex-row items-center justify-between w-full">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  {selectedCategoryData ? (
-                    <>
-                      Images - {selectedCategoryData.name}
-                      {selectedSubcategory &&
-                        ` > ${subcategories.find((s) => s.id === selectedSubcategory)?.name}`}
-                    </>
-                  ) : (
-                    "All Images"
-                  )}
-                </h3>
-              </div>
+              <h3 className="text-lg font-semibold text-foreground">All Images</h3>
               <div className="flex items-center gap-2">
-                {images.length > 0 && (
-                  <Button
-                    onClick={toggleSelectAll}
-                    variant="outline"
-                    className="bg-secondary border-border text-foreground hover:bg-muted"
-                    title={selectedImageIds.length === images.length ? "Deselect All" : "Select All"}
-                  >
-                    {selectedImageIds.length === images.length && images.length > 0 ? (
-                      <CheckSquare className="w-4 h-4 mr-2" />
-                    ) : (
-                      <Square className="w-4 h-4 mr-2" />
+                {isImagesExpanded && (
+                  <>
+                    {images.length > 0 && (
+                      <Button
+                        onClick={toggleSelectAll}
+                        variant="outline"
+                        className="bg-secondary border-border text-foreground hover:bg-muted"
+                        title={selectedImageIds.length === images.length ? "Deselect All" : "Select All"}
+                      >
+                        {selectedImageIds.length === images.length && images.length > 0 ? (
+                          <CheckSquare className="w-4 h-4 mr-2" />
+                        ) : (
+                          <Square className="w-4 h-4 mr-2" />
+                        )}
+                        Select All
+                      </Button>
                     )}
-                    Select All
-                  </Button>
-                )}
-                {selectedImageIds.length > 0 && (
-                  <Button
-                    onClick={handleBulkDelete}
-                    variant="outline"
-                    className="bg-destructive/10 border-destructive text-destructive hover:bg-destructive/20"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete ({selectedImageIds.length})
-                  </Button>
-                )}
-                <Button
-                  onClick={() => loadImages(1, false)}
-                  variant="outline"
-                  className="bg-secondary border-border text-foreground hover:bg-muted"
-                >
-                  <Loader2 className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                  Refresh
-                </Button>
-              </div>
-            </div>
-
-            {/* Filters and Sort */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full border-t border-border pt-4">
-
-
-              {/* Filter By & Sort By */}
-              <div className="flex gap-2">
-                <div className="w-[150px]">
-                  <Select value={filterBy} onChange={(e) => setFilterBy(e.target.value)}>
-                    <SelectOption value="">Filter By...</SelectOption>
-                    <SelectOption value="price">Price</SelectOption>
-                    <SelectOption value="description">Description</SelectOption>
-                  </Select>
-                </div>
-
-                <div className="w-[180px]">
-                  <Select
-                    value={`${sortBy}-${sortOrder}`}
-                    onChange={(e) => {
-                      const [by, order] = e.target.value.split('-');
-                      setSortBy(by);
-                      setSortOrder(order as 'asc' | 'desc');
-                    }}
-                  >
-                    <SelectOption value="createdAt-desc">Newest First</SelectOption>
-                    <SelectOption value="createdAt-asc">Oldest First</SelectOption>
-                    <SelectOption value="price-asc">Price: Low to High</SelectOption>
-                    <SelectOption value="price-desc">Price: High to Low</SelectOption>
-                    <SelectOption value="title-asc">Name: A-Z</SelectOption>
-                    <SelectOption value="title-desc">Name: Z-A</SelectOption>
-                    <SelectOption value="updatedAt-desc">Modified: Newest</SelectOption>
-                    <SelectOption value="updatedAt-asc">Modified: Oldest</SelectOption>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-                <p className="text-muted-foreground">Loading images...</p>
-              </div>
-            ) : images.length > 0 ? (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {images.map((image) => (
-                    <div
-                      key={image.id}
-                      className="group relative rounded-lg border-2 border-border overflow-hidden hover:border-primary transition-colors bg-card"
+                    {selectedImageIds.length > 0 && (
+                      <Button
+                        onClick={handleBulkDelete}
+                        variant="outline"
+                        className="bg-destructive/10 border-destructive text-destructive hover:bg-destructive/20"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete ({selectedImageIds.length})
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => loadImages(1, false)}
+                      variant="outline"
+                      className="bg-secondary border-border text-foreground hover:bg-muted"
                     >
-                      {/* Checkbox */}
-                      <div className="absolute top-2 left-2 z-10 bg-card/90 p-1 rounded">
-                        <input
-                          type="checkbox"
-                          checked={selectedImageIds.includes(image.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedImageIds([...selectedImageIds, image.id])
-                            } else {
-                              setSelectedImageIds(selectedImageIds.filter((id) => id !== image.id))
-                            }
-                          }}
-                          className="w-4 h-4 cursor-pointer rounded border-border"
-                        />
-                      </div>
+                      <Loader2 className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                      Refresh
+                    </Button>
+                  </>
+                )}
+                <button
+                  onClick={() => setIsImagesExpanded(!isImagesExpanded)}
+                  className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                >
+                  {isImagesExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </button>
+              </div>
+            </div>
 
-                      {/* Image */}
-                      {/* Image */}
-                      <div className="relative w-full h-48">
-                        <Image
-                          src={getImageUrl(image)}
-                          alt={image.title || "Gallery Image"}
-                          fill
-                          className="object-cover group-hover:opacity-75 transition-opacity"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        />
-                      </div>
-
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditImage(image)}
-                          className="p-2 bg-primary hover:bg-primary/90 rounded-full text-white transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteImage(image.id, image.title || "Image")}
-                          className="p-2 bg-destructive hover:bg-destructive/90 rounded-full text-white transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Info */}
-                      <div className="p-3 bg-card border-t border-border">
-                        <h4 className="text-sm font-semibold text-foreground break-words line-clamp-2">
-                          {image.title || "Untitled"}
-                        </h4>
-                        {image.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {image.description}
-                          </p>
-                        )}
-                        {image.price && (
-                          <p className="text-sm text-primary font-semibold mt-1">
-                            {image.price_display || image.get_display_price || `${image.price_currency} ${image.price}`}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {image.sub_category_name
-                            ? `${image.category_name} > ${image.sub_category_name}`
-                            : image.category_name}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-
-                {/* Pagination */}
-                {totalImages > 0 && (
-                  <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8 pt-6 border-t border-border relative">
-                    {/* Pagination Controls */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newPage = Math.max(1, currentPage - 1);
-                          setCurrentPage(newPage);
-                          loadImages(newPage, false);
-                        }}
-                        disabled={currentPage === 1}
-                        className="bg-secondary border-border text-foreground hover:bg-muted transition-all duration-200 font-semibold"
-                      >
-                        ← Previous
-                      </Button>
-
-                      {/* Page Numbers */}
-                      <div className="flex gap-2">
-                        {Array.from({ length: Math.ceil(totalImages / itemsPerPage) }, (_, i) => i + 1)
-                          .filter((page) => {
-                            const totalPages = Math.ceil(totalImages / itemsPerPage);
-                            if (totalPages <= 7) return true;
-                            if (page === 1 || page === totalPages) return true;
-                            if (page >= currentPage - 1 && page <= currentPage + 1) return true;
-                            return false;
-                          })
-                          .map((page, idx, arr) => {
-                            if (idx > 0 && arr[idx - 1] + 1 < page) {
-                              return (
-                                <span key={`dots-${page}`} className="px-3 text-muted-foreground font-semibold">
-                                  ...
-                                </span>
-                              );
-                            }
-                            return (
-                              <Button
-                                key={page}
-                                size="sm"
-                                onClick={() => {
-                                  setCurrentPage(page);
-                                  loadImages(page, false);
-                                }}
-                                variant={page === currentPage ? "primary" : "outline"}
-                                className={`transition-all duration-200 font-semibold min-w-10 ${page === currentPage
-                                  ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md scale-105"
-                                  : "bg-secondary border-border text-foreground hover:bg-muted hover:scale-105"
-                                  }`}
-                              >
-                                {page}
-                              </Button>
-                            );
-                          })}
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const totalPages = Math.ceil(totalImages / itemsPerPage);
-                          const newPage = Math.min(totalPages, currentPage + 1);
-                          setCurrentPage(newPage);
-                          loadImages(newPage, false);
-                        }}
-                        disabled={currentPage >= Math.ceil(totalImages / itemsPerPage)}
-                        className="bg-secondary border-border text-foreground hover:bg-muted transition-all duration-200 font-semibold"
-                      >
-                        Next →
-                      </Button>
+            {isImagesExpanded && (
+              <>
+                {/* Filters and Sort */}
+                <div className="flex flex-col sm:flex-row gap-3 w-full border-t border-border pt-4">
+                  {/* Filter By & Sort By */}
+                  <div className="flex gap-2">
+                    <div className="w-[150px]">
+                      <Select value={filterBy} onChange={(e) => setFilterBy(e.target.value)}>
+                        <SelectOption value="">Filter By...</SelectOption>
+                        <SelectOption value="price">Price</SelectOption>
+                        <SelectOption value="description">Description</SelectOption>
+                      </Select>
                     </div>
 
-                    {/* Page Info & Rows per page */}
-                    <div className="flex items-center gap-4 text-sm sm:absolute sm:right-0">
-                      <p className="font-semibold text-foreground hidden md:block">
-                        Page <span className="text-primary">{currentPage}</span> of{" "}
-                        <span className="text-primary">{Math.ceil(totalImages / itemsPerPage)}</span>
-                      </p>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Rows:</span>
-                        <select
-                          className="px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-                          value={itemsPerPage}
-                          onChange={(e) => {
-                            setItemsPerPage(Number(e.target.value));
-                            setCurrentPage(1);
-                          }}
-                        >
-                          <option value={10}>10</option>
-                          <option value={20}>20</option>
-                          <option value={30}>30</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
-                      </div>
+                    <div className="w-[180px]">
+                      <Select
+                        value={`${sortBy}-${sortOrder}`}
+                        onChange={(e) => {
+                          const [by, order] = e.target.value.split('-');
+                          setSortBy(by);
+                          setSortOrder(order as 'asc' | 'desc');
+                        }}
+                      >
+                        <SelectOption value="createdAt-desc">Newest First</SelectOption>
+                        <SelectOption value="createdAt-asc">Oldest First</SelectOption>
+                        <SelectOption value="price-asc">Price: Low to High</SelectOption>
+                        <SelectOption value="price-desc">Price: High to Low</SelectOption>
+                        <SelectOption value="title-asc">Name: A-Z</SelectOption>
+                        <SelectOption value="title-desc">Name: Z-A</SelectOption>
+                        <SelectOption value="updatedAt-desc">Modified: Newest</SelectOption>
+                        <SelectOption value="updatedAt-asc">Modified: Oldest</SelectOption>
+                      </Select>
                     </div>
                   </div>
-                )}
+                </div>
               </>
-            ) : (
-              <div className="py-12 text-center">
-                <ImagesIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No images found</p>
-              </div>
             )}
-          </CardContent>
+          </CardHeader>
+          {isImagesExpanded && (
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                  <p className="text-muted-foreground">Loading images...</p>
+                </div>
+              ) : images.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {images.map((image) => (
+                      <div
+                        key={image.id}
+                        className="group relative rounded-lg border-2 border-border overflow-hidden hover:border-primary transition-colors bg-card"
+                      >
+                        {/* Checkbox */}
+                        <div className="absolute top-2 left-2 z-10 bg-card/90 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={selectedImageIds.includes(image.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedImageIds([...selectedImageIds, image.id])
+                              } else {
+                                setSelectedImageIds(selectedImageIds.filter((id) => id !== image.id))
+                              }
+                            }}
+                            className="w-4 h-4 cursor-pointer rounded border-border"
+                          />
+                        </div>
+
+                        {/* Image */}
+                        {/* Image */}
+                        <div className="relative w-full h-48">
+                          <Image
+                            src={getImageUrl(image)}
+                            alt={image.title || "Gallery Image"}
+                            fill
+                            className="object-cover group-hover:opacity-75 transition-opacity"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
+
+                        {/* Overlay */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEditImage(image)}
+                            className="p-2 bg-primary hover:bg-primary/90 rounded-full text-white transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteImage(image.id, image.title || "Image")}
+                            className="p-2 bg-destructive hover:bg-destructive/90 rounded-full text-white transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-3 bg-card border-t border-border">
+                          <h4 className="text-sm font-semibold text-foreground break-words line-clamp-2">
+                            {image.title || "Untitled"}
+                          </h4>
+                          {image.description && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {image.description}
+                            </p>
+                          )}
+                          {image.price && (
+                            <p className="text-sm text-primary font-semibold mt-1">
+                              {image.price_display || image.get_display_price || `${image.price_currency} ${image.price}`}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {image.sub_category_name
+                              ? `${image.category_name} > ${image.sub_category_name}`
+                              : image.category_name}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+
+                  {/* Pagination */}
+                  {totalImages > 0 && (
+                    <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8 pt-6 border-t border-border relative">
+                      {/* Pagination Controls */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newPage = Math.max(1, currentPage - 1);
+                            setCurrentPage(newPage);
+                            loadImages(newPage, false);
+                          }}
+                          disabled={currentPage === 1}
+                          className="bg-secondary border-border text-foreground hover:bg-muted transition-all duration-200 font-semibold"
+                        >
+                          ← Previous
+                        </Button>
+
+                        {/* Page Numbers */}
+                        <div className="flex gap-2">
+                          {Array.from({ length: Math.ceil(totalImages / itemsPerPage) }, (_, i) => i + 1)
+                            .filter((page) => {
+                              const totalPages = Math.ceil(totalImages / itemsPerPage);
+                              if (totalPages <= 7) return true;
+                              if (page === 1 || page === totalPages) return true;
+                              if (page >= currentPage - 1 && page <= currentPage + 1) return true;
+                              return false;
+                            })
+                            .map((page, idx, arr) => {
+                              if (idx > 0 && arr[idx - 1] + 1 < page) {
+                                return (
+                                  <span key={`dots-${page}`} className="px-3 text-muted-foreground font-semibold">
+                                    ...
+                                  </span>
+                                );
+                              }
+                              return (
+                                <Button
+                                  key={page}
+                                  size="sm"
+                                  onClick={() => {
+                                    setCurrentPage(page);
+                                    loadImages(page, false);
+                                  }}
+                                  variant={page === currentPage ? "primary" : "outline"}
+                                  className={`transition-all duration-200 font-semibold min-w-10 ${page === currentPage
+                                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md scale-105"
+                                    : "bg-secondary border-border text-foreground hover:bg-muted hover:scale-105"
+                                    }`}
+                                >
+                                  {page}
+                                </Button>
+                              );
+                            })}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const totalPages = Math.ceil(totalImages / itemsPerPage);
+                            const newPage = Math.min(totalPages, currentPage + 1);
+                            setCurrentPage(newPage);
+                            loadImages(newPage, false);
+                          }}
+                          disabled={currentPage >= Math.ceil(totalImages / itemsPerPage)}
+                          className="bg-secondary border-border text-foreground hover:bg-muted transition-all duration-200 font-semibold"
+                        >
+                          Next →
+                        </Button>
+                      </div>
+
+                      {/* Page Info & Rows per page */}
+                      <div className="flex items-center gap-4 text-sm sm:absolute sm:right-0">
+                        <p className="font-semibold text-foreground hidden md:block">
+                          Page <span className="text-primary">{currentPage}</span> of{" "}
+                          <span className="text-primary">{Math.ceil(totalImages / itemsPerPage)}</span>
+                        </p>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Rows:</span>
+                          <select
+                            className="px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                              setItemsPerPage(Number(e.target.value));
+                              setCurrentPage(1);
+                            }}
+                          >
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                            <option value={30}>30</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="py-12 text-center">
+                  <ImagesIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No images found</p>
+                </div>
+              )}
+            </CardContent>
+          )}
         </Card>
       </div>
 
@@ -952,6 +1105,130 @@ export default function GalleryPage() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )
+      }
+      {/* Upload Progress Modal */}
+
+    </div >
+  )
+}
+
+// Helper Component for Batch Card to handle local state for "dropdown/details"
+function BatchCard({ batch }: { batch: any }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className={`p-4 rounded-xl border transition-all ${batch.status === 'processing'
+      ? 'bg-primary/5 border-primary/20 shadow-sm'
+      : 'bg-card border-border'
+      }`}>
+
+      {/* Header: Destination */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${batch.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+            batch.status === 'processing' ? 'bg-primary/10 text-primary' :
+              'bg-secondary text-muted-foreground'
+            }`}>
+            {batch.status === 'processing' ? <Loader2 className="animate-spin w-5 h-5" /> :
+              batch.status === 'completed' ? <Check className="w-5 h-5" /> :
+                <ImagesIcon className="w-5 h-5" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              {/* Breadcrumbs */}
+              <span>{batch.categoryName}</span>
+              <span className="text-muted-foreground/60">/</span>
+              <span className="text-foreground">
+                {batch.subcategoryName}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Badge variant={
+            batch.status === 'completed' ? 'default' :
+              batch.status === 'processing' ? 'secondary' : 'outline'
+          } className={
+            batch.status === 'completed' ? 'bg-green-500 hover:bg-green-600' : ''
+          }>
+            {batch.status === 'processing' ? 'Uploading...' :
+              batch.status === 'completed' ? 'Completed' : 'Queued'}
+          </Badge>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-1 hover:bg-secondary rounded-full transition-colors"
+          >
+            {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Progress Section */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-xs font-medium">
+          <span className={
+            batch.status === 'processing' ? 'text-primary' : 'text-muted-foreground'
+          }>
+            {batch.processedCount} of {batch.totalCount} files processed
+          </span>
+          <span className="text-foreground">{batch.progress}%</span>
+        </div>
+
+        <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ease-out ${batch.status === 'completed' ? 'bg-green-500' :
+              batch.status === 'partial_error' ? 'bg-amber-500' :
+                'bg-primary'
+              }`}
+            style={{ width: `${batch.progress}%` }}
+          />
+        </div>
+
+        {/* Stats Footer */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex gap-4">
+            {(batch.status === 'processing' || batch.status === 'completed' || batch.status === 'partial_error') && (
+              <>
+                <div className="flex items-center gap-1.5 text-xs text-green-600">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  Success: {batch.successCount}
+                </div>
+                {batch.failedCount > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs text-red-500">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    Failed: {batch.failedCount}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {isOpen && (
+            <span className="text-[10px] text-muted-foreground">Showing details</span>
+          )}
+        </div>
+      </div>
+
+      {/* Detail Dropdown */}
+      {
+        isOpen && (
+          <div className="mt-3 pt-3 border-t border-border space-y-2 max-h-[150px] overflow-y-auto scrollbar-thin scrollbar-thumb-secondary">
+            {batch.files.map((f: any, i: number) => (
+              <div key={i} className="flex justify-between items-center text-xs">
+                <div className="flex items-center gap-2 truncate max-w-[80%]">
+                  {f.status === 'success' ? <Check className="w-3 h-3 text-green-500" /> :
+                    f.status === 'error' ? <X className="w-3 h-3 text-red-500" /> :
+                      f.status === 'processing' ? <Loader2 className="w-3 h-3 animate-spin text-blue-500" /> :
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />}
+                  <span className={`truncate ${f.status === 'success' ? 'text-muted-foreground line-through opacity-70' : 'text-foreground'}`}>
+                    {f.file.name}
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground capitalize">{f.status}</span>
+              </div>
+            ))}
           </div>
         )
       }

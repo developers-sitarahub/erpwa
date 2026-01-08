@@ -6,37 +6,51 @@
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
-  --card: #f8fafc;
+  /* Slate 900 */
+  --card: #ffffff;
   --card-foreground: #0f172a;
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #25a55f;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #06b6d4;
+  /* Cyan 500 - Vibrant, fresh, unique */
   --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
+  --secondary: #ecfeff;
+  /* Cyan 50 */
+  --secondary-foreground: #0e7490;
+  /* Cyan 700 */
   --muted: #f1f5f9;
+  /* Slate 100 */
   --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
+  /* Slate 500 */
+  --accent: #e0f2fe;
+  /* Sky 100 */
+  --accent-foreground: #0284c7;
+  /* Sky 600 */
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --border: #e2e8f0;
+  /* Slate 200 */
   --input: #e2e8f0;
-  --ring: #0f172a;
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --ring: #06b6d4;
+  --chart-1: oklch(0.646 0.222 190);
+  /* Cyan */
+  --chart-2: oklch(0.60 0.18 220);
+  /* Azure */
+  --chart-3: oklch(0.55 0.20 250);
+  /* Blue */
+  --chart-4: oklch(0.85 0.15 90);
+  /* Yellow */
+  --chart-5: oklch(0.70 0.18 30);
+  /* Orange */
+  --radius: 0.5rem;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #06b6d4;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ecfeff;
+  --sidebar-accent-foreground: #0e7490;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #06b6d4;
   --wa-chat-bg: #efeae2;
   --wa-inbound: #ffffff;
   --wa-outbound: #dcf8c6;
@@ -44,40 +58,48 @@
 }
 
 .dark {
-  --background: #020817;
-  --foreground: #f8fafc;
-  --card: #0f172a;
-  --card-foreground: #f8fafc;
-  --popover: #0f172a;
-  --popover-foreground: #f8fafc;
-  --primary: #31d84b;
-  --primary-foreground: #0f172a;
+  --background: #0b1121;
+  /* Deep Midnight Blue ("WhatsApp-ish" but deeper) */
+  --foreground: #e9edef;
+  /* WhatsApp Text White */
+  --card: #151e32;
+  /* Lighter Midnight Navy for Cards */
+  --card-foreground: #e9edef;
+  --popover: #151e32;
+  --popover-foreground: #e9edef;
+  --primary: #00bcd4;
+  /* Cyan  - Electric & Fresh */
+  --primary-foreground: #000000;
   --secondary: #1e293b;
-  --secondary-foreground: #f8fafc;
+  /* Slate 800 */
+  --secondary-foreground: #e9edef;
   --muted: #1e293b;
   --muted-foreground: #94a3b8;
+  /* Slate 400 */
   --accent: #1e293b;
-  --accent-foreground: #f8fafc;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #f8fafc;
+  --accent-foreground: #e9edef;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
   --border: #1e293b;
+  /* Subtle borders */
   --input: #1e293b;
-  --ring: #cbd5e1;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --ring: #00bcd4;
+  --chart-1: oklch(0.70 0.20 190);
+  --chart-2: oklch(0.65 0.18 220);
+  --chart-3: oklch(0.60 0.20 250);
+  --chart-4: oklch(0.90 0.15 90);
+  --chart-5: oklch(0.75 0.18 30);
+  --radius: 0.5rem;
+  --sidebar: #0b1121;
+  --sidebar-foreground: #e9edef;
+  --sidebar-primary: #00bcd4;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent: #151e32;
+  --sidebar-accent-foreground: #00bcd4;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #00bcd4;
   --wa-chat-bg: #0b141a;
+  /* WhatsApp Dark BG exact match is #0b141a */
   --wa-inbound: #202c33;
   --wa-outbound: #005c4b;
   --wa-date: #1f2c34;
@@ -127,6 +149,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -201,6 +224,7 @@ input:-webkit-autofill:active {
   caret-color: var(--color-foreground);
   transition: background-color 9999s ease-in-out 0s;
 }
+
 /* ====================================================== */
 
 /* Toast card */

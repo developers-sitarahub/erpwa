@@ -1,5 +1,4 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 
@@ -7,33 +6,13 @@ import path from "path";
 const s3Client = new S3Client({
     region: process.env.AWS_REGION || "us-east-2",
     credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID?.replace(/@terminal:powershell$/, '').trim(),
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },
 });
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || "erp-devmedia";
 const CLOUDFRONT_BASE_URL = process.env.CLOUDFRONT_BASE_URL || "https://d2xewl4dlr9aio.cloudfront.net";
-
-/**
- * Generate a presigned URL for a file
- * @param {string} key - S3 key
- * @returns {Promise<string>} - Presigned URL
- */
-export async function generatePresignedUrl(key) {
-    if (!key) return null;
-    try {
-        const command = new GetObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: key,
-        });
-        // URL expires in 1 hour (3600 seconds)
-        return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-    } catch (error) {
-        console.error("Error generating presigned URL:", error);
-        return null;
-    }
-}
 
 /**
  * Upload a file to S3
