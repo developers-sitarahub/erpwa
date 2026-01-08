@@ -12,7 +12,7 @@ import { Select, SelectOption } from "@/components/select";
 
 import {
     RefreshCw, CheckCircle, XCircle, Clock, Trash2, Search, X, Plus, Paperclip,
-    Image as ImageIcon, Video, FileText, Loader2, Send, MoreVertical, Phone, Globe, Upload, AlertTriangle, Users
+    Image as ImageIcon, Video, FileText, Loader2, Send, MoreVertical, Phone, Globe, Upload, AlertTriangle, Users, Eye
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
@@ -63,6 +63,7 @@ export default function TemplatesPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [showMobilePreview, setShowMobilePreview] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
@@ -488,7 +489,7 @@ export default function TemplatesPage() {
                         <Button variant="link" onClick={openCreateModal} className="text-primary mt-2">Create Template &rarr;</Button>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {templates.map((t) => (
                             <motion.div
                                 key={t.id}
@@ -505,21 +506,23 @@ export default function TemplatesPage() {
                                     )}
                                 >
                                     {/* Card Header area */}
-                                    <div className="p-5 flex flex-col gap-3 min-h-[100px] border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent relative">
-                                        <div className="absolute top-4 right-4 z-10">
-                                            {getStatusBadge(t.status)}
-                                        </div>
-                                        <div className="pr-16">
-                                            <h3 className="font-semibold text-base text-foreground line-clamp-1" title={t.displayName}>
-                                                {t.displayName}
-                                            </h3>
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                                <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground">
-                                                    {t.category}
-                                                </Badge>
-                                                <span className="text-[10px] text-muted-foreground/60">•</span>
-                                                <span className="text-[10px] text-muted-foreground/60">{t.languages[0]?.language}</span>
+                                    <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="font-semibold text-base text-foreground truncate" title={t.displayName}>
+                                                    {t.displayName}
+                                                </h3>
                                             </div>
+                                            <div className="shrink-0">
+                                                {getStatusBadge(t.status)}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground shrink-0">
+                                                {t.category}
+                                            </Badge>
+                                            <span className="text-[10px] text-muted-foreground/60">•</span>
+                                            <span className="text-[10px] text-muted-foreground/60">{t.languages[0]?.language}</span>
                                         </div>
                                     </div>
 
@@ -702,7 +705,7 @@ export default function TemplatesPage() {
                                         </div>
 
                                         {/* Filters */}
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <Select
                                                 value={selectedCategory}
                                                 onChange={(e) => {
@@ -885,9 +888,20 @@ export default function TemplatesPage() {
                                     <h2 className="text-lg font-bold">{editId ? "Edit Template" : "New Template"}</h2>
                                     <p className="text-xs text-muted-foreground/80">Design your WhatsApp message layout</p>
                                 </div>
-                                <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setShowCreateModal(false)}>
-                                    <X className="w-5 h-5" />
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="lg:hidden h-8 text-xs gap-2"
+                                        onClick={() => setShowMobilePreview(!showMobilePreview)}
+                                    >
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Preview
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setShowCreateModal(false)}>
+                                        <X className="w-5 h-5" />
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 bg-muted/5 divide-y lg:divide-y-0 lg:divide-x divide-border/50">
@@ -1131,7 +1145,21 @@ export default function TemplatesPage() {
                                 </div>
 
                                 {/* RIGHT: PHONE PREVIEW */}
-                                <div className="lg:col-span-5 xl:col-span-4 bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex flex-col items-center justify-center relative border-l border-border/50">
+                                <div className={cn(
+                                    "bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
+                                    "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-8 lg:pt-8", // Desktop defaults (force static to override mobile fixed)
+                                    showMobilePreview ? "flex fixed inset-0 z-50 pt-24 pb-8" : "hidden" // Mobile overlay
+                                )}>
+                                    {showMobilePreview && (
+                                        <Button
+                                            className="absolute top-4 right-4 z-50 lg:hidden shadow-lg"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => setShowMobilePreview(false)}
+                                        >
+                                            Close Preview
+                                        </Button>
+                                    )}
                                     <div className="absolute inset-0 pattern-dots opacity-10"></div>
 
                                     <div className="relative w-[300px] h-[600px] bg-black rounded-[40px] shadow-2xl border-[8px] border-zinc-900 overflow-hidden ring-1 ring-white/20">
@@ -1223,51 +1251,54 @@ export default function TemplatesPage() {
                             </div>
                         </motion.div>
                     </div>
-                )}
-            </AnimatePresence>
+                )
+                }
+            </AnimatePresence >
 
             {/* Confirmation Modal */}
-            {deleteConf.isOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-[2px]">
-                    <Card className="w-full max-w-md bg-card border-border shadow-2xl">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                            <div className="flex items-center gap-2 text-destructive">
-                                <AlertTriangle className="w-5 h-5" />
-                                <h2 className="text-xl font-semibold text-foreground">Confirm Deletion</h2>
-                            </div>
-                            <button
-                                onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
-                                className="text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-foreground mb-6">
-                                Are you sure you want to delete "{deleteConf.title}"?
-                                <br />
-                                <span className="text-sm text-muted-foreground mt-2 block">This action cannot be undone.</span>
-                            </p>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+            {
+                deleteConf.isOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-[2px]">
+                        <Card className="w-full max-w-md bg-card border-border shadow-2xl">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                                <div className="flex items-center gap-2 text-destructive">
+                                    <AlertTriangle className="w-5 h-5" />
+                                    <h2 className="text-xl font-semibold text-foreground">Confirm Deletion</h2>
+                                </div>
+                                <button
                                     onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                                    className="text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    className="flex-1 bg-destructive hover:bg-destructive/90"
-                                    onClick={handleConfirmDelete}
-                                >
-                                    Delete
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-        </div>
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-foreground mb-6">
+                                    Are you sure you want to delete "{deleteConf.title}"?
+                                    <br />
+                                    <span className="text-sm text-muted-foreground mt-2 block">This action cannot be undone.</span>
+                                </p>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                                        onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        className="flex-1 bg-destructive hover:bg-destructive/90"
+                                        onClick={handleConfirmDelete}
+                                    >
+                                        Delete
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 
