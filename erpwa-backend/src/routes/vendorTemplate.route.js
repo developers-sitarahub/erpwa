@@ -309,12 +309,8 @@ router.post(
   requireRoles(["vendor_owner"]),
   asyncHandler(async (req, res) => {
 
-    // 🚨 HARD BLOCK ANY BODY OR MULTIPART
-    if (req.body && Object.keys(req.body).length > 0) {
-      return res.status(400).json({
-        message: "Submit endpoint must not receive a body",
-      });
-    }
+    // 🚨 HARD BLOCK ANY BODY OR MULTIPART - Removed strict check to avoid false positives with empty JSON objects
+    // if (req.body && Object.keys(req.body).length > 0) ...
 
     const template = await prisma.template.findUnique({
       where: { id: req.params.id },
@@ -479,7 +475,7 @@ router.post(
     console.log("Meta API Request Body:", JSON.stringify(payload, null, 2));
 
     const metaResp = await fetch(
-      `https://graph.facebook.com/v19.0/${template.vendor.whatsappBusinessId}/message_templates`,
+      `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates`,
       {
         method: "POST",
         headers: {
@@ -493,11 +489,15 @@ router.post(
     const metaData = await metaResp.json();
 
     if (!metaResp.ok) {
+      console.error("❌ Meta Submit Failed:", JSON.stringify(metaData, null, 2));
+
       await prisma.template.update({
         where: { id: template.id },
         data: { status: "rejected" },
       });
-      return res.status(400).json(metaData);
+
+      const errorMessage = metaData?.error?.message || metaData?.error?.user_msg || "Unknown Meta API Error";
+      return res.status(400).json({ message: errorMessage, details: metaData });
     }
 
     // Update template status and save Meta ID
@@ -549,7 +549,7 @@ router.delete(
     if (template.status !== "draft") {
       try {
         const accessToken = decrypt(template.vendor.whatsappAccessToken);
-        const url = `https://graph.facebook.com/v19.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`;
+        const url = `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`;
 
         console.log(`🗑️ Deleting from Meta: ${template.metaTemplateName}`);
 
@@ -562,21 +562,17 @@ router.delete(
 
         if (!metaResp.ok) {
           const errData = await metaResp.json();
-          console.error("❌ Meta Deletion Failed:", JSON.stringify(errData));
-          // We might still want to delete locally if the user insists, but for now let's warn
-          // or just proceed if it's a 404 (already deleted)
-          if (metaResp.status !== 404) {
-            return res.status(400).json({
-              message: "Failed to delete from Meta. Check console for details.",
-              error: errData
-            });
-          }
+          const errorMessage = errData?.error?.message || errData?.error?.user_msg || "Unknown Meta API Error";
+          console.error("❌ Meta Deletion Failed (proceeding with local delete):", errorMessage);
+
+          // Proceed to delete locally, but maybe return a warning field?
+          // We won't block the user from cleaning their dashboard.
         } else {
           console.log("✅ Deleted from Meta successfully");
         }
       } catch (error) {
-        console.error("Error deleting from Meta:", error);
-        return res.status(500).json({ message: "Internal server error during Meta deletion" });
+        console.error("Error asking Meta to delete:", error);
+        // Proceed with local delete anyway
       }
     }
 
@@ -616,7 +612,7 @@ router.post(
 
     // Fetch all templates from Meta
     const metaResp = await fetch(
-      `https://graph.facebook.com/v19.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`,
+      `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }

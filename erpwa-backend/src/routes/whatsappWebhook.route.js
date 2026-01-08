@@ -182,7 +182,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch {}
+        } catch { }
 
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
@@ -246,7 +246,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: message.conversationId,
           });
-        } catch {}
+        } catch { }
 
         /* 🔥 SAFE SOCKET STATUS EMIT */
         try {

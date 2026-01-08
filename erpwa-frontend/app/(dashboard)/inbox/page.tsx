@@ -92,9 +92,8 @@ function ConversationList({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => onSelect(conv.id)}
-            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${
-              selected === conv.id ? "bg-muted" : ""
-            }`}
+            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${selected === conv.id ? "bg-muted" : ""
+              }`}
           >
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
@@ -215,11 +214,10 @@ function ChatArea({ conversation, onBack }: { conversation: Conversation; onBack
               className={`flex items-end gap-2 ${msg.sender === "executive" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`group relative max-w-md px-3 py-2 shadow-sm ${
-                  msg.sender === "executive"
+                className={`group relative max-w-md px-3 py-2 shadow-sm ${msg.sender === "executive"
                     ? "bg-primary/10 border border-primary/20 dark:bg-primary/20 rounded-lg rounded-br-none"
                     : "bg-card border border-border rounded-lg rounded-bl-none"
-                }`}
+                  }`}
               >
                 {/* Message text */}
                 <p className="text-sm text-foreground break-words leading-relaxed">{msg.text}</p>
