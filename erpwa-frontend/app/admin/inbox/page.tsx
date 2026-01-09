@@ -63,7 +63,8 @@ interface Conversation {
   unreadCount?: number;
   hasUnread?: boolean;
 
-  // 🔥 ADD THESE
+  sessionStarted?: boolean; // ✅ ADD
+  sessionActive?: boolean; // ✅ ADD
   sessionExpiresAt?: string | null;
   templateRequired?: boolean;
 }
@@ -307,7 +308,8 @@ function ChatArea({
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const genericInputRef = useRef<HTMLInputElement | null>(null);
-  const isSessionActive = !!remainingTime;
+  const isSessionActive = conversation.sessionActive;
+  const sessionStarted = conversation.sessionStarted;
 
   const copyMessage = async (message: Message): Promise<boolean> => {
     try {
@@ -383,31 +385,19 @@ function ChatArea({
   };
 
   useEffect(() => {
-    if (!conversation.sessionExpiresAt) {
+    if (!conversation.sessionActive || !conversation.sessionExpiresAt) {
       setRemainingTime(null);
       return;
     }
 
-    let interval: NodeJS.Timeout | null = null;
+    const update = () =>
+      setRemainingTime(calculateRemainingTime(conversation.sessionExpiresAt!));
 
-    const update = () => {
-      const value = calculateRemainingTime(conversation.sessionExpiresAt!);
-      setRemainingTime(value);
+    update();
+    const id = setInterval(update, 30_000);
 
-      // ⛔ stop ticking once expired
-      if (!value && interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-
-    update(); // run immediately
-    interval = setInterval(update, 60_000);
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [conversation.sessionExpiresAt]);
+    return () => clearInterval(id);
+  }, [conversation.sessionActive, conversation.sessionExpiresAt]);
 
   useEffect(() => {
     if (!conversation?.id) return;
@@ -668,29 +658,26 @@ function ChatArea({
           </motion.button>
         </div>
       </div>
-      <div className="sticky top-[56px] z-10">
-        {isSessionActive ? (
-          <motion.div
-            key={remainingTime}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2"
-          >
-            <Clock className="w-4 h-4 text-yellow-600" />
-            <span className="text-xs text-yellow-700">
-              24-hour message window expires in {remainingTime}
-            </span>
-          </motion.div>
-        ) : (
-          <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-600" />
-            <span className="text-xs text-red-700">
-              24-hour window closed. Send a template message.
-            </span>
-          </div>
-        )}
-      </div>
+      {/* SESSION BANNER — ALWAYS VISIBLE */}
+      {sessionStarted && (
+        <div className="flex-shrink-0 z-30">
+          {isSessionActive ? (
+            <div className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-yellow-600" />
+              <span className="text-xs text-yellow-700">
+                24-hour message window expires in {remainingTime}
+              </span>
+            </div>
+          ) : (
+            <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span className="text-xs text-red-700">
+                24-hour window closed. Send a template message.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
       {/* MESSAGES WRAPPER */}
       <div className="relative flex-1 min-h-0 overflow-hidden">
         {/* FIXED WHATSAPP BACKGROUND */}
@@ -1687,6 +1674,8 @@ export default function InboxPage() {
           c.id === id
             ? {
                 ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
                 sessionExpiresAt: res.data.sessionExpiresAt,
                 templateRequired: !res.data.sessionActive,
               }
