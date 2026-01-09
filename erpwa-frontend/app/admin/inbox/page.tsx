@@ -54,17 +54,17 @@ interface Conversation {
   id: string;
   companyName: string;
   phone: string;
+
   lastMessage: string;
   lastActivity: string;
 
-  // ✅ NEW (required)
   lastMessageDirection?: "inbound" | "outbound";
   lastMessageStatus?: "sent" | "delivered" | "read" | "received" | "failed";
   unreadCount?: number;
-
   hasUnread?: boolean;
-  isPinned?: boolean;
-  businessHoursRemaining?: string;
+
+  // 🔥 ADD THESE
+  sessionExpiresAt?: string | null;
   templateRequired?: boolean;
 }
 
@@ -261,6 +261,7 @@ function ChatArea({
     message: Message;
     rect: DOMRect;
   } | null>(null);
+  const [remainingTime, setRemainingTime] = useState<string | null>(null);
 
   const [imagePreview, setImagePreview] = useState<{
     files: File[];
@@ -306,6 +307,7 @@ function ChatArea({
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const genericInputRef = useRef<HTMLInputElement | null>(null);
+  const isSessionActive = !!remainingTime;
 
   const copyMessage = async (message: Message): Promise<boolean> => {
     try {
@@ -328,6 +330,18 @@ function ChatArea({
     } catch {
       return false;
     }
+  };
+
+  const calculateRemainingTime = (expiresAt: string) => {
+    const diff = new Date(expiresAt).getTime() - Date.now();
+
+    if (diff <= 0) return null;
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff / (1000 * 60)) % 60);
+
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
   };
 
   const sendImageFromPreview = async () => {
@@ -367,6 +381,28 @@ function ChatArea({
       return <AlertCircle className="w-4 h-4 text-destructive" />;
     return null;
   };
+
+  useEffect(() => {
+    if (!conversation.sessionExpiresAt) {
+      setRemainingTime(null);
+      return;
+    }
+
+    const update = () => {
+      const value = calculateRemainingTime(conversation.sessionExpiresAt!);
+      setRemainingTime(value);
+
+      // ⛔ stop ticking once expired
+      if (!value) {
+        clearInterval(interval);
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 60_000);
+
+    return () => clearInterval(interval);
+  }, [conversation.sessionExpiresAt]);
 
   useEffect(() => {
     if (!conversation?.id) return;
@@ -627,25 +663,29 @@ function ChatArea({
           </motion.button>
         </div>
       </div>
-      {conversation.businessHoursRemaining &&
-        !conversation.templateRequired && (
-          <div className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2">
+      <div className="sticky top-[56px] z-10">
+        {isSessionActive ? (
+          <motion.div
+            key={remainingTime}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2"
+          >
             <Clock className="w-4 h-4 text-yellow-600" />
             <span className="text-xs text-yellow-700">
-              24-hour message window expires in{" "}
-              {conversation.businessHoursRemaining}
+              24-hour message window expires in {remainingTime}
+            </span>
+          </motion.div>
+        ) : (
+          <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600" />
+            <span className="text-xs text-red-700">
+              24-hour window closed. Send a template message.
             </span>
           </div>
         )}
-      {conversation.templateRequired && (
-        <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-600" />
-          <span className="text-xs text-red-700">
-            24-hour window closed. Send a template message to start the
-            conversation.
-          </span>
-        </div>
-      )}
+      </div>
       {/* MESSAGES WRAPPER */}
       <div className="relative flex-1 min-h-0 overflow-hidden">
         {/* FIXED WHATSAPP BACKGROUND */}
@@ -926,9 +966,9 @@ function ChatArea({
               <input
                 ref={inputRef}
                 type="text"
-                disabled={conversation.templateRequired}
+                disabled={!isSessionActive}
                 placeholder={
-                  conversation.templateRequired
+                  !isSessionActive
                     ? "Template message required"
                     : "Type a message"
                 }
@@ -938,7 +978,7 @@ function ChatArea({
                   if (
                     e.key === "Enter" &&
                     !e.nativeEvent.isComposing &&
-                    !conversation.templateRequired
+                    isSessionActive
                   ) {
                     e.preventDefault();
                     sendMessage();
@@ -1320,20 +1360,20 @@ function ChatArea({
       <AnimatePresence>
         {imagePreview && (
           <>
-            {/* BACKDROP (ChatArea only) */}
+            {/* BACKDROP – stays inside ChatArea */}
             <motion.div
-              className="absolute inset-0 z-40 bg-black"
+              className="absolute inset-0 z-40 bg-black/90"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             />
 
-            {/* PREVIEW SCREEN */}
+            {/* PREVIEW CONTAINER – limited to ChatArea */}
             <motion.div
               className="absolute inset-0 z-50 flex flex-col bg-black text-white"
-              initial={{ y: 40, opacity: 0 }}
+              initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
+              exit={{ y: 30, opacity: 0 }}
             >
               {/* HEADER */}
               <div className="flex items-center gap-3 px-4 py-3">
@@ -1353,10 +1393,16 @@ function ChatArea({
               </div>
 
               {/* MAIN IMAGE */}
-              <div className="flex-1 flex items-center justify-center">
+              {/* IMAGE AREA */}
+              <div className="flex-1 overflow-y-auto flex items-center justify-center px-4">
                 <img
                   src={imagePreview.urls[0]}
-                  className="max-w-full max-h-full object-contain"
+                  className="
+      max-w-full
+      max-h-[65vh]
+      object-contain
+      rounded-lg
+    "
                 />
               </div>
 
@@ -1374,7 +1420,7 @@ function ChatArea({
               )}
 
               {/* CAPTION + SEND */}
-              <div className="flex items-center gap-3 p-4">
+              <div className="flex items-center gap-3 p-4 border-t border-white/10">
                 <input
                   placeholder="Add a caption…"
                   value={imagePreview.caption}
@@ -1383,19 +1429,31 @@ function ChatArea({
                       p ? { ...p, caption: e.target.value } : p
                     )
                   }
-                  className="flex-1 bg-white/10 px-4 py-2 rounded-full outline-none"
+                  className="
+      flex-1
+      bg-white/10
+      px-4
+      py-2
+      rounded-full
+      outline-none
+      text-sm
+    "
                 />
 
                 <button
                   disabled={sendingPreview}
                   onClick={sendImageFromPreview}
-                  className={`bg-primary w-12 h-12 rounded-full flex items-center justify-center
-                  ${sendingPreview ? "opacity-60 cursor-not-allowed" : ""}
-                  `}
+                  className="
+      bg-primary
+      w-12 h-12
+      rounded-full
+      flex items-center justify-center
+    "
                 >
                   <Send className="w-5 h-5 text-white" />
                 </button>
               </div>
+
               {sendingPreview && (
                 <div className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center gap-4">
                   <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1623,8 +1681,8 @@ export default function InboxPage() {
           c.id === id
             ? {
                 ...c,
-                businessHoursRemaining: res.data.businessHoursRemaining,
-                templateRequired: res.data.templateRequired,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+                templateRequired: !res.data.sessionActive,
               }
             : c
         )

@@ -237,8 +237,11 @@ router.post("/", async (req, res) => {
         if (!message) continue;
 
         await prisma.conversation.update({
-          where: { id: message.conversationId },
-          data: { lastMessageAt: new Date() },
+          where: { id: conversation.id },
+          data: {
+            sessionExpiresAt,
+            lastMessageAt: new Date(),
+          },
         });
 
         try {
