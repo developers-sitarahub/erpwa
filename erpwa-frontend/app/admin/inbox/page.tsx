@@ -388,25 +388,30 @@ function ChatArea({
       return;
     }
 
+    let interval: NodeJS.Timeout | null = null;
+
     const update = () => {
       const value = calculateRemainingTime(conversation.sessionExpiresAt!);
       setRemainingTime(value);
 
       // ⛔ stop ticking once expired
-      if (!value) {
+      if (!value && interval) {
         clearInterval(interval);
+        interval = null;
       }
     };
 
-    update();
-    const interval = setInterval(update, 60_000);
+    update(); // run immediately
+    interval = setInterval(update, 60_000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [conversation.sessionExpiresAt]);
 
   useEffect(() => {
     if (!conversation?.id) return;
-
+    connectSocket();
     const socket = getSocket();
 
     const maybeMarkRead = async () => {
@@ -455,7 +460,7 @@ function ChatArea({
 
   useEffect(() => {
     if (!conversation?.id) return;
-
+    connectSocket();
     const socket = getSocket();
 
     const handleNewMessage = (msg: Message) => {
@@ -1583,6 +1588,7 @@ export default function InboxPage() {
 
   // 🔥 2️⃣ THEN LISTEN FOR INBOX UPDATES
   useEffect(() => {
+    connectSocket();
     const socket = getSocket();
 
     const handleInboxUpdate = async () => {

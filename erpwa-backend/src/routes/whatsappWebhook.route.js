@@ -127,7 +127,7 @@ router.post("/", async (req, res) => {
             content,
             whatsappMessageId,
             replyToMessageId: replyToWhatsappMessageId,
-            status: "delivered",
+            status: "received",
             inboundPayload: msg,
           },
         });
@@ -182,7 +182,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch { }
+        } catch {}
 
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
@@ -237,9 +237,8 @@ router.post("/", async (req, res) => {
         if (!message) continue;
 
         await prisma.conversation.update({
-          where: { id: conversation.id },
+          where: { id: message.conversationId },
           data: {
-            sessionExpiresAt,
             lastMessageAt: new Date(),
           },
         });
@@ -249,7 +248,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: message.conversationId,
           });
-        } catch { }
+        } catch {}
 
         /* 🔥 SAFE SOCKET STATUS EMIT */
         try {
