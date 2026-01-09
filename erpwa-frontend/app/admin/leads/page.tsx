@@ -246,6 +246,7 @@ function ManualEntryComponent({
     separator: "|",
   })
   const [manualSubcategories, setManualSubcategories] = useState<Category[]>([])
+  const [actionErrors, setActionErrors] = useState<string[]>([])
 
   const loadSubcategories = async (categoryId: number) => {
     try {
@@ -351,8 +352,26 @@ function ManualEntryComponent({
               />
             </div>
 
+            {/* Error Actions Box */}
+            {actionErrors.length > 0 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 my-2 animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  <p className="text-sm font-semibold text-destructive">Errors Found ({actionErrors.length})</p>
+                </div>
+                <div className="max-h-24 overflow-y-auto pr-1">
+                  <ul className="text-xs text-destructive/90 list-disc pl-4 space-y-1">
+                    {actionErrors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             <Button
               onClick={async () => {
+                setActionErrors([])
                 if (!manualForm.category_id) {
                   toast.error("Category is required")
                   return
@@ -366,6 +385,40 @@ function ManualEntryComponent({
                   return
                 }
 
+                // Validate leads data format
+                const leads = manualForm.leads_text.trim().split("\n")
+                const separator = manualForm.separator
+                let hasError = false
+
+                for (let i = 0; i < leads.length; i++) {
+                  const leadData = leads[i].split(separator).map(s => s.trim())
+                  const lineNum = i + 1
+
+                  // Check if there are at least 2 fields (name and phone/email)
+                  if (leadData.length < 2) continue
+
+                  // Validate phone number (if present) - should be numeric
+                  if (leadData[1]) {
+                    if (!/^\d+$/.test(leadData[1].replace(/[\s\-\(\)]/g, ''))) {
+                      toast.error(`Line ${lineNum}: Phone number must contain only numbers`)
+                      hasError = true
+                      break
+                    }
+                  }
+
+                  // Validate email (if present in 3rd position) - must have @
+                  if (leadData[2] && leadData[2].length > 0) {
+                    if (!leadData[2].includes('@')) {
+                      toast.error(`Line ${lineNum}: Email must contain @ symbol`)
+                      hasError = true
+                      break
+                    }
+                  }
+                }
+
+                if (hasError) return
+
+
                 try {
                   const formData = new FormData()
                   formData.append("category_id", manualForm.category_id)
@@ -376,7 +429,9 @@ function ManualEntryComponent({
 
                   const response = await leadsAPI.createManual(formData)
 
-                  if (response.data?.success !== false) {
+                  const { success, created, failed, errors } = response.data
+
+                  if (success && failed === 0) {
                     toast.success("Leads added successfully!")
                     setManualForm({
                       category_id: "",
@@ -387,6 +442,38 @@ function ManualEntryComponent({
                     })
                     setManualSubcategories([])
                     onLeadsAdded()
+                  } else if (success && failed > 0) {
+                    if (created > 0) {
+                      toast.success(`${created} leads added successfully!`)
+                      onLeadsAdded()
+                      // Clear form only if we want to force re-entry, but maybe better to keep it? 
+                      // For now, let's clear it to match previous behavior but alert on errors.
+                      setManualForm({
+                        category_id: "",
+                        subcategory_id: "",
+                        sales_person_name: "",
+                        leads_text: "",
+                        separator: "|",
+                      })
+                      setManualSubcategories([])
+                    }
+
+                    if (errors && errors.length > 0) {
+                      const newErrList: string[] = []
+                      errors.forEach((err: any) => {
+                        const num = err.data?.mobile_number || 'Lead'
+                        let msg = ''
+                        if (err.error?.includes('already exists')) {
+                          msg = `Lead with number ${num} already exists`
+                          toast.error(msg, { autoClose: 5000 })
+                        } else {
+                          msg = `Failed to add ${num}: ${err.error}`
+                          toast.error(msg, { autoClose: 5000 })
+                        }
+                        newErrList.push(msg)
+                      })
+                      setActionErrors(newErrList)
+                    }
                   } else {
                     toast.error("Failed to add leads")
                   }
@@ -1094,7 +1181,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("manual")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "manual"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border !text-black dark:!text-white hover:bg-muted"
+              : "bg-secondary border border-border !text-black dark:!text-grey hover:bg-muted"
               }`}
           >
             <FileText className="w-4 h-4 mr-2" />
@@ -1104,7 +1191,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("upload")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "upload"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border !text-black dark:!text-white hover:bg-muted"
+              : "bg-secondary border border-border !text-black dark:!text-grey hover:bg-muted"
               }`}
           >
             <Upload className="w-4 h-4 mr-2" />
@@ -1285,6 +1372,40 @@ export default function LeadsPage() {
                       className="bg-primary hover:bg-primary/90"
                     >
                       Change Sales Person
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        if (selectedLeads.size === 0) {
+                          toast.warning("No leads selected")
+                          return
+                        }
+
+                        const confirmDelete = window.confirm(
+                          `Delete ${selectedLeads.size} lead(s)? This cannot be undone.`
+                        )
+
+                        if (!confirmDelete) return
+
+                        try {
+                          const deletePromises = Array.from(selectedLeads).map((leadId) =>
+                            leadsAPI.delete(leadId)
+                          )
+
+                          await Promise.all(deletePromises)
+
+                          toast.success(`Successfully deleted ${selectedLeads.size} lead(s)`)
+                          setSelectedLeads(new Set())
+                          setShowBulkSalesPerson(false)
+                          loadLeads()
+                        } catch (error: any) {
+                          toast.error(error.response?.data?.error || "Failed to delete leads")
+                        }
+                      }}
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Selected
                     </Button>
                     <Button
                       size="sm"

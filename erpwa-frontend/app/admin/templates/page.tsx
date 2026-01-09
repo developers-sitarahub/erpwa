@@ -5,16 +5,20 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import { Button } from "@/components/button";
+import { Checkbox } from "@/components/checkbox";
 import { Badge } from "@/components/badge";
 import { Input } from "@/components/input";
+import { Select, SelectOption } from "@/components/select";
 
 import {
     RefreshCw, CheckCircle, XCircle, Clock, Trash2, Search, X, Plus, Paperclip,
-    Image as ImageIcon, Video, FileText, Loader2, Send, MoreVertical, Phone, Globe, Upload
+    Image as ImageIcon, Video, FileText, Loader2, Send, MoreVertical, Phone, Globe, Upload, AlertTriangle, Users, Eye
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
+import { leadsAPI } from "@/lib/leadsApi";
+import { Lead } from "@/lib/types";
 
 // Types
 type Template = {
@@ -48,10 +52,18 @@ export default function TemplatesPage() {
     const [deleting, setDeleting] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState<string | null>(null);
 
+    // --- Delete Modal State ---
+    const [deleteConf, setDeleteConf] = useState<{
+        isOpen: boolean;
+        id?: string;
+        title?: string;
+    }>({ isOpen: false });
+
     // --- Create/Edit Modal State ---
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [showMobilePreview, setShowMobilePreview] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
@@ -74,7 +86,23 @@ export default function TemplatesPage() {
     const [recipientInput, setRecipientInput] = useState("");
     const [recipientList, setRecipientList] = useState<string[]>([]);
     const [variables, setVariables] = useState<string[]>([]);
+    // variableSources: maps index -> "custom" | "company_name" | "name"
+    const [variableSources, setVariableSources] = useState<Record<number, string>>({});
     const [sending, setSending] = useState(false);
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [showLeadsDropdown, setShowLeadsDropdown] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<string>("");
+    const [selectedSubCategory, setSelectedSubCategory] = useState<string>("");
+
+    useEffect(() => {
+        if (showSendModal) {
+            leadsAPI.list().then(res => {
+                if (res.data && Array.isArray(res.data.leads)) {
+                    setLeads(res.data.leads);
+                }
+            }).catch(err => console.error("Failed to fetch leads", err));
+        }
+    }, [showSendModal]);
 
     // Fetch Templates
     const fetchTemplates = async () => {
@@ -287,19 +315,25 @@ export default function TemplatesPage() {
         }
     };
 
-    const handleDelete = async (template: Template, e: React.MouseEvent) => {
+    const handleDelete = (template: Template, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm(`Are you sure you want to delete "${template.displayName}"?`)) return;
+        setDeleteConf({ isOpen: true, id: template.id, title: template.displayName });
+    };
 
-        setDeleting(template.id);
+    const handleConfirmDelete = async () => {
+        if (!deleteConf.id) return;
+
+        const id = deleteConf.id;
+        setDeleting(id);
         try {
-            await api.delete(`/vendor/templates/${template.id}`);
+            await api.delete(`/vendor/templates/${id}`);
             toast.success("Template deleted successfully");
-            setTemplates(prev => prev.filter(t => t.id !== template.id));
+            setTemplates(prev => prev.filter(t => t.id !== id));
         } catch (error: any) {
             toast.error(error.response?.data?.message || "Failed to delete template");
         } finally {
             setDeleting(null);
+            setDeleteConf({ isOpen: false });
         }
     };
 
@@ -346,13 +380,56 @@ export default function TemplatesPage() {
 
         setSending(true);
         try {
-            await api.post("/vendor/whatsapp/template/send-template", {
-                recipients: recipientList,
+            // Check if we need dynamic variables
+            const hasDynamicVariables = Object.values(variableSources).some(v => v === 'company_name');
+            let payload: any = {
                 templateId: selectedTemplate.id,
-                bodyVariables: variables,
-            });
-            toast.success("Messages sent successfully!");
-            setShowSendModal(false);
+            };
+
+            if (hasDynamicVariables) {
+                // Build per-recipient messages
+                const customMessages = recipientList.map(mobile => {
+                    // Find the lead info
+                    const lead = leads.find(l => l.mobile_number === mobile);
+                    const companyName = lead?.company_name || "Valued Customer"; // Fallback
+
+                    // Map variables for this recipient
+                    const bodyVariables = variables.map((val, idx) => {
+                        if (variableSources[idx] === 'company_name') {
+                            return companyName;
+                        }
+                        return val;
+                    });
+
+                    return {
+                        to: mobile,
+                        bodyVariables
+                    };
+                });
+                payload.customMessages = customMessages;
+            } else {
+                // Standard bulk send
+                payload.recipients = recipientList;
+                payload.bodyVariables = variables;
+            }
+
+            const res = await api.post("/vendor/whatsapp/template/send-template", payload);
+
+            const results = res.data.results || [];
+            const failed = results.filter((r: any) => !r.success);
+
+            if (failed.length > 0) {
+                // Show first error message
+                const firstError = failed[0].error?.message || JSON.stringify(failed[0].error) || "Unknown error";
+                if (failed.length === results.length) {
+                    toast.error(`Failed to send: ${firstError}`);
+                } else {
+                    toast.warning(`${results.length - failed.length} sent, ${failed.length} failed. First error: ${firstError}`);
+                }
+            } else {
+                toast.success("Messages sent successfully!");
+                setShowSendModal(false);
+            }
         } catch (error: any) {
             toast.error(error.response?.data?.message || "Failed to send");
         } finally {
@@ -412,7 +489,7 @@ export default function TemplatesPage() {
                         <Button variant="link" onClick={openCreateModal} className="text-primary mt-2">Create Template &rarr;</Button>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {templates.map((t) => (
                             <motion.div
                                 key={t.id}
@@ -429,21 +506,23 @@ export default function TemplatesPage() {
                                     )}
                                 >
                                     {/* Card Header area */}
-                                    <div className="p-5 flex flex-col gap-3 min-h-[100px] border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent relative">
-                                        <div className="absolute top-4 right-4 z-10">
-                                            {getStatusBadge(t.status)}
-                                        </div>
-                                        <div className="pr-16">
-                                            <h3 className="font-semibold text-base text-foreground line-clamp-1" title={t.displayName}>
-                                                {t.displayName}
-                                            </h3>
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                                <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground">
-                                                    {t.category}
-                                                </Badge>
-                                                <span className="text-[10px] text-muted-foreground/60">•</span>
-                                                <span className="text-[10px] text-muted-foreground/60">{t.languages[0]?.language}</span>
+                                    <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="font-semibold text-base text-foreground truncate" title={t.displayName}>
+                                                    {t.displayName}
+                                                </h3>
                                             </div>
+                                            <div className="shrink-0">
+                                                {getStatusBadge(t.status)}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground shrink-0">
+                                                {t.category}
+                                            </Badge>
+                                            <span className="text-[10px] text-muted-foreground/60">•</span>
+                                            <span className="text-[10px] text-muted-foreground/60">{t.languages[0]?.language}</span>
                                         </div>
                                     </div>
 
@@ -476,10 +555,15 @@ export default function TemplatesPage() {
                                                     "flex-1 h-8 text-xs hover:bg-muted/60",
                                                     t.status === "draft"
                                                         ? "text-blue-600 hover:text-blue-700 bg-blue-50/50"
-                                                        : "text-muted-foreground hover:text-foreground"
+                                                        : t.status === "approved"
+                                                            ? "text-green-600 hover:text-green-700 bg-green-50/50"
+                                                            : "text-muted-foreground hover:text-foreground"
                                                 )}
                                                 onClick={(e) => {
-                                                    if (t.status === "draft") {
+                                                    if (t.status === "approved") {
+                                                        e.stopPropagation();
+                                                        openSendModal(t);
+                                                    } else if (t.status === "draft") {
                                                         handleSubmitToMeta(t, e);
                                                     } else {
                                                         handleSyncStatus(t.id, e);
@@ -491,10 +575,12 @@ export default function TemplatesPage() {
                                                     <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
                                                 ) : t.status === "draft" ? (
                                                     <Upload className="w-3 h-3 mr-1.5" />
+                                                ) : t.status === "approved" ? (
+                                                    <Send className="w-3 h-3 mr-1.5" />
                                                 ) : (
                                                     <RefreshCw className="w-3 h-3 mr-1.5" />
                                                 )}
-                                                {t.status === "draft" ? "Submit" : "Sync"}
+                                                {t.status === "draft" ? "Submit" : t.status === "approved" ? "Send" : "Sync"}
                                             </Button>
                                             <div className="w-px h-4 bg-border/60"></div>
                                             <Button
@@ -557,20 +643,54 @@ export default function TemplatesPage() {
                                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-1 flex items-center gap-2">
                                                 <FileText className="w-3.5 h-3.5" /> Variables
                                             </label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/5 p-4 rounded-xl border border-border/50">
+                                            <div className="grid grid-cols-1 gap-4 bg-muted/5 p-4 rounded-xl border border-border/50">
                                                 {variables.map((val, idx) => (
                                                     <div key={idx} className="space-y-1.5">
-                                                        <span className="text-[10px] font-medium text-muted-foreground uppercase">Variable {`{{${idx + 1}}}`}</span>
-                                                        <Input
-                                                            className="bg-background h-9"
-                                                            placeholder={`Value for {{${idx + 1}}}`}
-                                                            value={val}
-                                                            onChange={e => {
-                                                                const n = [...variables];
-                                                                n[idx] = e.target.value;
-                                                                setVariables(n);
-                                                            }}
-                                                        />
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[10px] font-medium text-muted-foreground uppercase">Variable {`{{${idx + 1}}}`}</span>
+
+                                                            <div className="flex bg-muted rounded-md p-0.5">
+                                                                <button
+                                                                    onClick={() => setVariableSources(prev => ({ ...prev, [idx]: 'custom' }))}
+                                                                    className={cn(
+                                                                        "px-2 py-0.5 text-[10px] rounded-sm transition-all",
+                                                                        (!variableSources[idx] || variableSources[idx] === 'custom')
+                                                                            ? "bg-background shadow-sm text-foreground font-medium"
+                                                                            : "text-muted-foreground hover:text-foreground"
+                                                                    )}
+                                                                >
+                                                                    Custom
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setVariableSources(prev => ({ ...prev, [idx]: 'company_name' }))}
+                                                                    className={cn(
+                                                                        "px-2 py-0.5 text-[10px] rounded-sm transition-all",
+                                                                        variableSources[idx] === 'company_name'
+                                                                            ? "bg-background shadow-sm text-foreground font-medium"
+                                                                            : "text-muted-foreground hover:text-foreground"
+                                                                    )}
+                                                                >
+                                                                    Company
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {variableSources[idx] === 'company_name' ? (
+                                                            <div className="h-9 px-3 rounded-md border bg-muted/20 flex items-center text-sm text-muted-foreground italic">
+                                                                Will use recipient's company name
+                                                            </div>
+                                                        ) : (
+                                                            <Input
+                                                                className="bg-background h-9"
+                                                                placeholder={`Value for {{${idx + 1}}}`}
+                                                                value={val}
+                                                                onChange={e => {
+                                                                    const n = [...variables];
+                                                                    n[idx] = e.target.value;
+                                                                    setVariables(n);
+                                                                }}
+                                                            />
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -578,61 +698,159 @@ export default function TemplatesPage() {
                                     )}
 
                                     {/* Recipients Section */}
-                                    <div className="space-y-3">
+                                    <div className="space-y-4">
                                         <div className="flex justify-between items-center">
-                                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recipients</label>
-                                            <Badge variant="secondary" className="text-[10px] font-medium">{recipientList.length} Added</Badge>
+                                            <label className="text-sm font-semibold text-foreground">Select Recipients</label>
+                                            <span className="text-xs text-muted-foreground">{recipientList.length} selected</span>
                                         </div>
 
-                                        <div className="flex gap-2">
-                                            <div className="relative flex-1">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                                <Input
-                                                    placeholder="Type phone number & press Enter..."
-                                                    className="pl-9 bg-background focus:ring-1 focus:ring-green-500/20"
-                                                    value={recipientInput}
-                                                    onChange={e => setRecipientInput(e.target.value)}
-                                                    onKeyDown={addRecipient}
-                                                />
-                                            </div>
-                                            <Button variant="outline" size="icon" onClick={() => {
-                                                if (recipientInput && !recipientList.includes(recipientInput)) {
-                                                    setRecipientList([...recipientList, recipientInput]);
-                                                    setRecipientInput("");
-                                                }
-                                            }}>
-                                                <Plus className="w-4 h-4" />
-                                            </Button>
-                                        </div>
+                                        {/* Filters */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <Select
+                                                value={selectedCategory}
+                                                onChange={(e) => {
+                                                    setSelectedCategory(e.target.value);
+                                                    setSelectedSubCategory("");
+                                                }}
+                                            >
+                                                <SelectOption value="">All Categories</SelectOption>
+                                                {Array.from(new Set(leads.map(l => l.category_name).filter(Boolean))).map(c => (
+                                                    <SelectOption key={c} value={c as string}>{c}</SelectOption>
+                                                ))}
+                                            </Select>
 
-                                        <div className="border border-border rounded-xl bg-muted/5 min-h-[120px] max-h-[200px] overflow-y-auto p-2 scrollbar-thin">
-                                            {recipientList.length === 0 ? (
-                                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 py-4 gap-2">
-                                                    <UsersIcon className="w-8 h-8 opacity-20" />
-                                                    <span className="text-xs">No recipients added yet</span>
-                                                </div>
-                                            ) : (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                    {recipientList.map((rec, i) => (
-                                                        <div key={i} className="flex items-center justify-between p-2 pl-3 rounded-lg bg-background border border-border/50 hover:border-border transition-colors group">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
-                                                                    {rec.slice(-2)}
-                                                                </div>
-                                                                <span className="text-sm font-medium font-mono text-foreground/80">{rec}</span>
-                                                            </div>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6 text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 rounded-full"
-                                                                onClick={() => removeRecipient(i)}
-                                                            >
-                                                                <X className="w-3 h-3" />
-                                                            </Button>
-                                                        </div>
+                                            <Select
+                                                value={selectedSubCategory}
+                                                onChange={(e) => setSelectedSubCategory(e.target.value)}
+                                            >
+                                                <SelectOption value="">All Sub-Categories</SelectOption>
+                                                {Array.from(new Set(leads
+                                                    .filter(l => !selectedCategory || l.category_name === selectedCategory)
+                                                    .map(l => l.sub_category_name).filter(Boolean)))
+                                                    .map(sc => (
+                                                        <SelectOption key={sc} value={sc as string}>{sc}</SelectOption>
                                                     ))}
+                                            </Select>
+                                        </div>
+
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                            <Input
+                                                placeholder="Search by name or phone..."
+                                                className="pl-9 bg-background/50 border-border/60"
+                                                value={recipientInput}
+                                                onChange={e => setRecipientInput(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="border border-border/60 rounded-xl overflow-hidden bg-card/30">
+                                            {/* Select All Row */}
+                                            {leads.length > 0 && (
+                                                <div className="p-3 border-b border-border/60 bg-muted/20 flex items-center gap-3">
+                                                    <Checkbox
+                                                        checked={
+                                                            leads
+                                                                .filter(l =>
+                                                                    (!recipientInput ||
+                                                                        l.company_name.toLowerCase().includes(recipientInput.toLowerCase()) ||
+                                                                        l.mobile_number.includes(recipientInput)) &&
+                                                                    (!selectedCategory || l.category_name === selectedCategory) &&
+                                                                    (!selectedSubCategory || l.sub_category_name === selectedSubCategory)
+                                                                ).length > 0 &&
+                                                            leads
+                                                                .filter(l =>
+                                                                    (!recipientInput ||
+                                                                        l.company_name.toLowerCase().includes(recipientInput.toLowerCase()) ||
+                                                                        l.mobile_number.includes(recipientInput)) &&
+                                                                    (!selectedCategory || l.category_name === selectedCategory) &&
+                                                                    (!selectedSubCategory || l.sub_category_name === selectedSubCategory)
+                                                                )
+                                                                .every(l => recipientList.includes(l.mobile_number))
+                                                        }
+                                                        onChange={() => {
+                                                            const filtered = leads.filter(l =>
+                                                                (!recipientInput ||
+                                                                    l.company_name.toLowerCase().includes(recipientInput.toLowerCase()) ||
+                                                                    l.mobile_number.includes(recipientInput)) &&
+                                                                (!selectedCategory || l.category_name === selectedCategory) &&
+                                                                (!selectedSubCategory || l.sub_category_name === selectedSubCategory)
+                                                            );
+                                                            const allSelected = filtered.every(l => recipientList.includes(l.mobile_number));
+
+                                                            if (allSelected) {
+                                                                const visiblePhones = filtered.map(l => l.mobile_number);
+                                                                setRecipientList(recipientList.filter(p => !visiblePhones.includes(p)));
+                                                            } else {
+                                                                const visiblePhones = filtered.map(l => l.mobile_number);
+                                                                setRecipientList([...new Set([...recipientList, ...visiblePhones])]);
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-sm font-medium">
+                                                        Select All ({leads.filter(l =>
+                                                            (!recipientInput ||
+                                                                l.company_name.toLowerCase().includes(recipientInput.toLowerCase()) ||
+                                                                l.mobile_number.includes(recipientInput)) &&
+                                                            (!selectedCategory || l.category_name === selectedCategory) &&
+                                                            (!selectedSubCategory || l.sub_category_name === selectedSubCategory)
+                                                        ).length})
+                                                    </span>
                                                 </div>
                                             )}
+
+                                            {/* List */}
+                                            <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-border divide-y divide-border/40">
+                                                {leads
+                                                    .filter(l =>
+                                                        (!recipientInput ||
+                                                            l.company_name.toLowerCase().includes(recipientInput.toLowerCase()) ||
+                                                            l.mobile_number.includes(recipientInput)) &&
+                                                        (!selectedCategory || l.category_name === selectedCategory) &&
+                                                        (!selectedSubCategory || l.sub_category_name === selectedSubCategory)
+                                                    )
+                                                    .map((lead) => (
+                                                        <div
+                                                            key={lead.id}
+                                                            className="flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                                                            onClick={() => {
+                                                                if (recipientList.includes(lead.mobile_number)) {
+                                                                    setRecipientList(recipientList.filter(p => p !== lead.mobile_number));
+                                                                } else {
+                                                                    setRecipientList([...recipientList, lead.mobile_number]);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Checkbox
+                                                                checked={recipientList.includes(lead.mobile_number)}
+                                                                onChange={() => { }} // handled by parent div click
+                                                                className="pointer-events-none"
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium text-foreground">{lead.company_name}</span>
+                                                                <span className="text-xs text-muted-foreground">{lead.mobile_number}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                {leads.length === 0 && (
+                                                    <div className="p-8 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                                                        <Users className="w-8 h-8 opacity-20" />
+                                                        <p className="text-sm">No leads found in database.</p>
+                                                    </div>
+                                                )}
+
+                                                {leads.length > 0 && leads.filter(l =>
+                                                    (!recipientInput ||
+                                                        l.company_name.toLowerCase().includes(recipientInput.toLowerCase()) ||
+                                                        l.mobile_number.includes(recipientInput)) &&
+                                                    (!selectedCategory || l.category_name === selectedCategory) &&
+                                                    (!selectedSubCategory || l.sub_category_name === selectedSubCategory)
+                                                ).length === 0 && (
+                                                        <div className="p-8 text-center text-muted-foreground text-sm">
+                                                            No matching leads found
+                                                        </div>
+                                                    )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -670,9 +888,20 @@ export default function TemplatesPage() {
                                     <h2 className="text-lg font-bold">{editId ? "Edit Template" : "New Template"}</h2>
                                     <p className="text-xs text-muted-foreground/80">Design your WhatsApp message layout</p>
                                 </div>
-                                <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setShowCreateModal(false)}>
-                                    <X className="w-5 h-5" />
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="lg:hidden h-8 text-xs gap-2"
+                                        onClick={() => setShowMobilePreview(!showMobilePreview)}
+                                    >
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Preview
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setShowCreateModal(false)}>
+                                        <X className="w-5 h-5" />
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 bg-muted/5 divide-y lg:divide-y-0 lg:divide-x divide-border/50">
@@ -916,7 +1145,21 @@ export default function TemplatesPage() {
                                 </div>
 
                                 {/* RIGHT: PHONE PREVIEW */}
-                                <div className="lg:col-span-5 xl:col-span-4 bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex flex-col items-center justify-center relative border-l border-border/50">
+                                <div className={cn(
+                                    "bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
+                                    "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-8 lg:pt-8", // Desktop defaults (force static to override mobile fixed)
+                                    showMobilePreview ? "flex fixed inset-0 z-50 pt-24 pb-8" : "hidden" // Mobile overlay
+                                )}>
+                                    {showMobilePreview && (
+                                        <Button
+                                            className="absolute top-4 right-4 z-50 lg:hidden shadow-lg"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => setShowMobilePreview(false)}
+                                        >
+                                            Close Preview
+                                        </Button>
+                                    )}
                                     <div className="absolute inset-0 pattern-dots opacity-10"></div>
 
                                     <div className="relative w-[300px] h-[600px] bg-black rounded-[40px] shadow-2xl border-[8px] border-zinc-900 overflow-hidden ring-1 ring-white/20">
@@ -1008,9 +1251,54 @@ export default function TemplatesPage() {
                             </div>
                         </motion.div>
                     </div>
-                )}
-            </AnimatePresence>
-        </div>
+                )
+                }
+            </AnimatePresence >
+
+            {/* Confirmation Modal */}
+            {
+                deleteConf.isOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-[2px]">
+                        <Card className="w-full max-w-md bg-card border-border shadow-2xl">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                                <div className="flex items-center gap-2 text-destructive">
+                                    <AlertTriangle className="w-5 h-5" />
+                                    <h2 className="text-xl font-semibold text-foreground">Confirm Deletion</h2>
+                                </div>
+                                <button
+                                    onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                                    className="text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-foreground mb-6">
+                                    Are you sure you want to delete "{deleteConf.title}"?
+                                    <br />
+                                    <span className="text-sm text-muted-foreground mt-2 block">This action cannot be undone.</span>
+                                </p>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                                        onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        className="flex-1 bg-destructive hover:bg-destructive/90"
+                                        onClick={handleConfirmDelete}
+                                    >
+                                        Delete
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 

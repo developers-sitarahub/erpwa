@@ -25,22 +25,26 @@ export function getMediaType(file: File): keyof typeof MEDIA_LIMITS_MB {
 =============================== */
 async function compressImage(file: File): Promise<File> {
   const options = {
-    maxSizeMB: MEDIA_LIMITS_MB.image,
-    maxWidthOrHeight: 1600,
+    maxSizeMB: MEDIA_LIMITS_MB.image, // 5MB
+    maxWidthOrHeight: 1920, // Increased from 1600 for better quality
     useWebWorker: true,
-    initialQuality: 0.8,
+    initialQuality: 0.95, // Increased from 0.8
     fileType: "image/jpeg",
     preserveExif: false,
   };
 
   const compressed = await imageCompression(file, options);
 
+  // Create a new File with .jpg extension to ensure S3/Backend sees it correctly
+  const newName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+  const finalFile = new File([compressed], newName, { type: "image/jpeg" });
+
   console.log("🖼 Image compressed:", {
     before: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-    after: `${(compressed.size / 1024 / 1024).toFixed(2)} MB`,
+    after: `${(finalFile.size / 1024 / 1024).toFixed(2)} MB`,
   });
 
-  return compressed;
+  return finalFile;
 }
 
 /* ===============================
@@ -63,8 +67,7 @@ export async function processMedia(file: File): Promise<{
 
   if (file.size > maxBytes) {
     throw new Error(
-      `${mediaType.toUpperCase()} exceeds WhatsApp limit (${
-        MEDIA_LIMITS_MB[mediaType]
+      `${mediaType.toUpperCase()} exceeds WhatsApp limit (${MEDIA_LIMITS_MB[mediaType]
       } MB)`
     );
   }

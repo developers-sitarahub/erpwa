@@ -18,9 +18,10 @@ router.post(
       templateId,
       bodyVariables = [],
       buttonVariables = [],
+      customMessages = [],
     } = req.body;
 
-    if (!recipients.length || !templateId) {
+    if ((!recipients.length && !customMessages.length) || !templateId) {
       return res.status(400).json({ message: "Invalid request" });
     }
 
@@ -71,25 +72,44 @@ router.post(
       }
     }
 
+    /** 4️⃣ Prepare messages */
+    let messagesToSend = [];
+
+    // Check if we have custom messages (per-recipient variables)
+    if (customMessages && Array.isArray(customMessages) && customMessages.length > 0) {
+      messagesToSend = customMessages;
+    } else {
+      // Default: same variables for all recipients
+      messagesToSend = recipients.map((to) => ({
+        to,
+        bodyVariables,
+        buttonVariables,
+      }));
+    }
+
     const results = [];
 
-    /** 4️⃣ Send to recipients */
-    for (const to of recipients) {
+    /** 5️⃣ Send to recipients */
+    for (const msg of messagesToSend) {
+      const { to: rawTo, bodyVariables: msgBodyVars, buttonVariables: msgButtonVars } = msg;
+
+      // Use message specific variables or fall back to global ones
+      const currentBodyVars = msgBodyVars || bodyVariables;
+      const currentButtonVars = msgButtonVars || buttonVariables;
+
+      const to = String(rawTo).replace(/\D/g, ""); // Remove non-digits
       try {
         const components = [];
 
         /** 🔹 HEADER (MEDIA ONLY) */
         if (media) {
-          // Use the S3 URL (link) for sending - NOT the resumable upload handle
-          // The whatsappMediaId from template creation is a resumable upload handle,
-          // which is not valid for sending messages. We use the public S3 URL instead.
           components.push({
             type: "header",
             parameters: [
               {
-                type: media.mediaType, // image | video | document
+                type: media.mediaType,
                 [media.mediaType]: {
-                  link: media.s3Url, // ✅ Use public URL instead of ID
+                  link: media.s3Url,
                 },
               },
             ],
@@ -97,10 +117,10 @@ router.post(
         }
 
         /** 🔹 BODY */
-        if (bodyVariables.length) {
+        if (currentBodyVars && currentBodyVars.length) {
           components.push({
             type: "body",
-            parameters: bodyVariables.map((v) => ({
+            parameters: currentBodyVars.map((v) => ({
               type: "text",
               text: String(v),
             })),
@@ -108,14 +128,18 @@ router.post(
         }
 
         /** 🔹 BUTTONS (URL buttons only) */
-        buttonVariables.forEach((v, index) => {
-          components.push({
-            type: "button",
-            sub_type: "url",
-            index: String(index),
-            parameters: [{ type: "text", text: String(v) }],
+        if (currentButtonVars && currentButtonVars.length) {
+          currentButtonVars.forEach((v, index) => {
+            components.push({
+              type: "button",
+              sub_type: "url",
+              index: String(index),
+              parameters: [{ type: "text", text: String(v) }],
+            });
           });
-        });
+        }
+
+
 
         /** 🔹 SEND TO WHATSAPP */
         const metaResp = await fetch(
@@ -149,6 +173,7 @@ router.post(
           success: false,
           error: err?.error?.message || err,
         });
+        console.error(`Failed to send template to ${to}:`, err);
       }
     }
 
