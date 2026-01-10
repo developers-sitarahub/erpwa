@@ -809,38 +809,58 @@ export default function TemplatesPage() {
                               </div>
                             </div>
 
-                            {variableSources[idx] === "company_name" ? (
-                              <div className="h-9 px-3 rounded-md border bg-muted/20 flex items-center text-sm text-muted-foreground italic">
-                                Will use recipient's company name
-                              </div>
-                            ) : (
-                              <Input
-                                className="bg-background h-9"
-                                placeholder={`Value for {{${idx + 1}}}`}
-                                value={val}
-                                onChange={(e) => {
-                                  const n = [...variables];
-                                  n[idx] = e.target.value;
-                                  setVariables(n);
-                                }}
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+    const addRecipient = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" && recipientInput.trim()) {
+            e.preventDefault();
+            if (!recipientList.includes(recipientInput.trim())) {
+                setRecipientList([...recipientList, recipientInput.trim()]);
+            }
+            setRecipientInput("");
+        }
+    };
 
-                  {/* Recipients Section */}
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <label className="text-sm font-semibold text-foreground">
-                        Select Recipients
-                      </label>
-                      <span className="text-xs text-muted-foreground">
-                        {recipientList.length} selected
-                      </span>
-                    </div>
+    const removeRecipient = (index: number) => {
+        setRecipientList(recipientList.filter((_, i) => i !== index));
+    };
+
+    const handleSend = async () => {
+        if (!selectedTemplate) return;
+        if (recipientList.length === 0) return toast.error("Please add at least one recipient");
+
+        setSending(true);
+        try {
+            // Check if we need dynamic variables
+            const hasDynamicVariables = Object.values(variableSources).some(v => v === 'company_name');
+            let payload: any = {
+                templateId: selectedTemplate.id,
+            };
+
+            if (hasDynamicVariables) {
+                // Build per-recipient messages
+                const customMessages = recipientList.map(mobile => {
+                    // Find the lead info
+                    const lead = leads.find(l => l.mobile_number === mobile);
+                    const companyName = lead?.company_name || "Valued Customer"; // Fallback
+
+                    // Map variables for this recipient
+                    const bodyVariables = variables.map((val, idx) => {
+                        if (variableSources[idx] === 'company_name') {
+                            return companyName;
+                        }
+                        return val.trim() || 'Valued Customer';
+                    });
+
+                    return {
+                        to: mobile,
+                        bodyVariables
+                    };
+                });
+                payload.customMessages = customMessages;
+            } else {
+                // Standard bulk send
+                payload.recipients = recipientList;
+                payload.bodyVariables = variables.map(v => v.trim() || 'Valued Customer');
+            }
 
                     {/* Filters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1232,10 +1252,154 @@ export default function TemplatesPage() {
                             ))}
                           </div>
                         </div>
-                      </div>
+                        <h3 className="text-lg font-semibold">No templates yet</h3>
+                        <p className="text-muted-foreground text-center max-w-sm text-sm">
+                            Get started by creating your first WhatsApp template approval.
+                        </p>
+                        <Button variant="link" onClick={openCreateModal} className="text-primary mt-2">Create Template &rarr;</Button>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {templates.map((t) => (
+                            <motion.div
+                                key={t.id}
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                                className="group h-full"
+                            >
+                                <Card
+                                    onClick={() => handleCardClick(t)}
+                                    className={cn(
+                                        "h-full flex flex-col cursor-pointer border-border/50 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden group-hover:border-primary/20",
+                                        t.status === "approved" && "hover:border-green-500/30"
+                                    )}
+                                >
+                                    {/* Card Header area */}
+                                    <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="font-semibold text-base text-foreground truncate" title={t.displayName}>
+                                                    {t.displayName}
+                                                </h3>
+                                            </div>
+                                            <div className="shrink-0">
+                                                {getStatusBadge(t.status)}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground shrink-0">
+                                                {t.category}
+                                            </Badge>
+                                            <span className="text-[10px] text-muted-foreground/60">•</span>
+                                            <span className="text-[10px] text-muted-foreground/60">{t.languages[0]?.language}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Card Body - Message Preview style */}
+                                    <CardContent className="p-0 flex-1 flex flex-col relative bg-muted/5">
+                                        <div className="p-5 flex-1 relative overflow-hidden">
+                                            {/* Subtle background pattern for whatsapp feel */}
+                                            <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
+
+                                            <div className="bg-white dark:bg-muted rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-none p-3 shadow-sm border border-border/20 text-xs text-foreground/80 leading-relaxed font-sans relative z-10 max-w-[90%] before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-white dark:before:bg-muted before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
+                                                {t.languages[0]?.headerType !== "TEXT" && (
+                                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                                        {t.languages[0]?.headerType === "IMAGE" ? <ImageIcon className="w-3 h-3" /> : <Paperclip className="w-3 h-3" />}
+                                                        {t.languages[0]?.headerType}
+                                                    </div>
+                                                )}
+                                                <p className="line-clamp-4 whitespace-pre-wrap">{t.languages[0]?.body || "No content"}</p>
+                                                <div className="text-[9px] text-muted-foreground text-right mt-1 font-medium">
+                                                    12:00
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Actions Footer */}
+                                        <div className="p-3 bg-card border-t border-border/40 flex items-center gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={cn(
+                                                    "flex-1 h-9 text-xs font-semibold transition-all duration-300 border-none",
+                                                    t.status === "draft"
+                                                        ? "text-blue-600 bg-blue-500/5 hover:bg-blue-500/15 hover:shadow-md hover:shadow-blue-500/10"
+                                                        : t.status === "approved"
+                                                            ? "text-green-600 bg-green-500/5 hover:bg-green-500/15 hover:shadow-md hover:shadow-green-500/10"
+                                                            : "text-muted-foreground hover:bg-muted/60"
+                                                )}
+                                                onClick={(e) => {
+                                                    if (t.status === "approved") {
+                                                        e.stopPropagation();
+                                                        openSendModal(t);
+                                                    } else if (t.status === "draft") {
+                                                        handleSubmitToMeta(t, e);
+                                                    } else {
+                                                        handleSyncStatus(t.id, e);
+                                                    }
+                                                }}
+                                                disabled={!!syncing || !!submitting}
+                                            >
+                                                {(syncing === t.id || submitting === t.id) ? (
+                                                    <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
+                                                ) : t.status === "draft" ? (
+                                                    <Upload className="w-3 h-3 mr-1.5" />
+                                                ) : t.status === "approved" ? (
+                                                    <Send className="w-3 h-3 mr-1.5" />
+                                                ) : (
+                                                    <RefreshCw className="w-3 h-3 mr-1.5" />
+                                                )}
+                                                {t.status === "draft" ? "Submit" : t.status === "approved" ? "Send" : "Sync"}
+                                            </Button>
+                                            <div className="w-px h-4 bg-border/60"></div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="flex-1 h-9 text-xs font-semibold text-red-500/80 hover:text-red-600 bg-red-500/5 hover:bg-red-500/15 border-none transition-all duration-300"
+                                                onClick={(e) => handleDelete(t, e)}
+                                                disabled={!!deleting}
+                                            >
+                                                {deleting === t.id ? <RefreshCw className="w-3 h-3 animate-spin mr-1.5" /> : <Trash2 className="w-3 h-3 mr-1.5" />}
+                                                Delete
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </motion.div>
+                        ))}
                     </div>
 
-                    <div className="w-full h-px bg-border/40"></div>
+            {/* SEND MODAL */}
+            <AnimatePresence>
+                {showSendModal && selectedTemplate && (
+                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowSendModal(false)}>
+                        <motion.div
+                            initial={{ opacity: 0, y: 100, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 100, scale: 0.95 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            className="bg-background w-full max-w-2xl sm:rounded-2xl shadow-2xl border border-border/40 overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[85vh]"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-5 border-b border-border/50 flex justify-between items-center bg-muted/10">
+                                <div>
+                                    <h2 className="text-lg font-bold flex items-center gap-2">
+                                        <Send className="w-4 h-4 text-green-600" />
+                                        Send Message
+                                    </h2>
+                                    <p className="text-xs text-muted-foreground">{selectedTemplate.displayName}</p>
+                                </div>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowSendModal(false);
+                                    }}
+                                    className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
 
                     {/* Content Group */}
                     <div className="space-y-4">
@@ -1308,39 +1472,39 @@ export default function TemplatesPage() {
                             </div>
                           )}
 
-                          {formData.headerType !== "TEXT" && (
-                            <div
-                              className="mt-2 border border-dashed border-primary/20 rounded-lg p-6 flex flex-col items-center justify-center bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer group"
-                              onClick={() => fileInputRef.current?.click()}
-                            >
-                              <input
-                                type="file"
-                                className="hidden"
-                                ref={fileInputRef}
-                                accept={
-                                  formData.headerType === "IMAGE"
-                                    ? "image/*"
-                                    : formData.headerType === "VIDEO"
-                                    ? "video/*"
-                                    : ".pdf"
-                                }
-                                onChange={handleFileChange}
-                              />
+                            <div className="p-4 border-t border-border bg-muted/10 flex justify-end gap-3">
+                                <Button variant="ghost" onClick={() => setShowSendModal(false)}>Cancel</Button>
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 text-white min-w-[150px] shadow-lg shadow-green-500/20"
+                                    onClick={handleSend}
+                                    disabled={sending}
+                                >
+                                    {sending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                                    Send Message
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
-                              {headerFile ? (
-                                <div className="text-center space-y-2">
-                                  {headerPreview && (
-                                    <img
-                                      src={headerPreview}
-                                      alt="Preview"
-                                      className="h-24 object-contain mx-auto rounded-md shadow-sm border border-border"
-                                    />
-                                  )}
-                                  <div className="flex items-center gap-2 bg-background p-1.5 rounded border border-border/50 text-xs shadow-sm">
-                                    <Paperclip className="w-3 h-3" />
-                                    <span className="font-medium truncate max-w-[150px]">
-                                      {headerFile.name}
-                                    </span>
+            {/* CREATE / EDIT TEMPLATE MODAL */}
+            <AnimatePresence>
+                {showCreateModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-[2px]" onClick={() => setShowCreateModal(false)}>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-background w-full max-w-6xl sm:rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col h-full sm:h-[90vh] relative z-50 pointer-events-auto"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-4 sm:p-5 border-b border-border flex justify-between items-center shrink-0 bg-muted/10 relative z-[70]">
+                                <div>
+                                    <h2 className="text-lg font-bold">{editId ? "Edit Template" : "New Template"}</h2>
+                                    <p className="text-xs text-muted-foreground/80">Design your WhatsApp message layout</p>
+                                </div>
+                                <div className="flex items-center gap-2">
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -1350,55 +1514,352 @@ export default function TemplatesPage() {
                                         setHeaderFile(null);
                                       }}
                                     >
-                                      <X className="w-3 h-3" />
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Preview
                                     </Button>
-                                  </div>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowCreateModal(false);
+                                        }}
+                                        className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
                                 </div>
-                              ) : (
-                                <div className="text-center space-y-2">
-                                  <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center mx-auto shadow-sm group-hover:scale-110 transition-transform">
-                                    <Plus className="w-5 h-5 text-primary" />
-                                  </div>
-                                  <p className="text-xs text-muted-foreground font-medium">
-                                    Click to upload{" "}
-                                    {formData.headerType.toLowerCase()}
-                                  </p>
+                            </div>
+
+                            <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 bg-muted/5 divide-y lg:divide-y-0 lg:divide-x divide-border/50">
+                                {/* LEFT: FORM */}
+                                <div className="lg:col-span-7 xl:col-span-8 p-4 sm:p-6 overflow-y-auto space-y-6 scrollbar-thin relative z-10">
+                                    <div className="space-y-6 max-w-3xl">
+
+                                        {/* Basic Info Group */}
+                                        <div className="space-y-4">
+                                            <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                                                <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">1</div>
+                                                Basic Information
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-8">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium">Template Name <span className="text-red-500">*</span></label>
+                                                    <Input
+                                                        placeholder="e.g. welcome_discount"
+                                                        value={formData.displayName}
+                                                        onChange={e => setFormData({ ...formData, displayName: e.target.value })}
+                                                        className="bg-background"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium">Category</label>
+                                                    <div className="relative">
+                                                        <select
+                                                            className="w-full h-10 pl-3 pr-8 border rounded-md bg-background text-sm appearance-none focus:ring-2 focus:ring-primary/20 outline-none border-input"
+                                                            value={formData.category}
+                                                            onChange={e => setFormData({ ...formData, category: e.target.value })}
+                                                        >
+                                                            <option value="MARKETING">Marketing</option>
+                                                            <option value="UTILITY">Utility</option>
+                                                            <option value="AUTHENTICATION">Authentication</option>
+                                                        </select>
+                                                        <div className="absolute right-3 top-3 pointer-events-none opacity-50"><MoreVertical className="w-4 h-4" /></div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1.5 md:col-span-2">
+                                                    <label className="text-xs font-medium">Language</label>
+                                                    <div className="flex gap-2">
+                                                        {["en_US", "hi_IN"].map((lang) => (
+                                                            <div
+                                                                key={lang}
+                                                                onClick={() => setFormData({ ...formData, language: lang })}
+                                                                className={cn(
+                                                                    "px-3 py-1.5 rounded-md border text-xs cursor-pointer transition-all",
+                                                                    formData.language === lang
+                                                                        ? "bg-primary/10 border-primary text-primary font-medium shadow-sm"
+                                                                        : "bg-background border-border hover:bg-muted"
+                                                                )}
+                                                            >
+                                                                {lang === "en_US" ? "English (US)" : "Hindi (India)"}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full h-px bg-border/40"></div>
+
+                                        {/* Content Group */}
+                                        <div className="space-y-4">
+                                            <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                                                <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">2</div>
+                                                Message Content
+                                            </h3>
+                                            <div className="pl-8 space-y-5">
+
+                                                {/* Header Selection */}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-medium">Header Type</label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {["TEXT", "IMAGE", "VIDEO", "DOCUMENT"].map(type => (
+                                                            <div
+                                                                key={type}
+                                                                className={cn(
+                                                                    "px-3 py-1.5 rounded-md border text-xs cursor-pointer transition-all flex items-center gap-2",
+                                                                    formData.headerType === type
+                                                                        ? "bg-primary/10 border-primary text-primary font-medium shadow-sm"
+                                                                        : "bg-background border-border hover:bg-muted scale-95 opacity-80 hover:opacity-100 hover:scale-100"
+                                                                )}
+                                                                onClick={() => {
+                                                                    setFormData({ ...formData, headerType: type });
+                                                                    setHeaderFile(null);
+                                                                }}
+                                                            >
+                                                                {type === "IMAGE" && <ImageIcon className="w-3 h-3" />}
+                                                                {type === "VIDEO" && <Video className="w-3 h-3" />}
+                                                                {type === "DOCUMENT" && <FileText className="w-3 h-3" />}
+                                                                {type}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {formData.headerType === "TEXT" && (
+                                                        <div className="mt-2 space-y-1.5">
+                                                            <label className="text-xs font-medium">Header Text</label>
+                                                            <Input
+                                                                placeholder="e.g. Special Offer"
+                                                                className="bg-background"
+                                                                value={formData.headerText}
+                                                                onChange={e => setFormData({ ...formData, headerText: e.target.value })}
+                                                            />
+                                                            <p className="text-[10px] text-muted-foreground">Text to appear in the header (optional, simpler than body)</p>
+                                                        </div>
+                                                    )}
+
+                                                    {formData.headerType !== "TEXT" && (
+                                                        <div className="mt-2 border border-dashed border-primary/20 rounded-lg p-6 flex flex-col items-center justify-center bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
+                                                            <input
+                                                                type="file"
+                                                                className="hidden"
+                                                                ref={fileInputRef}
+                                                                accept={formData.headerType === "IMAGE" ? "image/*" : formData.headerType === "VIDEO" ? "video/*" : ".pdf"}
+                                                                onChange={handleFileChange}
+                                                            />
+
+                                                            {headerFile ? (
+                                                                <div className="text-center space-y-2">
+                                                                    {headerPreview && <img src={headerPreview} alt="Preview" className="h-24 object-contain mx-auto rounded-md shadow-sm border border-border" />}
+                                                                    <div className="flex items-center gap-2 bg-background p-1.5 rounded border border-border/50 text-xs shadow-sm">
+                                                                        <Paperclip className="w-3 h-3" />
+                                                                        <span className="font-medium truncate max-w-[150px]">{headerFile.name}</span>
+                                                                        <Button variant="ghost" size="icon" className="w-4 h-4 rounded-full ml-1 text-muted-foreground hover:text-red-500" onClick={(e) => { e.stopPropagation(); setHeaderFile(null); }}>
+                                                                            <X className="w-3 h-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-center space-y-2">
+                                                                    <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center mx-auto shadow-sm group-hover:scale-110 transition-transform">
+                                                                        <Plus className="w-5 h-5 text-primary" />
+                                                                    </div>
+                                                                    <p className="text-xs text-muted-foreground font-medium">Click to upload {formData.headerType.toLowerCase()}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Body Text */}
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between items-center">
+                                                        <label className="text-xs font-medium">Body Message <span className="text-red-500">*</span></label>
+                                                        <Button size="sm" variant="outline" onClick={addVariable} className="h-6 text-[10px] bg-background">
+                                                            <Plus className="w-3 h-3 mr-1" /> Variable
+                                                        </Button>
+                                                    </div>
+                                                    <div className="relative">
+                                                        <textarea
+                                                            className="w-full min-h-[120px] p-3 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-sans text-sm leading-relaxed"
+                                                            placeholder="Hello {{1}}, check out our latest offers..."
+                                                            value={formData.body}
+                                                            onChange={e => setFormData({ ...formData, body: e.target.value })}
+                                                        />
+                                                        <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground bg-background/80 px-1 rounded">
+                                                            {formData.body.length} chars
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[10px] text-muted-foreground">Use {`{{1}}`}, {`{{2}}`} etc. for variables.</p>
+                                                </div>
+
+                                                {/* Footer */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium">Footer Text (Optional)</label>
+                                                    <Input
+                                                        className="bg-background h-9 text-sm"
+                                                        placeholder="e.g. Reply STOP to unsubscribe"
+                                                        value={formData.footerText}
+                                                        onChange={e => setFormData({ ...formData, footerText: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full h-px bg-border/40"></div>
+
+                                        {/* Buttons Group */}
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                                                    <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">3</div>
+                                                    Interactivity
+                                                </h3>
+                                                <div className="flex gap-2">
+                                                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => addButton("QUICK_REPLY")}>+ Quick Reply</Button>
+                                                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => addButton("URL")}>+ Link</Button>
+                                                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => addButton("PHONE_NUMBER")}>+ Phone</Button>
+                                                </div>
+                                            </div>
+
+                                            <div className="pl-8 space-y-3">
+                                                {buttons.length === 0 && (
+                                                    <div className="text-center py-6 text-xs text-muted-foreground/60 border border-dashed border-border/60 rounded-lg bg-muted/5">
+                                                        No buttons added yet. Add up to 3 buttons.
+                                                    </div>
+                                                )}
+
+                                                {buttons.map((btn, idx) => (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                                                        key={idx}
+                                                        className="flex gap-2 items-start border p-3 rounded-lg bg-background shadow-sm group"
+                                                    >
+                                                        <div className="flex-1 space-y-2">
+                                                            <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                                <span className="flex items-center gap-1">
+                                                                    {btn.type === "URL" && <Globe className="w-3 h-3" />}
+                                                                    {btn.type === "PHONE_NUMBER" && <Phone className="w-3 h-3" />}
+                                                                    {btn.type === "QUICK_REPLY" && <CheckCircle className="w-3 h-3" />}
+                                                                    {btn.type.replace("_", " ")}
+                                                                </span>
+                                                            </div>
+                                                            <Input
+                                                                className="h-8 text-sm"
+                                                                placeholder="Button Label"
+                                                                value={btn.text}
+                                                                onChange={e => updateButton(idx, "text", e.target.value)}
+                                                            />
+                                                            {(btn.type === "URL" || btn.type === "PHONE_NUMBER") && (
+                                                                <Input
+                                                                    className="h-8 text-sm"
+                                                                    placeholder={btn.type === "URL" ? "https://website.com" : "+1234567890"}
+                                                                    value={btn.value}
+                                                                    onChange={e => updateButton(idx, "value", e.target.value)}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                        <Button variant="ghost" size="icon" onClick={() => removeButton(idx)} className="text-muted-foreground hover:text-red-500 h-6 w-6 rounded hover:bg-red-50">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
 
-                        {/* Body Text */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <label className="text-xs font-medium">
-                              Body Message{" "}
-                              <span className="text-red-500">*</span>
-                            </label>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={addVariable}
-                              className="h-6 text-[10px] bg-background"
-                            >
-                              <Plus className="w-3 h-3 mr-1" /> Variable
-                            </Button>
-                          </div>
-                          <div className="relative">
-                            <textarea
-                              className="w-full min-h-[120px] p-3 border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-sans text-sm leading-relaxed"
-                              placeholder="Hello {{1}}, check out our latest offers..."
-                              value={formData.body}
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  body: e.target.value,
-                                })
-                              }
-                            />
-                            <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground bg-background/80 px-1 rounded">
-                              {formData.body.length} chars
+                                {/* RIGHT: PHONE PREVIEW */}
+                                <div className={cn(
+                                    "bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
+                                    "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-8 lg:pt-8", // Desktop defaults
+                                    showMobilePreview ? "flex fixed inset-0 z-[60] pt-24 pb-8" : "hidden" // Mobile overlay (higher z-index than modal)
+                                )}>
+                                    {showMobilePreview && (
+                                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 lg:hidden px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-white text-[10px] font-bold tracking-widest uppercase">
+                                            Preview Mode
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 pattern-dots opacity-10"></div>
+
+                                    <div className="relative w-[300px] h-[600px] bg-black rounded-[40px] shadow-2xl border-[8px] border-zinc-900 overflow-hidden ring-1 ring-white/20">
+                                        {/* Phone Notch/Status Bar */}
+                                        <div className="absolute top-0 left-0 right-0 h-8 bg-zinc-900 z-20 flex justify-center">
+                                            <div className="w-32 h-6 bg-black rounded-b-xl"></div>
+                                        </div>
+
+                                        {/* WhatsApp Header Fake */}
+                                        <div className="h-16 bg-[#008069] flex items-end pb-3 px-4 text-white z-10 relative shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center"><UsersIcon className="w-5 h-5" /></div>
+                                                <div>
+                                                    <div className="text-sm font-semibold leading-none">Business Name</div>
+                                                    <div className="text-[10px] opacity-80 mt-0.5">Online</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Chat Area */}
+                                        <div className="flex-1 bg-[#efe7dd] dark:bg-[#0b141a] p-3 relative flex flex-col pt-4 overflow-y-auto">
+                                            <div className="absolute inset-0 opacity-[0.4] bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat"></div>
+
+                                            {/* Date Bubble */}
+                                            <div className="self-center bg-[#e1f3fb] dark:bg-[#1f2c34] rounded-lg px-2 py-1 mb-4 z-10 shadow-sm">
+                                                <span className="text-[10px] text-gray-600 dark:text-gray-300 font-medium">Today</span>
+                                            </div>
+
+                                            {/* Message Bubble */}
+                                            <div className="bg-white dark:bg-[#202c33] rounded-tl-none rounded-tr-lg rounded-bl-lg rounded-br-lg p-1 shadow-sm max-w-[90%] self-start z-10 relative">
+                                                {/* Tail */}
+                                                <div className="absolute -left-1.5 top-0 w-3 h-3 bg-white dark:bg-[#202c33] [clip-path:polygon(100%_0,0_0,100%_100%)]"></div>
+
+                                                <div className="p-1">
+                                                    {formData.headerType === "IMAGE" && (
+                                                        <div className="bg-gray-200 dark:bg-gray-700 rounded-md h-36 w-full mb-1 overflow-hidden flex items-center justify-center">
+                                                            {headerPreview ? <img src={headerPreview} className="w-full h-full object-cover" /> : <ImageIcon className="text-gray-400 w-8 h-8" />}
+                                                        </div>
+                                                    )}
+                                                    {formData.headerType === "TEXT" && (
+                                                        <div className="px-2 pt-1 font-bold text-sm text-foreground">{formData.displayName}</div>
+                                                    )}
+
+                                                    <div className="px-2 pt-1 pb-4 text-[13px] text-gray-800 dark:text-gray-200 leading-snug whitespace-pre-wrap">
+                                                        {formData.body || "Your message body..."}
+                                                    </div>
+
+                                                    {formData.footerText && (
+                                                        <div className="px-2 pb-1 text-[10px] text-gray-500 dark:text-gray-400">
+                                                            {formData.footerText}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="absolute bottom-1 right-2 text-[10px] text-gray-500 flex items-center gap-1">
+                                                    12:00 PM
+                                                </div>
+                                            </div>
+
+                                            {/* Buttons in Chat */}
+                                            {buttons.length > 0 && (
+                                                <div className="mt-1 max-w-[90%] self-start z-10 gap-1 flex flex-col w-full">
+                                                    {buttons.map((btn, i) => (
+                                                        <div key={i} className="bg-white dark:bg-[#202c33] rounded-lg py-2.5 text-center shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2a3942] transition-colors">
+                                                            <div className="flex items-center justify-center gap-2 text-[#0084ff] text-sm font-medium">
+                                                                {btn.type === "URL" && <Globe className="w-3.5 h-3.5" />}
+                                                                {btn.type === "PHONE_NUMBER" && <Phone className="w-3.5 h-3.5" />}
+                                                                {btn.text || "Button"}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-6 font-medium tracking-wide">PREVIEW MODE</p>
+                                </div>
                             </div>
                           </div>
                           <p className="text-[10px] text-muted-foreground">
@@ -1406,117 +1867,16 @@ export default function TemplatesPage() {
                           </p>
                         </div>
 
-                        {/* Footer */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium">
-                            Footer Text (Optional)
-                          </label>
-                          <Input
-                            className="bg-background h-9 text-sm"
-                            placeholder="e.g. Reply STOP to unsubscribe"
-                            value={formData.footerText}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                footerText: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="w-full h-px bg-border/40"></div>
-
-                    {/* Buttons Group */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
-                          <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-primary text-xs font-bold">
-                            3
-                          </div>
-                          Interactivity
-                        </h3>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[10px]"
-                            onClick={() => addButton("QUICK_REPLY")}
-                          >
-                            + Quick Reply
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[10px]"
-                            onClick={() => addButton("URL")}
-                          >
-                            + Link
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[10px]"
-                            onClick={() => addButton("PHONE_NUMBER")}
-                          >
-                            + Phone
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="pl-8 space-y-3">
-                        {buttons.length === 0 && (
-                          <div className="text-center py-6 text-xs text-muted-foreground/60 border border-dashed border-border/60 rounded-lg bg-muted/5">
-                            No buttons added yet. Add up to 3 buttons.
-                          </div>
-                        )}
-
-                        {buttons.map((btn, idx) => (
-                          <motion.div
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            key={idx}
-                            className="flex gap-2 items-start border p-3 rounded-lg bg-background shadow-sm group"
-                          >
-                            <div className="flex-1 space-y-2">
-                              <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                <span className="flex items-center gap-1">
-                                  {btn.type === "URL" && (
-                                    <Globe className="w-3 h-3" />
-                                  )}
-                                  {btn.type === "PHONE_NUMBER" && (
-                                    <Phone className="w-3 h-3" />
-                                  )}
-                                  {btn.type === "QUICK_REPLY" && (
-                                    <CheckCircle className="w-3 h-3" />
-                                  )}
-                                  {btn.type.replace("_", " ")}
-                                </span>
-                              </div>
-                              <Input
-                                className="h-8 text-sm"
-                                placeholder="Button Label"
-                                value={btn.text}
-                                onChange={(e) =>
-                                  updateButton(idx, "text", e.target.value)
-                                }
-                              />
-                              {(btn.type === "URL" ||
-                                btn.type === "PHONE_NUMBER") && (
-                                <Input
-                                  className="h-8 text-sm"
-                                  placeholder={
-                                    btn.type === "URL"
-                                      ? "https://website.com"
-                                      : "+1234567890"
-                                  }
-                                  value={btn.value}
-                                  onChange={(e) =>
-                                    updateButton(idx, "value", e.target.value)
-                                  }
-                                />
-                              )}
+                            <div className="p-4 border-t border-border bg-background flex justify-end gap-3 shrink-0 relative z-20">
+                                <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 text-white min-w-[150px] shadow-lg shadow-green-500/20"
+                                    onClick={handleCreateSubmit}
+                                    disabled={isCreating}
+                                >
+                                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                                    {editId ? "Update Template" : "Submit for Approval"}
+                                </Button>
                             </div>
                             <Button
                               variant="ghost"

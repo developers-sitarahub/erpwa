@@ -22,6 +22,7 @@ import {
   MessageSquareIcon,
 } from "lucide-react";
 import Image from "next/image";
+import { toast } from "react-toastify";
 
 /* =======================
    UI MODELS (UNCHANGED)
@@ -106,6 +107,21 @@ interface ApiMessage {
   }>;
 }
 
+interface Template {
+  id: string;
+  metaTemplateName: string;
+  displayName: string;
+  category: string;
+  status: string;
+  languages: {
+    language: string;
+    body: string;
+    headerType: string;
+    footerText?: string;
+    headerText?: string;
+  }[];
+}
+
 /* =======================
    CONVERSATION LIST (UI UNCHANGED)
 ======================= */
@@ -180,9 +196,8 @@ function ConversationList({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => onSelect(conv.id)}
-            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${
-              selected === conv.id ? "bg-muted" : ""
-            }`}
+            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${selected === conv.id ? "bg-muted" : ""
+              }`}
           >
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
@@ -194,11 +209,10 @@ function ConversationList({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <p
-                    className={`text-base truncate ${
-                      conv.hasUnread
-                        ? "font-semibold text-foreground"
-                        : "font-medium text-foreground"
-                    }`}
+                    className={`text-base truncate ${conv.hasUnread
+                      ? "font-semibold text-foreground"
+                      : "font-medium text-foreground"
+                      }`}
                   >
                     {conv.companyName}
                   </p>
@@ -216,11 +230,10 @@ function ConversationList({
                     )}
 
                     <p
-                      className={`text-sm truncate ${
-                        conv.hasUnread
-                          ? "font-medium text-foreground"
-                          : "text-muted-foreground"
-                      }`}
+                      className={`text-sm truncate ${conv.hasUnread
+                        ? "font-medium text-foreground"
+                        : "text-muted-foreground"
+                        }`}
                     >
                       {conv.lastMessage}
                     </p>
@@ -309,10 +322,46 @@ function ChatArea({
     type: "image" | "video" | "audio" | "document" | "template";
   } | null>(null);
 
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [templateVariables, setTemplateVariables] = useState<string[]>([]);
+  const [isSendingTemplate, setIsSendingTemplate] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState("");
+
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const genericInputRef = useRef<HTMLInputElement | null>(null);
   const isSessionActive = conversation.sessionActive !== false;
   const sessionStarted = conversation.sessionStarted;
+
+  useEffect(() => {
+    if (mediaModal?.type === "template") {
+      api.get("/vendor/templates").then(res => {
+        const approved = res.data.filter((t: any) => t.status === "approved");
+        setTemplates(approved);
+      }).catch(err => console.error("Failed to load templates", err));
+    }
+  }, [mediaModal?.type]);
+
+  const handleSendTemplate = async () => {
+    if (!selectedTemplate || isSendingTemplate) return;
+
+    setIsSendingTemplate(true);
+    try {
+      await api.post("/vendor/whatsapp/template/send-template", {
+        templateId: selectedTemplate.id,
+        recipients: [conversation.phone],
+        bodyVariables: templateVariables.map(v => v.trim() || "Valued Customer"),
+      });
+      setMediaModal(null);
+      setSelectedTemplate(null);
+      setTemplateVariables([]);
+    } catch (err) {
+      console.error("Failed to send template", err);
+      toast.error("Failed to send template");
+    } finally {
+      setIsSendingTemplate(false);
+    }
+  };
 
   const copyMessage = async (message: Message): Promise<boolean> => {
     try {
@@ -370,7 +419,7 @@ function ChatArea({
       setImagePreview(null);
     } catch (err) {
       console.error("Image send failed", err);
-      alert("Failed to send image");
+      toast.error("Failed to send image");
     } finally {
       setSendingPreview(false);
     }
@@ -725,22 +774,20 @@ function ChatArea({
                       initial={{ opacity: 0, y: 20, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      className={`flex items-end gap-2 ${
-                        msg.sender === "executive"
-                          ? "justify-end"
-                          : "justify-start"
-                      }`}
+                      className={`flex items-end gap-2 ${msg.sender === "executive"
+                        ? "justify-end"
+                        : "justify-start"
+                        }`}
                     >
                       <div
                         className={`group relative
                                   max-w-md
                                   px-3 py-2
                                   shadow-sm
-                                  ${
-                                    msg.sender === "executive"
-                                      ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none"
-                                      : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none"
-                                  }
+                                  ${msg.sender === "executive"
+                            ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none"
+                            : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none"
+                          }
                                 `}
                       >
                         {(() => {
@@ -1110,9 +1157,9 @@ function ChatArea({
 
               const left = isIncoming
                 ? // LEFT-SIDE MESSAGE → open menu on RIGHT
-                  Math.min(window.innerWidth - menuWidth - 12, rect.left)
+                Math.min(window.innerWidth - menuWidth - 12, rect.left)
                 : // RIGHT-SIDE MESSAGE → open menu on LEFT
-                  Math.max(12, rect.right - menuWidth);
+                Math.max(12, rect.right - menuWidth);
 
               return (
                 <motion.div
@@ -1217,21 +1264,19 @@ function ChatArea({
                     <div className="flex gap-3">
                       <button
                         onClick={() => setImageMode("single")}
-                        className={`flex-1 py-2.5 rounded-lg ${
-                          imageMode === "single"
-                            ? "bg-primary text-white"
-                            : "bg-muted"
-                        }`}
+                        className={`flex-1 py-2.5 rounded-lg ${imageMode === "single"
+                          ? "bg-primary text-white"
+                          : "bg-muted"
+                          }`}
                       >
                         Single
                       </button>
                       <button
                         onClick={() => setImageMode("bulk")}
-                        className={`flex-1 py-2.5 rounded-lg ${
-                          imageMode === "bulk"
-                            ? "bg-primary text-white"
-                            : "bg-muted"
-                        }`}
+                        className={`flex-1 py-2.5 rounded-lg ${imageMode === "bulk"
+                          ? "bg-primary text-white"
+                          : "bg-muted"
+                          }`}
                       >
                         Bulk
                       </button>
@@ -1281,9 +1326,106 @@ function ChatArea({
 
               {/* TEMPLATE */}
               {mediaModal.type === "template" && (
-                <p className="text-sm text-muted-foreground mt-4">
-                  Choose a WhatsApp template
-                </p>
+                <div className="mt-4 flex flex-col h-[400px]">
+                  {!selectedTemplate ? (
+                    <>
+                      <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <input
+                          type="text"
+                          placeholder="Search templates..."
+                          value={templateSearch}
+                          onChange={(e) => setTemplateSearch(e.target.value)}
+                          className="w-full bg-muted/50 pl-10 pr-4 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        {templates
+                          .filter(t => t.displayName.toLowerCase().includes(templateSearch.toLowerCase()))
+                          .map(t => (
+                            <button
+                              key={t.id}
+                              onClick={() => {
+                                setSelectedTemplate(t);
+                                const body = t.languages[0]?.body || "";
+                                const match = body.match(/{{\d+}}/g);
+                                const count = match ? new Set(match).size : 0;
+                                setTemplateVariables(new Array(count).fill(""));
+                              }}
+                              className="w-full text-left p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                            >
+                              <p className="font-medium text-sm">{t.displayName}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                                {t.languages[0]?.body}
+                              </p>
+                            </button>
+                          ))}
+                        {templates.length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-sm text-muted-foreground">No approved templates found.</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col h-full">
+                      <div className="flex items-center gap-2 mb-4">
+                        <button
+                          onClick={() => setSelectedTemplate(null)}
+                          className="p-1 hover:bg-muted rounded-full"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                        </button>
+                        <p className="font-medium">{selectedTemplate.displayName}</p>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                        <div className="p-3 bg-muted rounded-lg border border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Preview</p>
+                          <p className="text-sm whitespace-pre-wrap">{selectedTemplate.languages[0]?.body}</p>
+                        </div>
+
+                        {templateVariables.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase">Variables</p>
+                            {templateVariables.map((val, idx) => (
+                              <div key={idx} className="space-y-1">
+                                <label className="text-[10px] text-muted-foreground font-medium">Variable {'{{' + (idx + 1) + '}}'}</label>
+                                <input
+                                  type="text"
+                                  value={val}
+                                  onChange={(e) => {
+                                    const next = [...templateVariables];
+                                    next[idx] = e.target.value;
+                                    setTemplateVariables(next);
+                                  }}
+                                  placeholder={`Enter value for {{${idx + 1}}}`}
+                                  className="w-full bg-muted/50 px-3 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-4 pt-4 border-t border-border flex gap-3">
+                        <button
+                          onClick={() => setSelectedTemplate(null)}
+                          className="flex-1 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted"
+                        >
+                          Back
+                        </button>
+                        <button
+                          onClick={handleSendTemplate}
+                          disabled={isSendingTemplate}
+                          className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          {isSendingTemplate ? "Sending..." : "Send Template"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Hidden file input */}
@@ -1297,8 +1439,8 @@ function ChatArea({
                       mediaModal.type === "video"
                         ? "video/*"
                         : mediaModal.type === "audio"
-                        ? "audio/*"
-                        : "*"
+                          ? "audio/*"
+                          : "*"
                     }
                     className="hidden"
                     onChange={async (e) => {
@@ -1321,7 +1463,7 @@ function ChatArea({
                           err instanceof Error
                             ? err.message
                             : "An error occurred";
-                        alert(message);
+                        toast.error(message);
                       }
                     }}
                   />
@@ -1335,18 +1477,8 @@ function ChatArea({
                 </>
               )}
 
-              {/* Template placeholder */}
-              {mediaModal.type === "template" && (
-                <button
-                  onClick={() => {
-                    alert("Template picker coming next");
-                    setMediaModal(null);
-                  }}
-                  className="w-full bg-primary text-white py-2 rounded-lg"
-                >
-                  Open Template Picker
-                </button>
-              )}
+              {/* Template picker is now integrated above */}
+              {mediaModal.type === "template" && null}
             </motion.div>
           </>
         )}
@@ -1700,9 +1832,8 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
       <div
-        className={`${
-          showChat ? "hidden md:block" : "block"
-        } w-full md:w-auto h-full`}
+        className={`${showChat ? "hidden md:block" : "block"
+          } w-full md:w-auto h-full`}
       >
         <ConversationList
           conversations={conversations}
