@@ -16,7 +16,7 @@ export function HeaderAdmin() {
   const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") : null
 
   return (
-    <header className="border-b border-border bg-card sticky top-0 z-10">
+    <header className="border-b border-sidebar-border bg-card sticky top-0 z-10">
       <div className="flex items-center justify-between px-6 py-4 h-16">
         {/* Title */}
         <h2 className="text-xl font-semibold text-foreground">Admin Dashboard</h2>
@@ -66,7 +66,7 @@ export function HeaderAdmin() {
                   </button>
                 </Link>
                 <button
-                  onClick={ logout}
+                  onClick={logout}
                   className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted flex items-center gap-2"
                 >
                   <LogOut className="w-4 h-4" />

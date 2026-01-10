@@ -126,7 +126,7 @@ export function SidebarAdmin() {
       )}
     >
       {/* Logo Section */}
-      <div className="flex items-center justify-between px-4 py-6 border-b border-sidebar-border">
+      <div className="flex items-center justify-between px-4 h-16 border-b border-sidebar-border">
         <div className={cn("flex items-center", isCollapsed ? "w-full justify-center" : "gap-2")}>
           <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-md">
             <MessageSquare className="w-5 h-5 text-primary-foreground" />

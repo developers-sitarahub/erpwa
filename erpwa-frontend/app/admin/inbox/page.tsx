@@ -55,17 +55,18 @@ interface Conversation {
   id: string;
   companyName: string;
   phone: string;
+
   lastMessage: string;
   lastActivity: string;
 
-  // ✅ NEW (required)
   lastMessageDirection?: "inbound" | "outbound";
   lastMessageStatus?: "sent" | "delivered" | "read" | "received" | "failed";
   unreadCount?: number;
-
   hasUnread?: boolean;
-  isPinned?: boolean;
-  businessHoursRemaining?: string;
+
+  sessionStarted?: boolean; // ✅ ADD
+  sessionActive?: boolean; // ✅ ADD
+  sessionExpiresAt?: string | null;
   templateRequired?: boolean;
 }
 
@@ -86,6 +87,9 @@ interface ApiConversation {
     createdAt: string;
   }[];
   lastMessageAt: string;
+  sessionStarted?: boolean;
+  sessionActive?: boolean;
+  sessionExpiresAt?: string | null;
 }
 
 interface ApiMessage {
@@ -274,6 +278,7 @@ function ChatArea({
     message: Message;
     rect: DOMRect;
   } | null>(null);
+  const [remainingTime, setRemainingTime] = useState<string | null>(null);
 
   const [imagePreview, setImagePreview] = useState<{
     files: File[];
@@ -325,6 +330,8 @@ function ChatArea({
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const genericInputRef = useRef<HTMLInputElement | null>(null);
+  const isSessionActive = conversation.sessionActive !== false;
+  const sessionStarted = conversation.sessionStarted;
 
   useEffect(() => {
     if (mediaModal?.type === "template") {
@@ -379,6 +386,18 @@ function ChatArea({
     }
   };
 
+  const calculateRemainingTime = (expiresAt: string) => {
+    const diff = new Date(expiresAt).getTime() - Date.now();
+
+    if (diff <= 0) return null;
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff / (1000 * 60)) % 60);
+
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
   const sendImageFromPreview = async () => {
     if (!imagePreview || sendingPreview) return;
 
@@ -418,8 +437,23 @@ function ChatArea({
   };
 
   useEffect(() => {
-    if (!conversation?.id) return;
+    if (!conversation.sessionActive || !conversation.sessionExpiresAt) {
+      setRemainingTime(null);
+      return;
+    }
 
+    const update = () =>
+      setRemainingTime(calculateRemainingTime(conversation.sessionExpiresAt!));
+
+    update();
+    const id = setInterval(update, 30_000);
+
+    return () => clearInterval(id);
+  }, [conversation.sessionActive, conversation.sessionExpiresAt]);
+
+  useEffect(() => {
+    if (!conversation?.id) return;
+    connectSocket();
     const socket = getSocket();
 
     const maybeMarkRead = async () => {
@@ -468,7 +502,7 @@ function ChatArea({
 
   useEffect(() => {
     if (!conversation?.id) return;
-
+    connectSocket();
     const socket = getSocket();
 
     const handleNewMessage = (msg: Message) => {
@@ -676,23 +710,24 @@ function ChatArea({
           </motion.button>
         </div>
       </div>
-      {conversation.businessHoursRemaining &&
-        !conversation.templateRequired && (
-          <div className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-yellow-600" />
-            <span className="text-xs text-yellow-700">
-              24-hour message window expires in{" "}
-              {conversation.businessHoursRemaining}
-            </span>
-          </div>
-        )}
-      {conversation.templateRequired && (
-        <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-600" />
-          <span className="text-xs text-red-700">
-            24-hour window closed. Send a template message to start the
-            conversation.
-          </span>
+      {/* SESSION BANNER — ALWAYS VISIBLE */}
+      {sessionStarted && (
+        <div className="flex-shrink-0 z-30">
+          {isSessionActive ? (
+            <div className="bg-yellow-50 border-b px-4 py-2.5 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-yellow-600" />
+              <span className="text-xs text-yellow-700">
+                24-hour message window expires in {remainingTime}
+              </span>
+            </div>
+          ) : (
+            <div className="bg-red-50 border-b px-4 py-2.5 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span className="text-xs text-red-700">
+                24-hour window closed. Send a template message.
+              </span>
+            </div>
+          )}
         </div>
       )}
       {/* MESSAGES WRAPPER */}
@@ -973,9 +1008,9 @@ function ChatArea({
               <input
                 ref={inputRef}
                 type="text"
-                disabled={conversation.templateRequired}
+                disabled={!isSessionActive}
                 placeholder={
-                  conversation.templateRequired
+                  !isSessionActive
                     ? "Template message required"
                     : "Type a message"
                 }
@@ -985,7 +1020,7 @@ function ChatArea({
                   if (
                     e.key === "Enter" &&
                     !e.nativeEvent.isComposing &&
-                    !conversation.templateRequired
+                    isSessionActive
                   ) {
                     e.preventDefault();
                     sendMessage();
@@ -995,12 +1030,12 @@ function ChatArea({
               />
             </div>
 
-            {conversation.templateRequired ? (
+            {!isSessionActive ? (
               <motion.button
-                className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setMediaModal({ type: "template" })}
+                className="bg-primary text-white px-4 py-2 rounded-lg"
+                onClick={() => {
+                  alert("Open template picker");
+                }}
               >
                 Send Template
               </motion.button>
@@ -1451,20 +1486,20 @@ function ChatArea({
       <AnimatePresence>
         {imagePreview && (
           <>
-            {/* BACKDROP (ChatArea only) */}
+            {/* BACKDROP – stays inside ChatArea */}
             <motion.div
-              className="absolute inset-0 z-40 bg-black"
+              className="absolute inset-0 z-40 bg-black/90"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             />
 
-            {/* PREVIEW SCREEN */}
+            {/* PREVIEW CONTAINER – limited to ChatArea */}
             <motion.div
               className="absolute inset-0 z-50 flex flex-col bg-black text-white"
-              initial={{ y: 40, opacity: 0 }}
+              initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
+              exit={{ y: 30, opacity: 0 }}
             >
               {/* HEADER */}
               <div className="flex items-center gap-3 px-4 py-3">
@@ -1484,10 +1519,16 @@ function ChatArea({
               </div>
 
               {/* MAIN IMAGE */}
-              <div className="flex-1 flex items-center justify-center">
+              {/* IMAGE AREA */}
+              <div className="flex-1 overflow-y-auto flex items-center justify-center px-4">
                 <img
                   src={imagePreview.urls[0]}
-                  className="max-w-full max-h-full object-contain"
+                  className="
+      max-w-full
+      max-h-[65vh]
+      object-contain
+      rounded-lg
+    "
                 />
               </div>
 
@@ -1505,7 +1546,7 @@ function ChatArea({
               )}
 
               {/* CAPTION + SEND */}
-              <div className="flex items-center gap-3 p-4">
+              <div className="flex items-center gap-3 p-4 border-t border-white/10">
                 <input
                   placeholder="Add a caption…"
                   value={imagePreview.caption}
@@ -1514,19 +1555,31 @@ function ChatArea({
                       p ? { ...p, caption: e.target.value } : p
                     )
                   }
-                  className="flex-1 bg-white/10 px-4 py-2 rounded-full outline-none"
+                  className="
+      flex-1
+      bg-white/10
+      px-4
+      py-2
+      rounded-full
+      outline-none
+      text-sm
+    "
                 />
 
                 <button
                   disabled={sendingPreview}
                   onClick={sendImageFromPreview}
-                  className={`bg-primary w-12 h-12 rounded-full flex items-center justify-center
-                  ${sendingPreview ? "opacity-60 cursor-not-allowed" : ""}
-                  `}
+                  className="
+      bg-primary
+      w-12 h-12
+      rounded-full
+      flex items-center justify-center
+    "
                 >
                   <Send className="w-5 h-5 text-white" />
                 </button>
               </div>
+
               {sendingPreview && (
                 <div className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center gap-4">
                   <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1631,6 +1684,10 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
     lastMessageStatus: lastMsg?.status,
     unreadCount,
     hasUnread: unreadCount > 0,
+    sessionStarted: c.sessionStarted ?? true,
+    sessionActive: c.sessionActive ?? true,
+    sessionExpiresAt: c.sessionExpiresAt ?? null,
+    templateRequired: c.sessionActive === false,
   };
 };
 
@@ -1656,6 +1713,7 @@ export default function InboxPage() {
 
   // 🔥 2️⃣ THEN LISTEN FOR INBOX UPDATES
   useEffect(() => {
+    connectSocket();
     const socket = getSocket();
 
     const handleInboxUpdate = async () => {
@@ -1753,10 +1811,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              businessHoursRemaining: res.data.businessHoursRemaining,
-              templateRequired: res.data.templateRequired,
-            }
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
             : c
         )
       );

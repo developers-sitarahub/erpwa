@@ -91,14 +91,17 @@ router.get(
     }
 
     // 24-hour session check (ONLY for sending logic)
-    const now = new Date();
+    const now = Date.now();
+
+    const sessionStarted = !!conversation.sessionStartedAt;
     const sessionActive =
-      conversation.sessionExpiresAt &&
-      new Date(conversation.sessionExpiresAt) > now;
+      !!conversation.sessionExpiresAt &&
+      conversation.sessionExpiresAt.getTime() > now;
 
     res.json({
       conversationId: conversation.id,
       lead: conversation.lead,
+      sessionStarted,
       sessionActive,
       sessionExpiresAt: conversation.sessionExpiresAt,
       messages: conversation.messages,

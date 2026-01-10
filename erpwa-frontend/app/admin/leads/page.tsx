@@ -385,6 +385,40 @@ function ManualEntryComponent({
                   return
                 }
 
+                // Validate leads data format
+                const leads = manualForm.leads_text.trim().split("\n")
+                const separator = manualForm.separator
+                let hasError = false
+
+                for (let i = 0; i < leads.length; i++) {
+                  const leadData = leads[i].split(separator).map(s => s.trim())
+                  const lineNum = i + 1
+
+                  // Check if there are at least 2 fields (name and phone/email)
+                  if (leadData.length < 2) continue
+
+                  // Validate phone number (if present) - should be numeric
+                  if (leadData[1]) {
+                    if (!/^\d+$/.test(leadData[1].replace(/[\s\-\(\)]/g, ''))) {
+                      toast.error(`Line ${lineNum}: Phone number must contain only numbers`)
+                      hasError = true
+                      break
+                    }
+                  }
+
+                  // Validate email (if present in 3rd position) - must have @
+                  if (leadData[2] && leadData[2].length > 0) {
+                    if (!leadData[2].includes('@')) {
+                      toast.error(`Line ${lineNum}: Email must contain @ symbol`)
+                      hasError = true
+                      break
+                    }
+                  }
+                }
+
+                if (hasError) return
+
+
                 try {
                   const formData = new FormData()
                   formData.append("category_id", manualForm.category_id)
@@ -1147,7 +1181,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("manual")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "manual"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border !text-black dark:!text-white hover:bg-muted"
+              : "bg-secondary border border-border !text-black dark:!text-grey hover:bg-muted"
               }`}
           >
             <FileText className="w-4 h-4 mr-2" />
@@ -1157,7 +1191,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("upload")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "upload"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border !text-black dark:!text-white hover:bg-muted"
+              : "bg-secondary border border-border !text-black dark:!text-grey hover:bg-muted"
               }`}
           >
             <Upload className="w-4 h-4 mr-2" />
@@ -1338,6 +1372,40 @@ export default function LeadsPage() {
                       className="bg-primary hover:bg-primary/90"
                     >
                       Change Sales Person
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        if (selectedLeads.size === 0) {
+                          toast.warning("No leads selected")
+                          return
+                        }
+
+                        const confirmDelete = window.confirm(
+                          `Delete ${selectedLeads.size} lead(s)? This cannot be undone.`
+                        )
+
+                        if (!confirmDelete) return
+
+                        try {
+                          const deletePromises = Array.from(selectedLeads).map((leadId) =>
+                            leadsAPI.delete(leadId)
+                          )
+
+                          await Promise.all(deletePromises)
+
+                          toast.success(`Successfully deleted ${selectedLeads.size} lead(s)`)
+                          setSelectedLeads(new Set())
+                          setShowBulkSalesPerson(false)
+                          loadLeads()
+                        } catch (error: any) {
+                          toast.error(error.response?.data?.error || "Failed to delete leads")
+                        }
+                      }}
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Selected
                     </Button>
                     <Button
                       size="sm"

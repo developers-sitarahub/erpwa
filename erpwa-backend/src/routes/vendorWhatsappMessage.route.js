@@ -200,7 +200,6 @@ router.post(
       where: { id: conversation.id },
       data: {
         lastMessageAt: new Date(),
-        sessionExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
 
@@ -385,10 +384,9 @@ router.post(
       });
 
       await prisma.conversation.update({
-        where: { id: conversationId },
+        where: { id: conversation.id },
         data: {
           lastMessageAt: new Date(),
-          sessionExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       });
     } catch (err) {

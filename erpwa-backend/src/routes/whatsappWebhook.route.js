@@ -45,14 +45,19 @@ router.post("/", async (req, res) => {
 
     if (!vendor) return res.sendStatus(200);
 
-    const now = new Date();
-    const sessionExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
     /* =====================================================
        1️⃣ HANDLE INBOUND CUSTOMER MESSAGES
     ===================================================== */
     if (value.messages?.length) {
       for (const msg of value.messages) {
+        // ✅ WhatsApp message timestamp (seconds → ms)
+        const inboundAt = new Date(Number(msg.timestamp) * 1000);
+
+        // ✅ 24 hour window from LAST inbound message
+        const sessionExpiresAt = new Date(
+          inboundAt.getTime() + 24 * 60 * 60 * 1000
+        );
+
         const whatsappMessageId = msg.id;
         const from = msg.from;
 
@@ -70,13 +75,13 @@ router.post("/", async (req, res) => {
               phoneNumber: from,
             },
           },
-          update: { lastContactedAt: now },
+          update: { lastContactedAt: inboundAt },
           create: {
             vendorId: vendor.id,
             phoneNumber: from,
             whatsappOptIn: true,
             optInSource: "inbound",
-            optInAt: now,
+            optInAt: inboundAt,
           },
         });
 
@@ -89,8 +94,11 @@ router.post("/", async (req, res) => {
             },
           },
           update: {
-            lastMessageAt: now,
+            lastMessageAt: inboundAt,
             isOpen: true,
+
+            // 🔥 THIS IS THE FIX
+            sessionStartedAt: inboundAt,
             sessionExpiresAt,
           },
           create: {
@@ -98,9 +106,11 @@ router.post("/", async (req, res) => {
             leadId: lead.id,
             channel: "whatsapp",
             isOpen: true,
-            sessionStartedAt: now,
-            lastMessageAt: now,
+
+            // 🔥 SOURCE OF TRUTH
+            sessionStartedAt: inboundAt,
             sessionExpiresAt,
+            lastMessageAt: inboundAt,
           },
         });
 
@@ -127,7 +137,7 @@ router.post("/", async (req, res) => {
             content,
             whatsappMessageId,
             replyToMessageId: replyToWhatsappMessageId,
-            status: "delivered",
+            status: "received",
             inboundPayload: msg,
           },
         });
@@ -182,7 +192,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch { }
+        } catch {}
 
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
@@ -238,7 +248,9 @@ router.post("/", async (req, res) => {
 
         await prisma.conversation.update({
           where: { id: message.conversationId },
-          data: { lastMessageAt: new Date() },
+          data: {
+            lastMessageAt: new Date(),
+          },
         });
 
         try {
@@ -246,7 +258,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: message.conversationId,
           });
-        } catch { }
+        } catch {}
 
         /* 🔥 SAFE SOCKET STATUS EMIT */
         try {
