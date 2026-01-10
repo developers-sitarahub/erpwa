@@ -398,7 +398,7 @@ export default function TemplatesPage() {
                         if (variableSources[idx] === 'company_name') {
                             return companyName;
                         }
-                        return val;
+                        return val.trim() || 'Valued Customer';
                     });
 
                     return {
@@ -410,7 +410,7 @@ export default function TemplatesPage() {
             } else {
                 // Standard bulk send
                 payload.recipients = recipientList;
-                payload.bodyVariables = variables;
+                payload.bodyVariables = variables.map(v => v.trim() || 'Valued Customer');
             }
 
             const res = await api.post("/vendor/whatsapp/template/send-template", payload);
@@ -552,12 +552,12 @@ export default function TemplatesPage() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className={cn(
-                                                    "flex-1 h-8 text-xs hover:bg-muted/60",
+                                                    "flex-1 h-9 text-xs font-semibold transition-all duration-300 border-none",
                                                     t.status === "draft"
-                                                        ? "text-blue-600 hover:text-blue-700 bg-blue-50/50"
+                                                        ? "text-blue-600 bg-blue-500/5 hover:bg-blue-500/15 hover:shadow-md hover:shadow-blue-500/10"
                                                         : t.status === "approved"
-                                                            ? "text-green-600 hover:text-green-700 bg-green-50/50"
-                                                            : "text-muted-foreground hover:text-foreground"
+                                                            ? "text-green-600 bg-green-500/5 hover:bg-green-500/15 hover:shadow-md hover:shadow-green-500/10"
+                                                            : "text-muted-foreground hover:bg-muted/60"
                                                 )}
                                                 onClick={(e) => {
                                                     if (t.status === "approved") {
@@ -586,7 +586,7 @@ export default function TemplatesPage() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="flex-1 h-8 text-xs text-red-500/80 hover:text-red-600 hover:bg-red-500/10"
+                                                className="flex-1 h-9 text-xs font-semibold text-red-500/80 hover:text-red-600 bg-red-500/5 hover:bg-red-500/15 border-none transition-all duration-300"
                                                 onClick={(e) => handleDelete(t, e)}
                                                 disabled={!!deleting}
                                             >
@@ -622,9 +622,15 @@ export default function TemplatesPage() {
                                     </h2>
                                     <p className="text-xs text-muted-foreground">{selectedTemplate.displayName}</p>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowSendModal(false)}>
-                                    <X className="w-4 h-4" />
-                                </Button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowSendModal(false);
+                                    }}
+                                    className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-0">
@@ -880,10 +886,10 @@ export default function TemplatesPage() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-background w-full max-w-6xl sm:rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col h-full sm:h-[90vh]"
+                            className="bg-background w-full max-w-6xl sm:rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col h-full sm:h-[90vh] relative z-50 pointer-events-auto"
                             onClick={e => e.stopPropagation()}
                         >
-                            <div className="p-4 sm:p-5 border-b border-border flex justify-between items-center shrink-0 bg-muted/10">
+                            <div className="p-4 sm:p-5 border-b border-border flex justify-between items-center shrink-0 bg-muted/10 relative z-[70]">
                                 <div>
                                     <h2 className="text-lg font-bold">{editId ? "Edit Template" : "New Template"}</h2>
                                     <p className="text-xs text-muted-foreground/80">Design your WhatsApp message layout</p>
@@ -898,15 +904,21 @@ export default function TemplatesPage() {
                                         <Eye className="w-3.5 h-3.5" />
                                         Preview
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setShowCreateModal(false)}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowCreateModal(false);
+                                        }}
+                                        className="p-2 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                                    >
                                         <X className="w-5 h-5" />
-                                    </Button>
+                                    </button>
                                 </div>
                             </div>
 
                             <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 bg-muted/5 divide-y lg:divide-y-0 lg:divide-x divide-border/50">
                                 {/* LEFT: FORM */}
-                                <div className="lg:col-span-7 xl:col-span-8 p-4 sm:p-6 overflow-y-auto space-y-6 scrollbar-thin">
+                                <div className="lg:col-span-7 xl:col-span-8 p-4 sm:p-6 overflow-y-auto space-y-6 scrollbar-thin relative z-10">
                                     <div className="space-y-6 max-w-3xl">
 
                                         {/* Basic Info Group */}
@@ -1147,18 +1159,13 @@ export default function TemplatesPage() {
                                 {/* RIGHT: PHONE PREVIEW */}
                                 <div className={cn(
                                     "bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
-                                    "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-8 lg:pt-8", // Desktop defaults (force static to override mobile fixed)
-                                    showMobilePreview ? "flex fixed inset-0 z-50 pt-24 pb-8" : "hidden" // Mobile overlay
+                                    "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-8 lg:pt-8", // Desktop defaults
+                                    showMobilePreview ? "flex fixed inset-0 z-[60] pt-24 pb-8" : "hidden" // Mobile overlay (higher z-index than modal)
                                 )}>
                                     {showMobilePreview && (
-                                        <Button
-                                            className="absolute top-4 right-4 z-50 lg:hidden shadow-lg"
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() => setShowMobilePreview(false)}
-                                        >
-                                            Close Preview
-                                        </Button>
+                                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 lg:hidden px-4 py-2 bg-black/60 backdrop-blur-md rounded-full text-white text-[10px] font-bold tracking-widest uppercase">
+                                            Preview Mode
+                                        </div>
                                     )}
                                     <div className="absolute inset-0 pattern-dots opacity-10"></div>
 
@@ -1238,7 +1245,7 @@ export default function TemplatesPage() {
                                 </div>
                             </div>
 
-                            <div className="p-4 border-t border-border bg-background flex justify-end gap-3 shrink-0 z-20">
+                            <div className="p-4 border-t border-border bg-background flex justify-end gap-3 shrink-0 relative z-20">
                                 <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
                                 <Button
                                     className="bg-green-600 hover:bg-green-700 text-white min-w-[150px] shadow-lg shadow-green-500/20"
