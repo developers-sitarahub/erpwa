@@ -49,6 +49,10 @@ interface Message {
   sender: "customer" | "executive";
   timestamp: string;
   status?: "sent" | "delivered" | "read" | "failed" | "received";
+  template?: {
+    footer?: string;
+    buttons?: Array<{ text: string; type: string }>;
+  };
 }
 
 interface Conversation {
@@ -105,6 +109,7 @@ interface ApiMessage {
     mimeType: string;
     caption?: string;
   }>;
+  outboundPayload?: any;
 }
 
 interface Template {
@@ -780,180 +785,144 @@ function ChatArea({
                         }`}
                     >
                       <div
-                        className={`group relative
-                                  max-w-md
-                                  px-3 py-2
-                                  shadow-sm
-                                  ${msg.sender === "executive"
-                            ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none"
-                            : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none"
+                        className={`group relative max-w-[85%] md:max-w-md shadow-sm overflow-hidden flex flex-col
+                                    ${msg.sender === "executive"
+                            ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none self-end"
+                            : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none self-start"
                           }
-                                `}
+                                  `}
                       >
-                        {(() => {
-                          const reply = getReplyPreview(
-                            msg.replyTo ?? repliedMessage
-                          );
-                          if (!reply) return null;
-
-                          return (
-                            <div className="mb-1 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-[rgba(0,0,0,0.04)] dark:bg-[rgba(255,255,255,0.08)] rounded">
-                              {reply.thumb && (
-                                <div className="relative w-10 h-10 flex-shrink-0">
-                                  <Image
-                                    src={reply.thumb}
-                                    alt=""
-                                    fill
-                                    sizes="40px"
-                                    className="rounded object-cover"
-                                  />
-                                </div>
-                              )}
-
-                              <div className="min-w-0">
-                                <div className="text-xs font-medium text-[#25D366] leading-tight">
-                                  {reply.title}
-                                </div>
-                                <div className="text-xs text-muted-foreground truncate leading-tight">
-                                  {reply.subtitle}
-                                </div>
+                        {/* 🖼 MEDIA (IMAGE/VIDEO) */}
+                        {msg.mediaUrl && (msg.mimeType?.startsWith("image/") || msg.mimeType?.startsWith("video/")) && (
+                          <div className="w-full overflow-hidden">
+                            {msg.mimeType.startsWith("image/") ? (
+                              <div
+                                className="relative w-full aspect-[4/3] cursor-pointer"
+                                onClick={() => window.open(msg.mediaUrl, "_blank")}
+                              >
+                                <Image
+                                  src={msg.mediaUrl}
+                                  alt="Message media"
+                                  fill
+                                  sizes="(max-width: 768px) 85vw, 450px"
+                                  className="object-cover"
+                                />
                               </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* 🖼 IMAGE */}
-                        {/* 🖼 IMAGE (WhatsApp style) */}
-                        {msg.mediaUrl && msg.mimeType?.startsWith("image/") && (
-                          <div className="mb-1">
-                            <div
-                              className="relative w-[320px] max-w-full aspect-[4/3] rounded-lg overflow-hidden cursor-pointer"
-                              onClick={() =>
-                                window.open(msg.mediaUrl, "_blank")
-                              }
-                            >
-                              <Image
-                                src={msg.mediaUrl}
-                                alt="Image"
-                                fill
-                                sizes="(max-width: 768px) 90vw, 320px"
-                                className="object-cover"
-                              />
-                            </div>
-
-                            {msg.caption && (
-                              <p className="mt-1 text-sm text-foreground">
-                                {msg.caption}
-                              </p>
+                            ) : (
+                              <div className="w-full bg-black aspect-video flex items-center">
+                                <video src={msg.mediaUrl} controls className="w-full h-auto" />
+                              </div>
                             )}
                           </div>
                         )}
 
-                        {/* 🎥 VIDEO (WhatsApp style) */}
-                        {msg.mediaUrl && msg.mimeType?.startsWith("video/") && (
-                          <div className="mb-1">
-                            <div className="w-[320px] max-w-full rounded-lg overflow-hidden bg-black">
-                              <video
-                                src={msg.mediaUrl}
-                                controls
-                                className="w-full h-auto"
-                              />
-                            </div>
-
-                            {msg.caption && (
-                              <p className="mt-1 text-sm text-foreground">
-                                {msg.caption}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* 🎵 AUDIO (WhatsApp style) */}
-                        {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
-                          <div className="mb-1 w-[260px] max-w-full">
-                            <audio
-                              src={msg.mediaUrl}
-                              controls
-                              className="w-full h-10"
-                            />
-
-                            {msg.caption && (
-                              <p className="mt-1 text-sm text-foreground">
-                                {msg.caption}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* 📄 DOCUMENT (WhatsApp style) */}
-                        {msg.mediaUrl &&
-                          msg.mimeType &&
-                          !msg.mimeType.startsWith("image/") &&
-                          !msg.mimeType.startsWith("video/") &&
-                          !msg.mimeType.startsWith("audio/") && (
+                        {/* 📄 DOCUMENT */}
+                        {msg.mediaUrl && msg.mimeType && !msg.mimeType.startsWith("image/") && !msg.mimeType.startsWith("video/") && !msg.mimeType.startsWith("audio/") && (
+                          <div className="p-2">
                             <a
                               href={msg.mediaUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="w-[260px] max-w-full flex items-center gap-3 p-3 rounded-lg border bg-muted hover:bg-muted/70"
+                              className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
                             >
-                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                                📄
-                              </div>
-
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">DOC</div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">
-                                  {msg.mediaUrl.split("/").pop()}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Document
-                                </p>
+                                <p className="text-sm font-medium text-foreground truncate">{msg.mediaUrl.split("/").pop()}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase uppercase">Document</p>
                               </div>
                             </a>
-                          )}
-
-                        {/* 📝 TEXT MESSAGE */}
-                        {msg.text && (
-                          <p className="text-sm leading-[1.35] break-words whitespace-pre-wrap overflow-hidden">
-                            {msg.text}
-                          </p>
+                          </div>
                         )}
 
-                        <div className="flex items-center gap-1 mt-1 justify-end">
-                          <span className="text-[10px] text-muted-foreground">
-                            {new Date(msg.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
+                        {/* 📝 CONTENT AREA */}
+                        <div className="px-3 py-2 flex flex-col">
+                          {/* REPLIED MESSAGE PREVIEW (Internal) */}
+                          {(() => {
+                            const reply = getReplyPreview(msg.replyTo ?? repliedMessage);
+                            if (!reply) return null;
+                            return (
+                              <div className="mb-2 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-black/5 dark:bg-white/5 rounded text-[11px]">
+                                {reply.thumb && (
+                                  <div className="relative w-8 h-8 flex-shrink-0">
+                                    <Image src={reply.thumb} alt="" fill sizes="32px" className="rounded object-cover" />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-[#25D366] truncate">{reply.title}</div>
+                                  <div className="text-muted-foreground truncate">{reply.subtitle}</div>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
-                          {msg.sender === "executive" && (
-                            <span
-                              className={
-                                msg.status === "read"
-                                  ? "text-blue-500"
-                                  : "text-muted-foreground"
-                              }
-                            >
-                              {getMessageStatusIcon(msg.status)}
-                            </span>
+                          {/* AUDIO */}
+                          {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
+                            <div className="mb-2">
+                              <audio src={msg.mediaUrl} controls className="w-full h-8" />
+                            </div>
                           )}
+
+                          {/* BODY TEXT */}
+                          {msg.text && (
+                            <p className="text-[14.2px] leading-[1.35] break-words whitespace-pre-wrap text-[#111b21] dark:text-[#e9edef]">
+                              {msg.text}
+                            </p>
+                          )}
+
+                          {/* FOOTER & TIMESTAMP ROW */}
+                          <div className="flex items-end justify-between gap-4 mt-1.5">
+                            {msg.template?.footer ? (
+                              <p className="text-[12px] text-[#667781] dark:text-[#8696a0] leading-none pb-0.5">
+                                {msg.template.footer}
+                              </p>
+                            ) : <div />}
+
+                            <div className="flex items-center gap-1 self-end pb-0.5">
+                              <span className="text-[11px] text-[#667781] dark:text-[#8696a0]">
+                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
+                              </span>
+                              {msg.sender === "executive" && (
+                                <span className={msg.status === "read" ? "text-[#53bdeb]" : "text-[#8696a0]"}>
+                                  {getMessageStatusIcon(msg.status)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* BUTTONS - Authentic WhatsApp Style */}
+                        {msg.template?.buttons && msg.template.buttons.length > 0 && (
+                          <div className="border-t border-[#0000000d] dark:border-[#ffffff12] divide-y divide-[#0000000d] dark:divide-[#ffffff12]">
+                            {msg.template.buttons.map((btn, i) => (
+                              <div
+                                key={i}
+                                className="py-2.5 text-center text-[14px] font-medium text-[#00a884] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors active:bg-black/10"
+                                onClick={() => {
+                                  if (btn.type === "URL" && (btn as any).value) {
+                                    window.open((btn as any).value, "_blank");
+                                  } else {
+                                    setReplyTo(msg);
+                                    setInputValue(btn.text);
+                                    setTimeout(() => inputRef.current?.focus(), 50);
+                                  }
+                                }}
+                              >
+                                {btn.text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* REACTION / MENU BUTTON (Floating) */}
+                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
-                              const rect =
-                                e.currentTarget.getBoundingClientRect();
-
-                              setActionMenu({
-                                message: msg,
-                                rect,
-                              });
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setActionMenu({ message: msg, rect });
                             }}
-                            className="p-1.5 rounded-full bg-card border shadow hover:bg-muted"
+                            className="p-1 rounded-full bg-white/80 dark:bg-black/50 shadow-sm hover:bg-white dark:hover:bg-black transition-colors"
                           >
-                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                            <MoreVertical className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -1783,10 +1752,8 @@ export default function InboxPage() {
             whatsappMessageId: m.whatsappMessageId,
             replyToMessageId: m.replyToMessageId,
 
-            // TEXT
-            text: media ? undefined : m.content,
-
-            // MEDIA
+            // TEXT & MEDIA
+            text: m.content,
             mediaUrl: media?.mediaUrl,
             mimeType: media?.mimeType,
             caption: media?.caption,
@@ -1794,6 +1761,12 @@ export default function InboxPage() {
             sender: m.direction === "outbound" ? "executive" : "customer",
             timestamp: m.createdAt,
             status: m.status ?? "delivered",
+
+            // TEMPLATE DATA (Look in outboundPayload.template first, then fallback)
+            template: m.outboundPayload?.template || (m.outboundPayload?.name ? {
+              footer: m.outboundPayload.footer,
+              buttons: m.outboundPayload.buttons
+            } : undefined),
           };
         }
       );
@@ -1811,11 +1784,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-                ...c,
-                sessionStarted: res.data.sessionStarted,
-                sessionActive: res.data.sessionActive,
-                sessionExpiresAt: res.data.sessionExpiresAt,
-              }
+              ...c,
+              sessionStarted: res.data.sessionStarted,
+              sessionActive: res.data.sessionActive,
+              sessionExpiresAt: res.data.sessionExpiresAt,
+            }
             : c
         )
       );
