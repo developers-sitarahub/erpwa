@@ -86,6 +86,9 @@ interface ApiConversation {
     createdAt: string;
   }[];
   lastMessageAt: string;
+  sessionStarted?: boolean;
+  sessionActive?: boolean;
+  sessionExpiresAt?: string | null;
 }
 
 interface ApiMessage {
@@ -308,7 +311,7 @@ function ChatArea({
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const genericInputRef = useRef<HTMLInputElement | null>(null);
-  const isSessionActive = conversation.sessionActive;
+  const isSessionActive = conversation.sessionActive !== false;
   const sessionStarted = conversation.sessionStarted;
 
   const copyMessage = async (message: Message): Promise<boolean> => {
@@ -980,11 +983,10 @@ function ChatArea({
               />
             </div>
 
-            {conversation.templateRequired ? (
+            {!isSessionActive ? (
               <motion.button
                 className="bg-primary text-white px-4 py-2 rounded-lg"
                 onClick={() => {
-                  // TODO: open template picker modal
                   alert("Open template picker");
                 }}
               >
@@ -1550,6 +1552,10 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
     lastMessageStatus: lastMsg?.status,
     unreadCount,
     hasUnread: unreadCount > 0,
+    sessionStarted: c.sessionStarted ?? true,
+    sessionActive: c.sessionActive ?? true,
+    sessionExpiresAt: c.sessionExpiresAt ?? null,
+    templateRequired: c.sessionActive === false,
   };
 };
 
@@ -1677,7 +1683,6 @@ export default function InboxPage() {
                 sessionStarted: res.data.sessionStarted,
                 sessionActive: res.data.sessionActive,
                 sessionExpiresAt: res.data.sessionExpiresAt,
-                templateRequired: !res.data.sessionActive,
               }
             : c
         )
