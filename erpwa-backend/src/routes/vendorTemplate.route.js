@@ -54,7 +54,7 @@ router.get(
 router.post(
   "/",
   authenticate,
-  requireRoles(["vendor_owner"]),
+  requireRoles(["vendor_owner", "vendor_admin"]),
   upload.single("header.file"),
   asyncHandler(async (req, res) => {
     const {
@@ -306,7 +306,7 @@ router.put(
 router.post(
   "/:id/submit",
   authenticate,
-  requireRoles(["vendor_owner"]),
+  requireRoles(["vendor_owner", "vendor_admin"]),
   asyncHandler(async (req, res) => {
 
     // 🚨 HARD BLOCK ANY BODY OR MULTIPART - Removed strict check to avoid false positives with empty JSON objects

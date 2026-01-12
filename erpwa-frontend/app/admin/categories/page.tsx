@@ -15,6 +15,7 @@ import { categoriesAPI } from "@/lib/categoriesApi"
 import type { Category, Contact } from "@/lib/types"
 import { toast } from "react-toastify"
 import { Checkbox } from "@/components/checkbox"
+import { CoolTooltip } from "../../../components/ui/cool-tooltip"
 
 function StatusBadge({ status, isLead }: { status: string; isLead?: boolean }) {
   // Lead statuses
@@ -782,42 +783,66 @@ export default function CategoriesPage() {
               return (
                 <div className="mt-4">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="text-sm table-fixed bg-card">
                       <thead>
                         <tr className="border-b border-border bg-secondary/30">
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">
                             Company Name
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">
                             Mobile Number
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">
                             Category
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">
                             Sub-Category
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">
                             Sales Person
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-                          <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actions</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">Status</th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground w-24">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {paginatedContacts && paginatedContacts.length > 0 ? (
                           paginatedContacts.map((contact: any) => (
                             <tr key={contact.id || `${contact.mobile_number}-${contact.company_name}`} className="border-b border-border hover:bg-muted/30">
-                              <td className="py-3 px-4 text-foreground">{contact.company_name || "--"}</td>
-                              <td className="py-3 px-4 text-muted-foreground">{contact.mobile_number || "--"}</td>
-                              <td className="py-3 px-4 text-foreground">
-                                {contact.category_name || "--"}
+                              <td className="py-3 px-4">
+                                <CoolTooltip content={contact.company_name}>
+                                  <div className="truncate w-full max-w-[120px] text-foreground">
+                                    {contact.company_name || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
-                              <td className="py-3 px-4 text-foreground">
-                                {contact.sub_category_name || "--"}
+                              <td className="py-3 px-4">
+                                <CoolTooltip content={contact.mobile_number}>
+                                  <div className="truncate w-full max-w-[120px] text-muted-foreground">
+                                    {contact.mobile_number || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
-                              <td className="py-3 px-4 text-foreground">
-                                {contact.sales_person_name || "--"}
+                              <td className="py-3 px-4">
+                                <CoolTooltip content={contact.category_name}>
+                                  <div className="truncate w-full max-w-[120px] text-foreground">
+                                    {contact.category_name || "--"}
+                                  </div>
+                                </CoolTooltip>
+                              </td>
+                              <td className="py-3 px-4">
+                                <CoolTooltip content={contact.sub_category_name}>
+                                  <div className="truncate w-full max-w-[120px] text-foreground">
+                                    {contact.sub_category_name || "--"}
+                                  </div>
+                                </CoolTooltip>
+                              </td>
+                              <td className="py-3 px-4">
+                                <CoolTooltip content={contact.sales_person_name}>
+                                  <div className="truncate w-full max-w-[120px] text-foreground">
+                                    {contact.sales_person_name || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
                               <td className="py-3 px-4">
                                 <StatusBadge status={contact.status || (contact.is_lead ? "new" : "pending")} isLead={contact.is_lead} />

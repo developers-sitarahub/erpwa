@@ -24,6 +24,8 @@ export const listUsers = async (req, res) => {
                 email: true,
                 role: true,
                 status: true,
+                isOnline: true,
+                lastLoginAt: true,
                 createdAt: true,
             },
             orderBy: { createdAt: "desc" },
@@ -60,9 +62,8 @@ export const createUser = async (req, res) => {
                 role,
                 passwordHash,
                 vendorId: req.user.vendorId,
-                status: "active",
-                isOnline: false, // New users are typically not online until they log in
-                lastLoginAt: null, // No last login until they log in
+                passwordHash,
+                vendorId: req.user.vendorId,
             },
             select: {
                 id: true,
@@ -77,10 +78,11 @@ export const createUser = async (req, res) => {
         });
 
         // Generate Invite Token (reusing password reset logic)
+        console.log("🔑 Generating Invite Token with RESET SECRET for user:", user.id);
         const inviteToken = jwt.sign(
-            { sub: user.id, type: "password_reset" },
+            { sub: user.id, type: "invite", role: role },
             process.env.PASSWORD_RESET_TOKEN_SECRET,
-            { expiresIn: "7d" }
+            { expiresIn: "36500d" }
         );
 
         const inviteLink = `${process.env.FRONTEND_URL}/create-password?token=${inviteToken}`;
@@ -151,7 +153,9 @@ export const updateUser = async (req, res) => {
         if (name) updateData.name = name;
         if (email) updateData.email = email;
         if (role) updateData.role = role;
-        if (status) updateData.status = status;
+        if (status) {
+            // updateData.status = status;
+        }
         if (password) {
             updateData.passwordHash = await hashPassword(password);
         }
