@@ -17,6 +17,7 @@ import {
   Database,
   Folder,
   Image,
+  Megaphone,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/context/sidebar-provider"
@@ -27,7 +28,7 @@ export function SidebarAdmin() {
   const { isCollapsed, toggleSidebar } = useSidebar()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -36,11 +37,11 @@ export function SidebarAdmin() {
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
-  const menuItems = [
+  const allMenuItems = [
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/inbox", icon: MessageSquare, label: "Inbox" },
     { href: "/admin/templates", icon: FileText, label: "Templates" },
-
+    { href:"/admin/campaigns", icon: Megaphone, label: "Campaigns" },
     { href: "/admin/leads", icon: Database, label: "Leads" },
     { href: "/admin/categories", icon: Folder, label: "Categories" },
     { href: "/admin/gallery", icon: Image, label: "Gallery" },
@@ -48,6 +49,12 @@ export function SidebarAdmin() {
     { href: "/admin/setup", icon: MessageSquare, label: "Setup" },
     { href: "/admin/settings", icon: Settings, label: "Settings" },
   ]
+
+  const menuItems = allMenuItems.filter(item => {
+    // Hide Setup from non-vendor_owners (i.e. vendor_admin and others)
+    if (item.label === "Setup" && user?.role !== "vendor_owner") return false;
+    return true;
+  });
 
   if (isMobile) {
     return (
