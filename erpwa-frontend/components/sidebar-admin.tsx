@@ -28,7 +28,7 @@ export function SidebarAdmin() {
   const { isCollapsed, toggleSidebar } = useSidebar()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -37,7 +37,7 @@ export function SidebarAdmin() {
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
-  const menuItems = [
+  const allMenuItems = [
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/inbox", icon: MessageSquare, label: "Inbox" },
     { href: "/admin/templates", icon: FileText, label: "Templates" },
@@ -49,6 +49,12 @@ export function SidebarAdmin() {
     { href: "/admin/setup", icon: MessageSquare, label: "Setup" },
     { href: "/admin/settings", icon: Settings, label: "Settings" },
   ]
+
+  const menuItems = allMenuItems.filter(item => {
+    // Hide Setup from non-vendor_owners (i.e. vendor_admin and others)
+    if (item.label === "Setup" && user?.role !== "vendor_owner") return false;
+    return true;
+  });
 
   if (isMobile) {
     return (
