@@ -45,14 +45,19 @@ router.post("/", async (req, res) => {
 
     if (!vendor) return res.sendStatus(200);
 
-    const now = new Date();
-    const sessionExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
     /* =====================================================
        1️⃣ HANDLE INBOUND CUSTOMER MESSAGES
     ===================================================== */
     if (value.messages?.length) {
       for (const msg of value.messages) {
+        // ✅ WhatsApp message timestamp (seconds → ms)
+        const inboundAt = new Date(Number(msg.timestamp) * 1000);
+
+        // ✅ 24 hour window from LAST inbound message
+        const sessionExpiresAt = new Date(
+          inboundAt.getTime() + 24 * 60 * 60 * 1000
+        );
+
         const whatsappMessageId = msg.id;
         const from = msg.from;
 
@@ -70,13 +75,13 @@ router.post("/", async (req, res) => {
               phoneNumber: from,
             },
           },
-          update: { lastContactedAt: now },
+          update: { lastContactedAt: inboundAt },
           create: {
             vendorId: vendor.id,
             phoneNumber: from,
             whatsappOptIn: true,
             optInSource: "inbound",
-            optInAt: now,
+            optInAt: inboundAt,
           },
         });
 
@@ -89,8 +94,11 @@ router.post("/", async (req, res) => {
             },
           },
           update: {
-            lastMessageAt: now,
+            lastMessageAt: inboundAt,
             isOpen: true,
+
+            // 🔥 THIS IS THE FIX
+            sessionStartedAt: inboundAt,
             sessionExpiresAt,
           },
           create: {
@@ -98,9 +106,11 @@ router.post("/", async (req, res) => {
             leadId: lead.id,
             channel: "whatsapp",
             isOpen: true,
-            sessionStartedAt: now,
-            lastMessageAt: now,
+
+            // 🔥 SOURCE OF TRUTH
+            sessionStartedAt: inboundAt,
             sessionExpiresAt,
+            lastMessageAt: inboundAt,
           },
         });
 
