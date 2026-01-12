@@ -34,32 +34,38 @@ export async function forgotPassword(req, res) {
       });
     }
 
-    const otp = generateOtp();
-    const otpHash = hashOtp(otp);
+    const resetToken = jwt.sign(
+      { sub: user.id, type: "password_reset" },
+      process.env.PASSWORD_RESET_TOKEN_SECRET,
+      { expiresIn: "1h" }
+    );
 
-    await prisma.$transaction([
-      prisma.passwordResetOtp.updateMany({
-        where: { userId: user.id },
-        data: { used: true },
-      }),
-      prisma.passwordResetOtp.create({
-        data: {
-          userId: user.id,
-          otpHash,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-        },
-      }),
-    ]);
+    const resetLink = `${process.env.FRONTEND_URL}/forgot-password?token=${resetToken}`;
 
     await sendMail({
       to: email,
-      ...passwordResetOtpTemplate({
-        name: user.name,
-        otp,
-      }),
+      subject: "Reset Your Password",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2563EB;">Password Reset</h2>
+            <p>Hello ${user.name},</p>
+            <p>You requested to reset your password. Click the link below to verify your email and set a new password:</p>
+            
+            <div style="margin: 30px 0; text-align: center;">
+                <a href="${resetLink}" style="background-color: #2563EB; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+            </div>
+
+            <p style="font-size: 14px; color: #666;">Or paste this link in your browser:</p>
+            <p style="font-size: 14px; color: #666; word-break: break-all;">${resetLink}</p>
+            
+            <p style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #999;">
+                This link is valid for 1 hour. If you didn't request this, please ignore this email.
+            </p>
+        </div>
+      `,
     });
 
-    return res.json({ message: "OTP sent to your email" });
+    return res.json({ message: "Password reset link sent to your email" });
   } catch (err) {
     console.error("Forgot password error:", err);
     return res.status(500).json({ message: "Internal server error" });

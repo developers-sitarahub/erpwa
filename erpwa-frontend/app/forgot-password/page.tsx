@@ -14,11 +14,21 @@ import { toast } from "react-toastify"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
+  // 🔍 Check for Token in URL
+  const searchParams = useSearchParams()
   const [resetToken, setResetToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    const token = searchParams.get("token")
+    if (token) {
+      setResetToken(token)
+      setStep(3) // Jump to password set step
+    }
+  }, [searchParams])
 
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState("")
-  const [otp, setOtp] = useState("")
+  // const [otp, setOtp] = useState("") // Removed OTP
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -31,29 +41,9 @@ export default function ForgotPasswordPage() {
 
     try {
       await api.post("/auth/forgot-password", { email })
-      toast.success("If the email exists, a reset link has been sent")
-      setStep(2) // success screen
+      setStep(2) // Success screen
     } catch {
       toast.error("Failed to send reset link")
-    } finally {
-      setLoading(false)
-    }
-  }
-  const handleOtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      const res = await api.post("/auth/verify-forgot-otp", {
-        email,
-        otp,
-      })
-
-      setResetToken(res.data.resetToken) // ✅ IMPORTANT
-      toast.success("OTP verified")
-      setStep(3)
-    } catch {
-      setErrors({ otp: "Invalid or expired OTP" })
     } finally {
       setLoading(false)
     }
@@ -183,36 +173,26 @@ export default function ForgotPasswordPage() {
             )}
 
             {step === 2 && (
-              <motion.form
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                onSubmit={handleOtpSubmit}
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Enter OTP</label>
-                  <p className="text-xs text-muted-foreground">6-digit code sent to {email}</p>
-                  <Input
-                    type="text"
-                    placeholder="000000"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.slice(0, 6))}
-                    maxLength={6}
-                    className="text-center text-lg tracking-widest"
-                  />
-                  {errors.otp && <p className="text-destructive text-sm">{errors.otp}</p>}
+              <div className="text-center space-y-4 py-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Mail className="w-8 h-8 text-blue-500" />
                 </div>
-                <Button type="submit" className="w-full">
-                  Verify OTP
-                </Button>
-                <button
-                  type="button"
+                <h3 className="text-xl font-semibold">Check your inbox</h3>
+                <p className="text-muted-foreground">
+                  We have sent a password reset link to <span className="font-medium text-foreground">{email}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Click the link in the email to reset your password.
+                </p>
+
+                <Button
+                  variant="outline"
                   onClick={() => setStep(1)}
-                  className="w-full text-primary hover:text-primary/80 text-sm font-medium"
+                  className="mt-4"
                 >
-                  Use Different Email
-                </button>
-              </motion.form>
+                  Back to Email
+                </Button>
+              </div>
             )}
 
             {step === 3 && (

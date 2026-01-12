@@ -10,6 +10,7 @@ import { categoriesAPI } from "@/lib/categoriesApi"
 import { leadsAPI } from "@/lib/leadsApi"
 import type { Category, Lead } from "@/lib/types"
 import { toast } from "react-toastify"
+import { usersAPI, User } from "@/lib/usersApi"
 
 function StatusBadge({ status }: { status: Lead["status"] }) {
   const styles: Record<Lead["status"], string> = {
@@ -1000,13 +1001,14 @@ export default function LeadsPage() {
   }
 
   const loadTeamMembers = async () => {
-    // Mock data as requested
-    setTeamMembers([
-      { id: "s1", name: "sales1" },
-      { id: "s2", name: "sales2" },
-      { id: "s3", name: "sales3" },
-      { id: "s4", name: "sales4" },
-    ])
+    try {
+      const res = await usersAPI.list('sales')
+      if (res.data) {
+        setTeamMembers(res.data)
+      }
+    } catch (error) {
+      console.error("Failed to load sales persons", error)
+    }
   }
 
   const loadLeads = async () => {
