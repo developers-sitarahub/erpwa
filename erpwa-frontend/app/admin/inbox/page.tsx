@@ -220,8 +220,9 @@ function ConversationList({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => onSelect(conv.id)}
-            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${selected === conv.id ? "bg-muted" : ""
-              }`}
+            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${
+              selected === conv.id ? "bg-muted" : ""
+            }`}
           >
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
@@ -231,8 +232,14 @@ function ConversationList({
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-base font-semibold text-foreground truncate">
+                <div className="flex items-center justify-between mb-1">      
+                  <p
+                    className={`text-base truncate ${
+                      conv.hasUnread
+                        ? "font-semibold text-foreground"
+                        : "font-medium text-foreground"
+                    }`}
+                  >
                     {conv.companyName}
                   </p>
 
@@ -249,10 +256,11 @@ function ConversationList({
                     )}
 
                     <p
-                      className={`text-sm truncate ${conv.hasUnread
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                        }`}
+                      className={`text-sm truncate ${
+                        conv.hasUnread
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground"
+                      }`}
                     >
                       {conv.lastMessage}
                     </p>
@@ -342,7 +350,9 @@ function ChatArea({
   } | null>(null);
 
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
+    null
+  );
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
   const [isSendingTemplate, setIsSendingTemplate] = useState(false);
   const [templateSearch, setTemplateSearch] = useState("");
@@ -366,10 +376,13 @@ function ChatArea({
 
   useEffect(() => {
     if (mediaModal?.type === "template") {
-      api.get("/vendor/templates").then(res => {
-        const approved = res.data.filter((t: any) => t.status === "approved");
-        setTemplates(approved);
-      }).catch(err => console.error("Failed to load templates", err));
+      api
+        .get("/vendor/templates")
+        .then((res) => {
+          const approved = res.data.filter((t: any) => t.status === "approved");
+          setTemplates(approved);
+        })
+        .catch((err) => console.error("Failed to load templates", err));
     }
     // Load categories when opening gallery modal
     if (mediaModal?.type === "gallery") {
@@ -493,7 +506,9 @@ function ChatArea({
       await api.post("/vendor/whatsapp/template/send-template", {
         templateId: selectedTemplate.id,
         recipients: [conversation.phone],
-        bodyVariables: templateVariables.map(v => v.trim() || "Valued Customer"),
+        bodyVariables: templateVariables.map(
+          (v) => v.trim() || "Valued Customer"
+        ),
       });
       setMediaModal(null);
       setSelectedTemplate(null);
@@ -918,89 +933,125 @@ function ChatArea({
                       initial={{ opacity: 0, y: 20, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      className={`flex items-end gap-2 ${msg.sender === "executive"
-                        ? "justify-end"
-                        : "justify-start"
-                        }`}
+                      className={`flex items-end gap-2 ${
+                        msg.sender === "executive"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
                     >
                       <div
-                        className={`group relative shadow-sm overflow-hidden flex flex-col
-                                    ${msg.template ? "w-[300px] sm:w-[330px]" : "max-w-[85%] md:max-w-md"}
-                                    ${msg.sender === "executive"
-                            ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none self-end"
-                            : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none self-start"
-                          }
+                        className={`group relative max-w-[85%] md:max-w-md shadow-sm overflow-hidden flex flex-col
+                                    ${
+                                      msg.sender === "executive"
+                                        ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none self-end"
+                                        : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none self-start"
+                                    }
                                   `}
                       >
                         {/* 🖼 MEDIA (IMAGE/VIDEO) */}
-                        {msg.mediaUrl && (msg.mimeType?.startsWith("image/") || msg.mimeType?.startsWith("video/")) && (
-                          <div className="w-full overflow-hidden">
-                            {msg.mimeType.startsWith("image/") ? (
-                              <div
-                                className="relative w-full aspect-[4/3] cursor-pointer"
-                                onClick={() => window.open(msg.mediaUrl, "_blank")}
-                              >
-                                <Image
-                                  src={msg.mediaUrl}
-                                  alt="Message media"
-                                  fill
-                                  sizes="(max-width: 768px) 85vw, 450px"
-                                  className="object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-full bg-black aspect-video flex items-center">
-                                <video src={msg.mediaUrl} controls className="w-full h-auto" />
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        {msg.mediaUrl &&
+                          (msg.mimeType?.startsWith("image/") ||
+                            msg.mimeType?.startsWith("video/")) && (
+                            <div className="w-full overflow-hidden">
+                              {msg.mimeType.startsWith("image/") ? (
+                                <div
+                                  className="relative w-full aspect-[4/3] cursor-pointer"
+                                  onClick={() =>
+                                    window.open(msg.mediaUrl, "_blank")
+                                  }
+                                >
+                                  <Image
+                                    src={msg.mediaUrl}
+                                    alt="Message media"
+                                    fill
+                                    sizes="(max-width: 768px) 85vw, 450px"
+                                    className="object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full bg-black aspect-video flex items-center">
+                                  <video
+                                    src={msg.mediaUrl}
+                                    controls
+                                    className="w-full h-auto"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                         {/* 📄 DOCUMENT */}
-                        {msg.mediaUrl && msg.mimeType && !msg.mimeType.startsWith("image/") && !msg.mimeType.startsWith("video/") && !msg.mimeType.startsWith("audio/") && (
-                          <div className="p-2">
-                            <a
-                              href={msg.mediaUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">DOC</div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">{msg.mediaUrl.split("/").pop()}</p>
-                                <p className="text-[10px] text-muted-foreground uppercase uppercase">Document</p>
-                              </div>
-                            </a>
-                          </div>
-                        )}
+                        {msg.mediaUrl &&
+                          msg.mimeType &&
+                          !msg.mimeType.startsWith("image/") &&
+                          !msg.mimeType.startsWith("video/") &&
+                          !msg.mimeType.startsWith("audio/") && (
+                            <div className="p-2">
+                              <a
+                                href={msg.mediaUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                  DOC
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-foreground truncate">
+                                    {msg.mediaUrl.split("/").pop()}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground uppercase uppercase">
+                                    Document
+                                  </p>
+                                </div>
+                              </a>
+                            </div>
+                          )}
 
                         {/* 📝 CONTENT AREA */}
                         <div className="px-3 py-2 flex flex-col">
                           {/* REPLIED MESSAGE PREVIEW (Internal) */}
                           {(() => {
-                            const reply = getReplyPreview(msg.replyTo ?? repliedMessage);
+                            const reply = getReplyPreview(
+                              msg.replyTo ?? repliedMessage
+                            );
                             if (!reply) return null;
                             return (
                               <div className="mb-2 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-black/5 dark:bg-white/5 rounded text-[11px]">
                                 {reply.thumb && (
                                   <div className="relative w-8 h-8 flex-shrink-0">
-                                    <Image src={reply.thumb} alt="" fill sizes="32px" className="rounded object-cover" />
+                                    <Image
+                                      src={reply.thumb}
+                                      alt=""
+                                      fill
+                                      sizes="32px"
+                                      className="rounded object-cover"
+                                    />
                                   </div>
                                 )}
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-[#25D366] truncate">{reply.title}</div>
-                                  <div className="text-muted-foreground truncate">{reply.subtitle}</div>
+                                  <div className="font-semibold text-[#25D366] truncate">
+                                    {reply.title}
+                                  </div>
+                                  <div className="text-muted-foreground truncate">
+                                    {reply.subtitle}
+                                  </div>
                                 </div>
                               </div>
                             );
                           })()}
 
                           {/* AUDIO */}
-                          {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
-                            <div className="mb-2">
-                              <audio src={msg.mediaUrl} controls className="w-full h-8" />
-                            </div>
-                          )}
+                          {msg.mediaUrl &&
+                            msg.mimeType?.startsWith("audio/") && (
+                              <div className="mb-2">
+                                <audio
+                                  src={msg.mediaUrl}
+                                  controls
+                                  className="w-full h-8"
+                                />
+                              </div>
+                            )}
 
                           {/* BODY TEXT */}
                           {msg.text && (
@@ -1015,14 +1066,28 @@ function ChatArea({
                               <p className="text-[12px] text-[#667781] dark:text-[#8696a0] leading-none pb-0.5">
                                 {msg.template.footer}
                               </p>
-                            ) : <div />}
+                            ) : (
+                              <div />
+                            )}
 
                             <div className="flex items-center gap-1 self-end pb-0.5">
                               <span className="text-[11px] text-[#667781] dark:text-[#8696a0]">
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
+                                {new Date(msg.timestamp)
+                                  .toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                    hour12: true,
+                                  })
+                                  .toLowerCase()}
                               </span>
                               {msg.sender === "executive" && (
-                                <span className={msg.status === "read" ? "text-[#53bdeb]" : "text-[#8696a0]"}>
+                                <span
+                                  className={
+                                    msg.status === "read"
+                                      ? "text-[#53bdeb]"
+                                      : "text-[#8696a0]"
+                                  }
+                                >
                                   {getMessageStatusIcon(msg.status)}
                                 </span>
                               )}
@@ -1031,33 +1096,41 @@ function ChatArea({
                         </div>
 
                         {/* BUTTONS - Authentic WhatsApp Style */}
-                        {msg.template?.buttons && msg.template.buttons.length > 0 && (
-                          <div className="border-t border-[#0000000d] dark:border-[#ffffff12] divide-y divide-[#0000000d] dark:divide-[#ffffff12]">
-                            {msg.template.buttons.map((btn, i) => (
-                              <div
-                                key={i}
-                                className="py-2.5 text-center text-[14px] font-medium text-[#00a884] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors active:bg-black/10"
-                                onClick={() => {
-                                  if (btn.type === "URL" && (btn as any).value) {
-                                    window.open((btn as any).value, "_blank");
-                                  } else {
-                                    setReplyTo(msg);
-                                    setInputValue(btn.text);
-                                    setTimeout(() => inputRef.current?.focus(), 50);
-                                  }
-                                }}
-                              >
-                                {btn.text}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        {msg.template?.buttons &&
+                          msg.template.buttons.length > 0 && (
+                            <div className="border-t border-[#0000000d] dark:border-[#ffffff12] divide-y divide-[#0000000d] dark:divide-[#ffffff12]">
+                              {msg.template.buttons.map((btn, i) => (
+                                <div
+                                  key={i}
+                                  className="py-2.5 text-center text-[14px] font-medium text-[#00a884] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors active:bg-black/10"
+                                  onClick={() => {
+                                    if (
+                                      btn.type === "URL" &&
+                                      (btn as any).value
+                                    ) {
+                                      window.open((btn as any).value, "_blank");
+                                    } else {
+                                      setReplyTo(msg);
+                                      setInputValue(btn.text);
+                                      setTimeout(
+                                        () => inputRef.current?.focus(),
+                                        50
+                                      );
+                                    }
+                                  }}
+                                >
+                                  {btn.text}
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
                         {/* REACTION / MENU BUTTON (Floating) */}
                         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
                               setActionMenu({ message: msg, rect });
                             }}
                             className="p-1 rounded-full bg-white/80 dark:bg-black/50 shadow-sm hover:bg-white dark:hover:bg-black transition-colors"
@@ -1264,9 +1337,9 @@ function ChatArea({
 
               const left = isIncoming
                 ? // LEFT-SIDE MESSAGE → open menu on RIGHT
-                Math.min(window.innerWidth - menuWidth - 12, rect.left)
+                  Math.min(window.innerWidth - menuWidth - 12, rect.left)
                 : // RIGHT-SIDE MESSAGE → open menu on LEFT
-                Math.max(12, rect.right - menuWidth);
+                  Math.max(12, rect.right - menuWidth);
 
               return (
                 <motion.div
@@ -1420,8 +1493,12 @@ function ChatArea({
                     <div className="grid grid-cols-2 gap-4">
                       {/* DEVICE */}
                       <button
-                        onClick={() => imageInputRef.current?.click()}
-                        className="rounded-xl border p-5 hover:bg-muted text-left flex flex-col items-center justify-center gap-2 aspect-square"
+                        onClick={() => setImageMode("single")}
+                        className={`flex-1 py-2.5 rounded-lg ${
+                          imageMode === "single"
+                            ? "bg-primary text-white"
+                            : "bg-muted"
+                        }`}
                       >
                         <div className="text-4xl">📁</div>
                         <p className="font-medium text-sm">Device</p>
@@ -1429,8 +1506,12 @@ function ChatArea({
 
                       {/* GALLERY */}
                       <button
-                        onClick={() => setMediaModal({ type: "gallery" })}
-                        className="rounded-xl border p-5 hover:bg-muted text-left flex flex-col items-center justify-center gap-2 aspect-square"
+                        onClick={() => setImageMode("bulk")}
+                        className={`flex-1 py-2.5 rounded-lg ${
+                          imageMode === "bulk"
+                            ? "bg-primary text-white"
+                            : "bg-muted"
+                        }`}
                       >
                         <div className="text-4xl">🖼️</div>
                         <p className="font-medium text-sm">Gallery</p>
@@ -1479,25 +1560,14 @@ function ChatArea({
                           </button>
                         ))}
                       </div>
-
-                      {/* Subcategories Row - only if category selected & has subcats */}
-                      {selectedGalleryCategory && gallerySubcategories.length > 0 && (
-                        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 pt-1 border-t border-dashed border-border/50">
-                          <span className="text-[10px] text-muted-foreground mr-1 uppercase tracking-wider font-bold">Sub-Category:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedGallerySubcategory(null);
-                              loadGalleryImages(selectedGalleryCategory);
-                            }}
-                            className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedGallerySubcategory
-                              ? "bg-primary/20 text-primary"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
-                              }`}
-                          >
-                            All
-                          </button>
-                          {gallerySubcategories.map((sc) => (
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        {templates
+                          .filter((t) =>
+                            t.displayName
+                              .toLowerCase()
+                              .includes(templateSearch.toLowerCase())
+                          )
+                          .map((t) => (
                             <button
                               type="button"
                               key={sc.id}
@@ -1510,76 +1580,26 @@ function ChatArea({
                                 : "bg-muted text-muted-foreground hover:bg-muted/80"
                                 }`}
                             >
-                              {sc.name}
+                              <p className="font-medium text-sm">
+                                {t.displayName}
+                              </p>
+                              <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                                {t.languages[0]?.body}
+                              </p>
                             </button>
                           ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* IMAGES GRID */}
-                    <div className="flex-1 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 gap-2 pr-1 custom-scrollbar content-start">
-                      {galleryLoading ? (
-                        <div className="col-span-full flex items-center justify-center h-40">
-                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                        </div>
-                      ) : galleryImages.length === 0 ? (
-                        <div className="col-span-full flex flex-col items-center justify-center h-40 text-muted-foreground">
-                          <ImageIcon className="w-8 h-8 opacity-20 mb-2" />
-                          <p className="text-sm">No images found</p>
-                        </div>
-                      ) : (
-                        galleryImages.map((img) => {
-                          const isSelected = !!selectedGalleryImages.find((i) => i.id === img.id);
-                          return (
-                            <div
-                              key={img.id}
-                              className={`relative aspect-square cursor-pointer group rounded-lg overflow-hidden border-2 transition-all bg-muted/20 ${isSelected ? "border-primary ring-2 ring-primary/20" : "border-transparent"}`}
-                              onClick={() => {
-                                if (imageMode === "single") {
-                                  // Single Mode: replace selection
-                                  setSelectedGalleryImages([img]);
-                                } else {
-                                  // Bulk Mode: toggle selection
-                                  if (isSelected) {
-                                    setSelectedGalleryImages(prev => prev.filter(i => i.id !== img.id));
-                                  } else {
-                                    setSelectedGalleryImages(prev => [...prev, img]);
-                                  }
-                                }
-                              }}
-                            >
-                              <Image
-                                src={img.s3_url || img.url || img.image_url || ""}
-                                alt="Gallery"
-                                fill
-                                className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                sizes="(max-width: 768px) 33vw, 200px"
-                              />
-                              <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                                {isSelected && <Check className="w-6 h-6 text-white bg-primary rounded-full p-1 shadow-sm" />}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-
-                    {/* SEND GALLERY BUTTON */}
-                    <div className="pt-4 mt-2 border-t border-border bg-card z-10">
-
-                      <div className="flex items-center justify-between mb-3 px-1">
-                        {imageMode === "bulk" ? (
-                          <button
-                            onClick={toggleSelectAll}
-                            className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
-                          >
-                            {galleryImages.length > 0 && galleryImages.every(img => selectedGalleryImages.some(s => s.id === img.id))
-                              ? "Deselect All"
-                              : "Select All"}
-                          </button>
-                        ) : <div />}
-
+                        {templates.length === 0 && (
+                          <div className="text-center py-8">
+                            <p className="text-sm text-muted-foreground">
+                              No approved templates found.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col h-full">
+                      <div className="flex items-center gap-2 mb-4">
                         <button
                           onClick={() => setIncludeCaption(!includeCaption)}
                           className="flex items-center gap-2 cursor-pointer group"
@@ -1590,138 +1610,42 @@ function ChatArea({
                           </div>
                           <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Show Caption</span>
                         </button>
+                        <p className="font-medium">
+                          {selectedTemplate.displayName}
+                        </p>
                       </div>
 
-                      <button
-                        onClick={handleSendGalleryImages}
-                        disabled={selectedGalleryImages.length === 0 || isPreparingMedia}
-                        className="w-full bg-primary text-white py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none active:scale-[0.98]"
-                      >
-                        {isPreparingMedia ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Preparing Preview...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4" />
-                            Send {selectedGalleryImages.length > 0 ? `(${selectedGalleryImages.length})` : ""}
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* VIDEO */}
-                {mediaModal.type === "video" && (
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Select videos
-                  </p>
-                )}
-
-                {/* AUDIO */}
-                {mediaModal.type === "audio" && (
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Select audio files
-                  </p>
-                )}
-
-                {/* DOCUMENT */}
-                {mediaModal.type === "document" && (
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Select documents
-                  </p>
-                )}
-
-                {mediaModal.type === "template" && (
-                  <div className="mt-0 flex flex-col h-[500px]">
-                    {!selectedTemplate ? (
-                      <>
-                        <div className="relative mb-4">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <input
-                            type="text"
-                            placeholder="Search templates by name..."
-                            value={templateSearch}
-                            onChange={(e) => setTemplateSearch(e.target.value)}
-                            className="w-full bg-muted/50 pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 border border-border/50 transition-all"
-                          />
-                        </div>
-                        <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                          {templates
-                            .filter(t => t.displayName.toLowerCase().includes(templateSearch.toLowerCase()))
-                            .map(t => (
-                              <button
-                                key={t.id}
-                                onClick={() => {
-                                  setSelectedTemplate(t);
-                                  const body = t.languages[0]?.body || "";
-                                  const match = body.match(/{{\d+}}/g);
-                                  const count = match ? new Set(match).size : 0;
-                                  setTemplateVariables(new Array(count).fill(""));
-                                }}
-                                className="w-full text-left p-4 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group relative overflow-hidden"
-                              >
-                                <div className="flex justify-between items-start mb-1">
-                                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">{t.displayName}</p>
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider ${t.category === 'MARKETING' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' :
-                                    t.category === 'UTILITY' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
-                                      'bg-muted text-muted-foreground'
-                                    }`}>
-                                    {t.category}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                                  {t.languages[0]?.body}
-                                </p>
-                                <div className="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Send className="w-4 h-4 text-primary" />
-                                </div>
-                              </button>
-                            ))}
-                          {templates.length === 0 && (
-                            <div className="text-center py-12">
-                              <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                                <MessageSquareIcon className="w-6 h-6 text-muted-foreground" />
-                              </div>
-                              <p className="text-sm font-medium text-foreground">No approved templates</p>
-                              <p className="text-xs text-muted-foreground mt-1">Check your Meta Business Suite</p>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex flex-col h-full">
-                        <div className="flex items-center gap-3 mb-6 bg-muted/30 p-3 rounded-xl">
-                          <button
-                            onClick={() => setSelectedTemplate(null)}
-                            className="p-1.5 hover:bg-muted rounded-full bg-background shadow-sm transition-transform active:scale-95"
-                          >
-                            <ArrowLeft className="w-4 h-4" />
-                          </button>
-                          <div>
-                            <p className="font-semibold text-sm">{selectedTemplate.displayName}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{selectedTemplate.category}</p>
-                          </div>
+                      <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                        <div className="p-3 bg-muted rounded-lg border border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                            Preview
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap">
+                            {selectedTemplate.languages[0]?.body}
+                          </p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar pb-4">
-                          {/* Real-time Preview Bubble */}
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-center px-1">
-                              <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Live Preview</label>
-                            </div>
-
-                            {/* Mobile Frame Container */}
-                            <div className="relative mx-auto max-w-[340px] border-[6px] border-[#1F2937] rounded-[30px] overflow-hidden shadow-2xl bg-[#0b141a]">
-                              {/* Status Bar Mock */}
-                              <div className="h-6 bg-[#0b141a] flex justify-between items-center px-4 pt-1 z-20 relative">
-                                <span className="text-[9px] text-white/60 font-medium">9:41</span>
-                                <div className="flex gap-1.5 opacity-60">
-                                  <div className="w-2.5 h-2.5 rounded-full bg-white/20"></div>
-                                  <div className="w-2.5 h-2.5 rounded-full bg-white/20"></div>
-                                </div>
+                        {templateVariables.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase">
+                              Variables
+                            </p>
+                            {templateVariables.map((val, idx) => (
+                              <div key={idx} className="space-y-1">
+                                <label className="text-[10px] text-muted-foreground font-medium">
+                                  Variable {"{{" + (idx + 1) + "}}"}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={val}
+                                  onChange={(e) => {
+                                    const next = [...templateVariables];
+                                    next[idx] = e.target.value;
+                                    setTemplateVariables(next);
+                                  }}
+                                  placeholder={`Enter value for {{${idx + 1}}}`}
+                                  className="w-full bg-muted/50 px-3 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
+                                />
                               </div>
 
                               {/* Chat Area */}
@@ -1893,9 +1817,34 @@ function ChatArea({
                       onChange={async (e) => {
                         if (!e.target.files?.length) return;
 
-                        try {
-                          for (const rawFile of Array.from(e.target.files)) {
-                            const { file } = await processMedia(rawFile);
+              {/* Hidden file input */}
+              {mediaModal.type !== "template" && (
+                <>
+                  <input
+                    ref={genericInputRef}
+                    type="file"
+                    multiple
+                    accept={
+                      mediaModal.type === "video"
+                        ? "video/*"
+                        : mediaModal.type === "audio"
+                        ? "audio/*"
+                        : "*"
+                    }
+                    className="hidden"
+                    onChange={async (e) => {
+                      if (!e.target.files?.length) return;
+
+                      try {
+                        for (const rawFile of Array.from(e.target.files)) {
+                          const { file } = await processMedia(rawFile);
+
+                          const form = new FormData();
+                          form.append("conversationId", conversation.id);
+                          form.append("file", file);
+
+                          await api.post("/vendor/whatsapp/send-media", form);
+                        }
 
                             const form = new FormData();
                             form.append("conversationId", conversation.id);
@@ -2240,10 +2189,14 @@ export default function InboxPage() {
             status: m.status ?? "delivered",
 
             // TEMPLATE DATA (Look in outboundPayload.template first, then fallback)
-            template: m.outboundPayload?.template || (m.outboundPayload?.name ? {
-              footer: m.outboundPayload.footer,
-              buttons: m.outboundPayload.buttons
-            } : undefined),
+            template:
+              m.outboundPayload?.template ||
+              (m.outboundPayload?.name
+                ? {
+                    footer: m.outboundPayload.footer,
+                    buttons: m.outboundPayload.buttons,
+                  }
+                : undefined),
           };
         }
       );
@@ -2261,11 +2214,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              sessionStarted: res.data.sessionStarted,
-              sessionActive: res.data.sessionActive,
-              sessionExpiresAt: res.data.sessionExpiresAt,
-            }
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
             : c
         )
       );
@@ -2282,8 +2235,9 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
       <div
-        className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full`}
+        className={`${
+          showChat ? "hidden md:block" : "block"
+        } w-full md:w-auto h-full`}
       >
         <ConversationList
           conversations={conversations}
