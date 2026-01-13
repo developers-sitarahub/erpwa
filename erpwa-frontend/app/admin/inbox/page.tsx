@@ -1643,7 +1643,7 @@ function ChatArea({
                                   setSelectedGallerySubcategory(val);
                                   loadGalleryImages(
                                     selectedGalleryCategory!,
-                                    val
+                                    val ?? undefined
                                   );
                                 }}
                                 className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 transition-all font-inter"

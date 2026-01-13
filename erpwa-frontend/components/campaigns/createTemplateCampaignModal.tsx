@@ -258,7 +258,7 @@ export default function CreateTemplateCampaignModal({
                               </span>
                             </div>
                             <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed italic">
-                              "{t.languages[0]?.body}"
+                              &ldquo;{t.languages[0]?.body}&rdquo;
                             </p>
                             <div className="mt-3 flex items-center justify-end text-[10px] font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                               SELECT TEMPLATE <ChevronRight className="w-3 h-3 ml-1" />
