@@ -20,7 +20,7 @@ import {
   Archive,
   Trash2,
 } from "lucide-react"
-import { apiClient } from "@/lib/api"
+import apiClient from "@/lib/api"
 import { getSocket, connectSocket } from "@/lib/socket"
 import { useAuth } from "@/context/authContext"
 
@@ -242,8 +242,8 @@ function ChatArea({
   const loadConversation = async () => {
     try {
       setLoading(true)
-      const data = await apiClient.get(`/inbox/${conversationId}`)
-      setConversation(data)
+      const response = await apiClient.get(`/inbox/${conversationId}`)
+      setConversation(response.data)
     } catch (error) {
       console.error("Failed to load conversation:", error)
     } finally {
@@ -501,12 +501,12 @@ export default function InboxPage() {
   const loadInbox = async () => {
     try {
       setLoading(true)
-      const data = await apiClient.get("/inbox")
-      setConversations(data)
+      const response = await apiClient.get("/inbox")
+      setConversations(response.data)
 
       // Auto-select first conversation
-      if (data.length > 0 && !selectedConversation) {
-        setSelectedConversation(data[0].id)
+      if (response.data.length > 0 && !selectedConversation) {
+        setSelectedConversation(response.data[0].id)
       }
     } catch (error) {
       console.error("Failed to load inbox:", error)
