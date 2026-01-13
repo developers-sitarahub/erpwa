@@ -73,7 +73,7 @@ export function initSocket(httpServer) {
   /**
    * 🔌 SOCKET CONNECTION
    */
-  io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
     const { id: userId, vendorId } = socket.user;
 
     console.log("🔌 SOCKET CONNECTED:", userId);
@@ -127,8 +127,37 @@ export function initSocket(httpServer) {
       socket.leave(`conversation:${conversationId}`);
     });
 
-    socket.on("disconnect", (reason) => {
+    // 🔌 Mark user as ONLINE
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isOnline: true },
+    }).catch(e => console.error("Error setting online status:", e));
+
+    // 📢 Broadcast to vendor room AND self
+    io.to(`vendor:${vendorId}`).emit("user:presence", {
+      userId,
+      isOnline: true,
+    });
+    // Ensure the connecting user gets their own status update immediately
+    socket.emit("user:presence", {
+      userId,
+      isOnline: true,
+    });
+
+    socket.on("disconnect", async (reason) => {
       console.log("❌ SOCKET DISCONNECTED:", userId, reason);
+
+      // 🔌 Mark user as OFFLINE
+      await prisma.user.update({
+        where: { id: userId },
+        data: { isOnline: false, lastLoginAt: new Date() },
+      }).catch(e => console.error("Error setting offline status:", e));
+
+      // 📢 Broadcast to vendor room
+      io.to(`vendor:${vendorId}`).emit("user:presence", {
+        userId,
+        isOnline: false,
+      });
     });
   });
 

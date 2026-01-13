@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import api, { setAccessToken } from "@/lib/api";
 import { connectSocket, disconnectSocket } from "@/lib/socket";
 
@@ -31,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
   const mountedRef = useRef(false);
 
   /* ================= RESTORE SESSION ================= */
@@ -74,7 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       disconnectSocket(); // 🔥 IMPORTANT
       setAccessToken(null);
       setUser(null);
-      router.replace("/login");
+
+      const publicPaths = ["/login", "/forgot-password", "/create-password"];
+      if (!publicPaths.includes(pathname)) {
+        router.replace("/login");
+      }
     };
 
     window.addEventListener("auth:logout", handleLogout);
