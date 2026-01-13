@@ -215,8 +215,8 @@ function ChatArea({ conversation, onBack }: { conversation: Conversation; onBack
             >
               <div
                 className={`group relative max-w-md px-3 py-2 shadow-sm ${msg.sender === "executive"
-                    ? "bg-primary/10 border border-primary/20 dark:bg-primary/20 rounded-lg rounded-br-none"
-                    : "bg-card border border-border rounded-lg rounded-bl-none"
+                  ? "bg-primary/10 border border-primary/20 dark:bg-primary/20 rounded-lg rounded-br-none"
+                  : "bg-card border border-border rounded-lg rounded-bl-none"
                   }`}
               >
                 {/* Message text */}
