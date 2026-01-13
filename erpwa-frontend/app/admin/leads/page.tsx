@@ -5,11 +5,14 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/card"
 import { Badge } from "@/components/badge"
+import { Checkbox } from "@/components/checkbox"
+import { CoolTooltip } from "@/components/ui/cool-tooltip"
 import { Plus, Edit2, Trash2, Upload, X, FileText, Check, Save, Search, Filter, ChevronDown, AlertTriangle } from "lucide-react"
 import { categoriesAPI } from "@/lib/categoriesApi"
 import { leadsAPI } from "@/lib/leadsApi"
 import type { Category, Lead } from "@/lib/types"
 import { toast } from "react-toastify"
+import { usersAPI, User } from "@/lib/usersApi"
 
 function StatusBadge({ status }: { status: Lead["status"] }) {
   const styles: Record<Lead["status"], string> = {
@@ -1000,13 +1003,14 @@ export default function LeadsPage() {
   }
 
   const loadTeamMembers = async () => {
-    // Mock data as requested
-    setTeamMembers([
-      { id: "s1", name: "sales1" },
-      { id: "s2", name: "sales2" },
-      { id: "s3", name: "sales3" },
-      { id: "s4", name: "sales4" },
-    ])
+    try {
+      const res = await usersAPI.list('sales')
+      if (res.data) {
+        setTeamMembers(res.data)
+      }
+    } catch (error) {
+      console.error("Failed to load sales persons", error)
+    }
   }
 
   const loadLeads = async () => {
@@ -1156,14 +1160,14 @@ export default function LeadsPage() {
   }
 
   const columns = [
-    { key: "company_name", label: "Company" },
-    { key: "mobile_number", label: "Phone" },
-    { key: "email", label: "Email" },
-    { key: "city", label: "City" },
-    { key: "category_name", label: "Category" },
-    { key: "sub_category_name", label: "Sub-Category" },
-    { key: "status", label: "Status" },
-    { key: "sales_person_name", label: "Sales Person" },
+    { key: "company_name", label: "Company", width: "w-32" },
+    { key: "mobile_number", label: "Phone", width: "w-32" },
+    { key: "email", label: "Email", width: "w-32" },
+    { key: "city", label: "City", width: "w-32" },
+    { key: "category_name", label: "Category", width: "w-32" },
+    { key: "sub_category_name", label: "Sub-Category", width: "w-32" },
+    { key: "status", label: "Status", width: "w-32" },
+    { key: "sales_person_name", label: "Sales Person", width: "w-32" },
   ]
 
   return (
@@ -1522,7 +1526,7 @@ export default function LeadsPage() {
             {paginatedLeads.length > 0 ? (
               <>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="text-sm table-fixed bg-card">
                     <thead>
                       <tr className="border-b border-border bg-secondary/30">
                         <th className="text-left py-3 px-3 w-10 pl-10">
@@ -1540,11 +1544,11 @@ export default function LeadsPage() {
                           />
                         </th>
                         {columns.map((col) => (
-                          <th key={col.key} className="text-left py-3 px-3 font-medium text-muted-foreground whitespace-nowrap">
+                          <th key={col.key} className={`text-left py-3 px-3 font-medium text-muted-foreground whitespace-nowrap ${col.width}`}>
                             <span>{col.label}</span>
                           </th>
                         ))}
-                        <th className="text-center py-3 px-3 font-medium text-muted-foreground">
+                        <th className="text-center py-3 px-3 font-medium text-muted-foreground w-24">
                           Actions
                         </th>
                       </tr>
@@ -1570,7 +1574,7 @@ export default function LeadsPage() {
                           </td>
                           {editingLeadId === lead.id ? (
                             <>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <input
                                   type="text"
                                   value={editForm[lead.id]?.company_name || lead.company_name || ""}
@@ -1583,10 +1587,10 @@ export default function LeadsPage() {
                                       },
                                     }))
                                   }
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                               </td>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <input
                                   type="text"
                                   value={editForm[lead.id]?.mobile_number || lead.mobile_number || ""}
@@ -1599,10 +1603,10 @@ export default function LeadsPage() {
                                       },
                                     }))
                                   }
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                               </td>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <input
                                   type="text"
                                   value={editForm[lead.id]?.email || lead.email || ""}
@@ -1615,10 +1619,10 @@ export default function LeadsPage() {
                                       },
                                     }))
                                   }
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                               </td>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <input
                                   type="text"
                                   value={editForm[lead.id]?.city || lead.city || ""}
@@ -1631,12 +1635,12 @@ export default function LeadsPage() {
                                       },
                                     }))
                                   }
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                               </td>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <select
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                   value={editForm[lead.id]?.category_id || lead.category?.toString() || ""}
                                   onChange={(e) => {
                                     const categoryId = e.target.value
@@ -1661,9 +1665,9 @@ export default function LeadsPage() {
                                   ))}
                                 </select>
                               </td>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <select
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                   value={editForm[lead.id]?.subcategory_id || lead.sub_category?.toString() || ""}
                                   onChange={(e) =>
                                     setEditForm((prev) => ({
@@ -1687,9 +1691,9 @@ export default function LeadsPage() {
                                   ))}
                                 </select>
                               </td>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <select
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                   value={editForm[lead.id]?.status || lead.status || "new"}
                                   onChange={(e) =>
                                     setEditForm((prev) => ({
@@ -1708,9 +1712,9 @@ export default function LeadsPage() {
                                   <option value="lost">Lost</option>
                                 </select>
                               </td>
-                              <td className="py-3 px-3">
+                              <td className="p-1">
                                 <select
-                                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                  className="w-full h-full px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                   value={editForm[lead.id]?.sales_person_name || lead.sales_person_name || ""}
                                   onChange={(e) =>
                                     setEditForm((prev) => ({
@@ -1806,29 +1810,57 @@ export default function LeadsPage() {
                             </>
                           ) : (
                             <>
-                              <td className="py-3 px-3 text-foreground font-medium">
-                                {lead.company_name || "--"}
+                              <td className="py-3 px-3">
+                                <CoolTooltip content={lead.company_name}>
+                                  <div className="truncate w-full max-w-[120px]">
+                                    {lead.company_name || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
-                              <td className="py-3 px-3 text-muted-foreground">
-                                {lead.mobile_number || "--"}
+                              <td className="py-3 px-3">
+                                <CoolTooltip content={lead.mobile_number}>
+                                  <div className="truncate w-full max-w-[120px]">
+                                    {lead.mobile_number || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
-                              <td className="py-3 px-3 text-muted-foreground">
-                                {lead.email || "--"}
+                              <td className="py-3 px-3">
+                                <CoolTooltip content={lead.email}>
+                                  <div className="truncate w-full max-w-[120px]">
+                                    {lead.email || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
-                              <td className="py-3 px-3 text-muted-foreground">
-                                {lead.city || "--"}
+                              <td className="py-3 px-3">
+                                <CoolTooltip content={lead.city}>
+                                  <div className="truncate w-full max-w-[120px]">
+                                    {lead.city || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
-                              <td className="py-3 px-3 text-foreground text-sm">
-                                {lead.category_name || "--"}
+                              <td className="py-3 px-3">
+                                <CoolTooltip content={lead.category_name}>
+                                  <div className="truncate w-full max-w-[120px]">
+                                    {lead.category_name || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
-                              <td className="py-3 px-3 text-foreground text-sm">
-                                {lead.sub_category_name || "--"}
+                              <td className="py-3 px-3">
+                                <CoolTooltip content={lead.sub_category_name}>
+                                  <div className="truncate w-full max-w-[120px]">
+                                    {lead.sub_category_name || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
                               <td className="py-3 px-3">
                                 <StatusBadge status={lead.status} />
                               </td>
-                              <td className="py-3 px-3 text-muted-foreground">
-                                {lead.sales_person_name || "--"}
+                              <td className="py-3 px-3">
+                                <CoolTooltip content={lead.sales_person_name}>
+                                  <div className="truncate w-full max-w-[120px]">
+                                    {lead.sales_person_name || "--"}
+                                  </div>
+                                </CoolTooltip>
                               </td>
                               <td className="py-3 px-3 text-center">
                                 <div className="flex justify-center gap-2">

@@ -18,6 +18,7 @@ import leadRoutes from "./routes/lead.routes.js";
 import leadManagementRoutes from "./routes/leadManagement.routes.js";
 import galleryRoutes from "./routes/gallery.routes.js";
 import { initSocket } from "./socket.js";
+import userRoutes from "./routes/user.routes.js";
 import testUploadRoute from "./routes/testUpload.route.js";
 
 const app = express();
@@ -43,6 +44,7 @@ app.set("etag", false);
 app.get("/ping", (req, res) => res.send("pong"));
 
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/whatsapp-test", whatsappTestRoutes);
 app.use("/api/vendor", vendorWhatsappRoutes);
 app.use("/api/vendor/whatsapp", vendorWhatsappMessageRoutes);
