@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/card"
@@ -11,7 +11,7 @@ import { CheckCircle, Lock, AlertCircle, Mail } from "lucide-react"
 import api from "@/lib/api"
 import { toast } from "react-toastify"
 
-export default function CreatePasswordPage() {
+function CreatePasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [token, setToken] = useState<string | null>(null)
@@ -132,8 +132,10 @@ export default function CreatePasswordPage() {
       )
       setStep(3)
       toast.success("Password set successfully!")
-    } catch (error: any) {
-      const msg = error.response?.data?.error || error.response?.data?.message || "Failed to set password"
+    } catch (error: unknown) {
+      const msg = error instanceof Error && 'response' in error 
+        ? (error as { response?: { data?: { error?: string } } }).response?.data?.error || "Failed to set password"
+        : "Failed to set password"
       toast.error(msg)
       setErrors({ form: msg })
     } finally {
@@ -369,5 +371,24 @@ export default function CreatePasswordPage() {
         </Card>
       </motion.div>
     </div>
+  )
+}
+
+export default function CreatePasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-background via-card to-secondary flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-12 text-center">
+            <div className="flex justify-center mb-6">
+              <Lock className="w-12 h-12 text-muted-foreground animate-pulse" />
+            </div>
+            <p className="text-muted-foreground">Loading...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <CreatePasswordContent />
+    </Suspense>
   )
 }
