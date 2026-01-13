@@ -115,7 +115,7 @@ interface ApiMessage {
     mimeType: string;
     caption?: string;
   }>;
-  outboundPayload?: any;
+  outboundPayload?: Record<string, unknown>;
 }
 
 interface Template {
@@ -220,8 +220,9 @@ function ConversationList({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => onSelect(conv.id)}
-            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${selected === conv.id ? "bg-muted" : ""
-              }`}
+            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${
+              selected === conv.id ? "bg-muted" : ""
+            }`}
           >
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
@@ -249,10 +250,11 @@ function ConversationList({
                     )}
 
                     <p
-                      className={`text-sm truncate ${conv.hasUnread
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                        }`}
+                      className={`text-sm truncate ${
+                        conv.hasUnread
+                          ? "text-foreground"
+                          : "text-muted-foreground"
+                      }`}
                     >
                       {conv.lastMessage}
                     </p>
@@ -342,7 +344,9 @@ function ChatArea({
   } | null>(null);
 
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
+    null
+  );
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
   const [isSendingTemplate, setIsSendingTemplate] = useState(false);
   const [templateSearch, setTemplateSearch] = useState("");
@@ -350,12 +354,20 @@ function ChatArea({
   // Gallery State
   const [showGallery, setShowGallery] = useState(false); // Legacy, can be reused or ignored if we switch fully to modal type
   const [galleryCategories, setGalleryCategories] = useState<Category[]>([]);
-  const [gallerySubcategories, setGallerySubcategories] = useState<Category[]>([]);
+  const [gallerySubcategories, setGallerySubcategories] = useState<Category[]>(
+    []
+  );
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
-  const [selectedGalleryCategory, setSelectedGalleryCategory] = useState<number | null>(null);
-  const [selectedGallerySubcategory, setSelectedGallerySubcategory] = useState<number | null>(null);
+  const [selectedGalleryCategory, setSelectedGalleryCategory] = useState<
+    number | null
+  >(null);
+  const [selectedGallerySubcategory, setSelectedGallerySubcategory] = useState<
+    number | null
+  >(null);
   const [galleryLoading, setGalleryLoading] = useState(false);
-  const [selectedGalleryImages, setSelectedGalleryImages] = useState<GalleryImage[]>([]);
+  const [selectedGalleryImages, setSelectedGalleryImages] = useState<
+    GalleryImage[]
+  >([]);
   const [includeCaption, setIncludeCaption] = useState(false);
   const [isPreparingMedia, setIsPreparingMedia] = useState(false);
 
@@ -366,26 +378,30 @@ function ChatArea({
 
   useEffect(() => {
     if (mediaModal?.type === "template") {
-      api.get("/vendor/templates").then(res => {
-        const approved = res.data.filter((t: any) => t.status === "approved");
-        setTemplates(approved);
-      }).catch(err => console.error("Failed to load templates", err));
+      api
+        .get("/vendor/templates")
+        .then((res) => {
+          const approved = res.data.filter((t: Template) => t.status === "approved");
+          setTemplates(approved);
+        })
+        .catch((err) => console.error("Failed to load templates", err));
     }
     // Load categories when opening gallery modal
     if (mediaModal?.type === "gallery") {
-      categoriesAPI.list().then(res => {
-        setGalleryCategories(res.data || []);
-      }).catch(err => console.error("Failed to load categories", err));
+      categoriesAPI
+        .list()
+        .then((res) => {
+          setGalleryCategories(res.data || []);
+        })
+        .catch((err) => console.error("Failed to load categories", err));
       loadGalleryImages();
     }
   }, [mediaModal?.type]);
-
 
   const handleGalleryCategoryClick = async (catId: number | null) => {
     setSelectedGalleryCategory(catId);
     setSelectedGallerySubcategory(null);
     // Remove setGallerySubcategories([]) to prevent layout jump/closing
-
 
     if (catId) {
       // Run parallel to avoid waiting for subcategories before showing images
@@ -402,10 +418,20 @@ function ChatArea({
     }
   };
 
-  const loadGalleryImages = async (categoryId?: number, subCategoryId?: number) => {
+  const loadGalleryImages = async (
+    categoryId?: number,
+    subCategoryId?: number
+  ) => {
     setGalleryLoading(true);
     try {
-      const res = await galleryAPI.list(categoryId, subCategoryId, 1, 50, "createdAt", "desc");
+      const res = await galleryAPI.list(
+        categoryId,
+        subCategoryId,
+        1,
+        50,
+        "createdAt",
+        "desc"
+      );
       setGalleryImages(res.data?.images || []);
     } catch (err) {
       console.error("Failed to load gallery images", err);
@@ -418,17 +444,21 @@ function ChatArea({
     if (galleryImages.length === 0) return;
 
     // Check if all visible images are selected
-    const allVisibleSelected = galleryImages.every(img => selectedGalleryImages.some(s => s.id === img.id));
+    const allVisibleSelected = galleryImages.every((img) =>
+      selectedGalleryImages.some((s) => s.id === img.id)
+    );
 
     if (allVisibleSelected) {
       // Deselect all visible
-      const visibleIds = new Set(galleryImages.map(i => i.id));
-      setSelectedGalleryImages(prev => prev.filter(i => !visibleIds.has(i.id)));
+      const visibleIds = new Set(galleryImages.map((i) => i.id));
+      setSelectedGalleryImages((prev) =>
+        prev.filter((i) => !visibleIds.has(i.id))
+      );
     } else {
       // Select all visible (merging with existing selection)
       const newSelection = [...selectedGalleryImages];
-      galleryImages.forEach(img => {
-        if (!newSelection.some(s => s.id === img.id)) {
+      galleryImages.forEach((img) => {
+        if (!newSelection.some((s) => s.id === img.id)) {
           newSelection.push(img);
         }
       });
@@ -449,34 +479,40 @@ function ChatArea({
         if (!url) continue;
 
         // Fetch blob via proxy
-        const blobResp = await fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
+        const blobResp = await fetch(
+          `/api/proxy?url=${encodeURIComponent(url)}`
+        );
         const blob = await blobResp.blob();
 
         // Use title/desc as filename if possible, else generic
-        const filename = (img.title || `gallery_${img.id}`).replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".jpg";
+        const filename =
+          (img.title || `gallery_${img.id}`)
+            .replace(/[^a-z0-9]/gi, "_")
+            .toLowerCase() + ".jpg";
         const file = new File([blob], filename, { type: blob.type });
         processedFiles.push(file);
       }
 
       if (processedFiles.length > 0) {
-        const urls = processedFiles.map(f => URL.createObjectURL(f));
+        const urls = processedFiles.map((f) => URL.createObjectURL(f));
 
         let initialCaption = "";
         if (includeCaption && selectedGalleryImages.length > 0) {
-          // @ts-ignore
-          initialCaption = selectedGalleryImages[0].description || selectedGalleryImages[0].title || "";
+          initialCaption =
+            selectedGalleryImages[0].description ||
+            selectedGalleryImages[0].title ||
+            "";
         }
 
         setImagePreview({
           files: processedFiles,
           urls,
-          caption: initialCaption
+          caption: initialCaption,
         });
 
         setMediaModal(null);
         setSelectedGalleryImages([]);
       }
-
     } catch (err) {
       console.error("Failed to prepare gallery images", err);
       toast.error("Failed to load images for preview");
@@ -493,7 +529,9 @@ function ChatArea({
       await api.post("/vendor/whatsapp/template/send-template", {
         templateId: selectedTemplate.id,
         recipients: [conversation.phone],
-        bodyVariables: templateVariables.map(v => v.trim() || "Valued Customer"),
+        bodyVariables: templateVariables.map(
+          (v) => v.trim() || "Valued Customer"
+        ),
       });
       setMediaModal(null);
       setSelectedTemplate(null);
@@ -918,89 +956,130 @@ function ChatArea({
                       initial={{ opacity: 0, y: 20, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      className={`flex items-end gap-2 ${msg.sender === "executive"
-                        ? "justify-end"
-                        : "justify-start"
-                        }`}
+                      className={`flex items-end gap-2 ${
+                        msg.sender === "executive"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
                     >
                       <div
                         className={`group relative shadow-sm overflow-hidden flex flex-col
-                                    ${msg.template ? "w-[300px] sm:w-[330px]" : "max-w-[85%] md:max-w-md"}
-                                    ${msg.sender === "executive"
-                            ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none self-end"
-                            : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none self-start"
-                          }
+                                    ${
+                                      msg.template
+                                        ? "w-[300px] sm:w-[330px]"
+                                        : "max-w-[85%] md:max-w-md"
+                                    }
+                                    ${
+                                      msg.sender === "executive"
+                                        ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none self-end"
+                                        : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none self-start"
+                                    }
                                   `}
                       >
                         {/* 🖼 MEDIA (IMAGE/VIDEO) */}
-                        {msg.mediaUrl && (msg.mimeType?.startsWith("image/") || msg.mimeType?.startsWith("video/")) && (
-                          <div className="w-full overflow-hidden">
-                            {msg.mimeType.startsWith("image/") ? (
-                              <div
-                                className="relative w-full aspect-[4/3] cursor-pointer"
-                                onClick={() => window.open(msg.mediaUrl, "_blank")}
-                              >
-                                <Image
-                                  src={msg.mediaUrl}
-                                  alt="Message media"
-                                  fill
-                                  sizes="(max-width: 768px) 85vw, 450px"
-                                  className="object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-full bg-black aspect-video flex items-center">
-                                <video src={msg.mediaUrl} controls className="w-full h-auto" />
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        {msg.mediaUrl &&
+                          (msg.mimeType?.startsWith("image/") ||
+                            msg.mimeType?.startsWith("video/")) && (
+                            <div className="w-full overflow-hidden">
+                              {msg.mimeType.startsWith("image/") ? (
+                                <div
+                                  className="relative w-full aspect-[4/3] cursor-pointer"
+                                  onClick={() =>
+                                    window.open(msg.mediaUrl, "_blank")
+                                  }
+                                >
+                                  <Image
+                                    src={msg.mediaUrl}
+                                    alt="Message media"
+                                    fill
+                                    sizes="(max-width: 768px) 85vw, 450px"
+                                    className="object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-full bg-black aspect-video flex items-center">
+                                  <video
+                                    src={msg.mediaUrl}
+                                    controls
+                                    className="w-full h-auto"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                         {/* 📄 DOCUMENT */}
-                        {msg.mediaUrl && msg.mimeType && !msg.mimeType.startsWith("image/") && !msg.mimeType.startsWith("video/") && !msg.mimeType.startsWith("audio/") && (
-                          <div className="p-2">
-                            <a
-                              href={msg.mediaUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">DOC</div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">{msg.mediaUrl.split("/").pop()}</p>
-                                <p className="text-[10px] text-muted-foreground uppercase uppercase">Document</p>
-                              </div>
-                            </a>
-                          </div>
-                        )}
+                        {msg.mediaUrl &&
+                          msg.mimeType &&
+                          !msg.mimeType.startsWith("image/") &&
+                          !msg.mimeType.startsWith("video/") &&
+                          !msg.mimeType.startsWith("audio/") && (
+                            <div className="p-2">
+                              <a
+                                href={msg.mediaUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                  DOC
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-foreground truncate">
+                                    {msg.mediaUrl.split("/").pop()}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground uppercase uppercase">
+                                    Document
+                                  </p>
+                                </div>
+                              </a>
+                            </div>
+                          )}
 
                         {/* 📝 CONTENT AREA */}
                         <div className="px-3 py-2 flex flex-col">
                           {/* REPLIED MESSAGE PREVIEW (Internal) */}
                           {(() => {
-                            const reply = getReplyPreview(msg.replyTo ?? repliedMessage);
+                            const reply = getReplyPreview(
+                              msg.replyTo ?? repliedMessage
+                            );
                             if (!reply) return null;
                             return (
                               <div className="mb-2 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-black/5 dark:bg-white/5 rounded text-[11px]">
                                 {reply.thumb && (
                                   <div className="relative w-8 h-8 flex-shrink-0">
-                                    <Image src={reply.thumb} alt="" fill sizes="32px" className="rounded object-cover" />
+                                    <Image
+                                      src={reply.thumb}
+                                      alt=""
+                                      fill
+                                      sizes="32px"
+                                      className="rounded object-cover"
+                                    />
                                   </div>
                                 )}
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-[#25D366] truncate">{reply.title}</div>
-                                  <div className="text-muted-foreground truncate">{reply.subtitle}</div>
+                                  <div className="font-semibold text-[#25D366] truncate">
+                                    {reply.title}
+                                  </div>
+                                  <div className="text-muted-foreground truncate">
+                                    {reply.subtitle}
+                                  </div>
                                 </div>
                               </div>
                             );
                           })()}
 
                           {/* AUDIO */}
-                          {msg.mediaUrl && msg.mimeType?.startsWith("audio/") && (
-                            <div className="mb-2">
-                              <audio src={msg.mediaUrl} controls className="w-full h-8" />
-                            </div>
-                          )}
+                          {msg.mediaUrl &&
+                            msg.mimeType?.startsWith("audio/") && (
+                              <div className="mb-2">
+                                <audio
+                                  src={msg.mediaUrl}
+                                  controls
+                                  className="w-full h-8"
+                                />
+                              </div>
+                            )}
 
                           {/* BODY TEXT */}
                           {msg.text && (
@@ -1015,14 +1094,28 @@ function ChatArea({
                               <p className="text-[12px] text-[#667781] dark:text-[#8696a0] leading-none pb-0.5">
                                 {msg.template.footer}
                               </p>
-                            ) : <div />}
+                            ) : (
+                              <div />
+                            )}
 
                             <div className="flex items-center gap-1 self-end pb-0.5">
                               <span className="text-[11px] text-[#667781] dark:text-[#8696a0]">
-                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()}
+                                {new Date(msg.timestamp)
+                                  .toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                    hour12: true,
+                                  })
+                                  .toLowerCase()}
                               </span>
                               {msg.sender === "executive" && (
-                                <span className={msg.status === "read" ? "text-[#53bdeb]" : "text-[#8696a0]"}>
+                                <span
+                                  className={
+                                    msg.status === "read"
+                                      ? "text-[#53bdeb]"
+                                      : "text-[#8696a0]"
+                                  }
+                                >
                                   {getMessageStatusIcon(msg.status)}
                                 </span>
                               )}
@@ -1031,33 +1124,41 @@ function ChatArea({
                         </div>
 
                         {/* BUTTONS - Authentic WhatsApp Style */}
-                        {msg.template?.buttons && msg.template.buttons.length > 0 && (
-                          <div className="border-t border-[#0000000d] dark:border-[#ffffff12] divide-y divide-[#0000000d] dark:divide-[#ffffff12]">
-                            {msg.template.buttons.map((btn, i) => (
-                              <div
-                                key={i}
-                                className="py-2.5 text-center text-[14px] font-medium text-[#00a884] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors active:bg-black/10"
-                                onClick={() => {
-                                  if (btn.type === "URL" && (btn as any).value) {
-                                    window.open((btn as any).value, "_blank");
-                                  } else {
-                                    setReplyTo(msg);
-                                    setInputValue(btn.text);
-                                    setTimeout(() => inputRef.current?.focus(), 50);
-                                  }
-                                }}
-                              >
-                                {btn.text}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        {msg.template?.buttons &&
+                          msg.template.buttons.length > 0 && (
+                            <div className="border-t border-[#0000000d] dark:border-[#ffffff12] divide-y divide-[#0000000d] dark:divide-[#ffffff12]">
+                              {msg.template.buttons.map((btn, i) => (
+                                <div
+                                  key={i}
+                                  className="py-2.5 text-center text-[14px] font-medium text-[#00a884] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors active:bg-black/10"
+                                  onClick={() => {
+                                    if (
+                                      btn.type === "URL" &&
+                                      (btn as { type: string; text: string; value?: string }).value
+                                    ) {
+                                      window.open((btn as { type: string; text: string; value?: string }).value, "_blank");
+                                    } else {
+                                      setReplyTo(msg);
+                                      setInputValue(btn.text);
+                                      setTimeout(
+                                        () => inputRef.current?.focus(),
+                                        50
+                                      );
+                                    }
+                                  }}
+                                >
+                                  {btn.text}
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
                         {/* REACTION / MENU BUTTON (Floating) */}
                         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
                               setActionMenu({ message: msg, rect });
                             }}
                             className="p-1 rounded-full bg-white/80 dark:bg-black/50 shadow-sm hover:bg-white dark:hover:bg-black transition-colors"
@@ -1264,9 +1365,9 @@ function ChatArea({
 
               const left = isIncoming
                 ? // LEFT-SIDE MESSAGE → open menu on RIGHT
-                Math.min(window.innerWidth - menuWidth - 12, rect.left)
+                  Math.min(window.innerWidth - menuWidth - 12, rect.left)
                 : // RIGHT-SIDE MESSAGE → open menu on LEFT
-                Math.max(12, rect.right - menuWidth);
+                  Math.max(12, rect.right - menuWidth);
 
               return (
                 <motion.div
@@ -1371,7 +1472,6 @@ function ChatArea({
               </div>
 
               <div className="p-6">
-
                 {/* IMAGE */}
                 {mediaModal.type === "image" && (
                   <div className="mt-4 flex flex-col h-[500px]">
@@ -1394,10 +1494,11 @@ function ChatArea({
                               setImageMode("single");
                               setSelectedGalleryImages([]);
                             }}
-                            className={`flex-1 py-2.5 rounded-lg ${imageMode === "single"
-                              ? "bg-primary text-white"
-                              : "bg-muted"
-                              }`}
+                            className={`flex-1 py-2.5 rounded-lg ${
+                              imageMode === "single"
+                                ? "bg-primary text-white"
+                                : "bg-muted"
+                            }`}
                           >
                             Single
                           </button>
@@ -1406,10 +1507,11 @@ function ChatArea({
                               setImageMode("bulk");
                               setSelectedGalleryImages([]);
                             }}
-                            className={`flex-1 py-2.5 rounded-lg ${imageMode === "bulk"
-                              ? "bg-primary text-white"
-                              : "bg-muted"
-                              }`}
+                            className={`flex-1 py-2.5 rounded-lg ${
+                              imageMode === "bulk"
+                                ? "bg-primary text-white"
+                                : "bg-muted"
+                            }`}
                           >
                             Bulk
                           </button>
@@ -1458,10 +1560,11 @@ function ChatArea({
                         <button
                           type="button"
                           onClick={() => handleGalleryCategoryClick(null)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${!selectedGalleryCategory
-                            ? "bg-primary text-white border-primary"
-                            : "bg-background border-border hover:bg-muted"
-                            }`}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${
+                            !selectedGalleryCategory
+                              ? "bg-primary text-white border-primary"
+                              : "bg-background border-border hover:bg-muted"
+                          }`}
                         >
                           All
                         </button>
@@ -1470,10 +1573,11 @@ function ChatArea({
                             type="button"
                             key={c.id}
                             onClick={() => handleGalleryCategoryClick(c.id)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${selectedGalleryCategory === c.id
-                              ? "bg-primary text-white border-primary"
-                              : "bg-background border-border hover:bg-muted"
-                              }`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${
+                              selectedGalleryCategory === c.id
+                                ? "bg-primary text-white border-primary"
+                                : "bg-background border-border hover:bg-muted"
+                            }`}
                           >
                             {c.name}
                           </button>
@@ -1481,40 +1585,48 @@ function ChatArea({
                       </div>
 
                       {/* Subcategories Row - only if category selected & has subcats */}
-                      {selectedGalleryCategory && gallerySubcategories.length > 0 && (
-                        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 pt-1 border-t border-dashed border-border/50">
-                          <span className="text-[10px] text-muted-foreground mr-1 uppercase tracking-wider font-bold">Sub-Category:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedGallerySubcategory(null);
-                              loadGalleryImages(selectedGalleryCategory);
-                            }}
-                            className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedGallerySubcategory
-                              ? "bg-primary/20 text-primary"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
-                              }`}
-                          >
-                            All
-                          </button>
-                          {gallerySubcategories.map((sc) => (
+                      {selectedGalleryCategory &&
+                        gallerySubcategories.length > 0 && (
+                          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 pt-1 border-t border-dashed border-border/50">
+                            <span className="text-[10px] text-muted-foreground mr-1 uppercase tracking-wider font-bold">
+                              Sub-Category:
+                            </span>
                             <button
                               type="button"
-                              key={sc.id}
                               onClick={() => {
-                                setSelectedGallerySubcategory(sc.id);
-                                loadGalleryImages(selectedGalleryCategory, sc.id);
+                                setSelectedGallerySubcategory(null);
+                                loadGalleryImages(selectedGalleryCategory);
                               }}
-                              className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedGallerySubcategory === sc.id
-                                ? "bg-primary/20 text-primary"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                                }`}
+                              className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                                !selectedGallerySubcategory
+                                  ? "bg-primary/20 text-primary"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
                             >
-                              {sc.name}
+                              All
                             </button>
-                          ))}
-                        </div>
-                      )}
+                            {gallerySubcategories.map((sc) => (
+                              <button
+                                type="button"
+                                key={sc.id}
+                                onClick={() => {
+                                  setSelectedGallerySubcategory(sc.id);
+                                  loadGalleryImages(
+                                    selectedGalleryCategory,
+                                    sc.id
+                                  );
+                                }}
+                                className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                                  selectedGallerySubcategory === sc.id
+                                    ? "bg-primary/20 text-primary"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
+                              >
+                                {sc.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                     </div>
 
                     {/* IMAGES GRID */}
@@ -1530,11 +1642,17 @@ function ChatArea({
                         </div>
                       ) : (
                         galleryImages.map((img) => {
-                          const isSelected = !!selectedGalleryImages.find((i) => i.id === img.id);
+                          const isSelected = !!selectedGalleryImages.find(
+                            (i) => i.id === img.id
+                          );
                           return (
                             <div
                               key={img.id}
-                              className={`relative aspect-square cursor-pointer group rounded-lg overflow-hidden border-2 transition-all bg-muted/20 ${isSelected ? "border-primary ring-2 ring-primary/20" : "border-transparent"}`}
+                              className={`relative aspect-square cursor-pointer group rounded-lg overflow-hidden border-2 transition-all bg-muted/20 ${
+                                isSelected
+                                  ? "border-primary ring-2 ring-primary/20"
+                                  : "border-transparent"
+                              }`}
                               onClick={() => {
                                 if (imageMode === "single") {
                                   // Single Mode: replace selection
@@ -1542,22 +1660,37 @@ function ChatArea({
                                 } else {
                                   // Bulk Mode: toggle selection
                                   if (isSelected) {
-                                    setSelectedGalleryImages(prev => prev.filter(i => i.id !== img.id));
+                                    setSelectedGalleryImages((prev) =>
+                                      prev.filter((i) => i.id !== img.id)
+                                    );
                                   } else {
-                                    setSelectedGalleryImages(prev => [...prev, img]);
+                                    setSelectedGalleryImages((prev) => [
+                                      ...prev,
+                                      img,
+                                    ]);
                                   }
                                 }
                               }}
                             >
                               <Image
-                                src={img.s3_url || img.url || img.image_url || ""}
+                                src={
+                                  img.s3_url || img.url || img.image_url || ""
+                                }
                                 alt="Gallery"
                                 fill
                                 className="object-cover transition-transform duration-500 group-hover:scale-110"
                                 sizes="(max-width: 768px) 33vw, 200px"
                               />
-                              <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                                {isSelected && <Check className="w-6 h-6 text-white bg-primary rounded-full p-1 shadow-sm" />}
+                              <div
+                                className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${
+                                  isSelected
+                                    ? "opacity-100"
+                                    : "opacity-0 group-hover:opacity-100"
+                                }`}
+                              >
+                                {isSelected && (
+                                  <Check className="w-6 h-6 text-white bg-primary rounded-full p-1 shadow-sm" />
+                                )}
                               </div>
                             </div>
                           );
@@ -1567,34 +1700,49 @@ function ChatArea({
 
                     {/* SEND GALLERY BUTTON */}
                     <div className="pt-4 mt-2 border-t border-border bg-card z-10">
-
                       <div className="flex items-center justify-between mb-3 px-1">
                         {imageMode === "bulk" ? (
                           <button
                             onClick={toggleSelectAll}
                             className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
                           >
-                            {galleryImages.length > 0 && galleryImages.every(img => selectedGalleryImages.some(s => s.id === img.id))
+                            {galleryImages.length > 0 &&
+                            galleryImages.every((img) =>
+                              selectedGalleryImages.some((s) => s.id === img.id)
+                            )
                               ? "Deselect All"
                               : "Select All"}
                           </button>
-                        ) : <div />}
+                        ) : (
+                          <div />
+                        )}
 
                         <button
                           onClick={() => setIncludeCaption(!includeCaption)}
                           className="flex items-center gap-2 cursor-pointer group"
                         >
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${includeCaption ? "bg-primary border-primary" : "border-muted-foreground group-hover:border-primary"
-                            }`}>
-                            {includeCaption && <Check className="w-3 h-3 text-white" />}
+                          <div
+                            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                              includeCaption
+                                ? "bg-primary border-primary"
+                                : "border-muted-foreground group-hover:border-primary"
+                            }`}
+                          >
+                            {includeCaption && (
+                              <Check className="w-3 h-3 text-white" />
+                            )}
                           </div>
-                          <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Show Caption</span>
+                          <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                            Show Caption
+                          </span>
                         </button>
                       </div>
 
                       <button
                         onClick={handleSendGalleryImages}
-                        disabled={selectedGalleryImages.length === 0 || isPreparingMedia}
+                        disabled={
+                          selectedGalleryImages.length === 0 || isPreparingMedia
+                        }
                         className="w-full bg-primary text-white py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none active:scale-[0.98]"
                       >
                         {isPreparingMedia ? (
@@ -1605,7 +1753,10 @@ function ChatArea({
                         ) : (
                           <>
                             <Send className="w-4 h-4" />
-                            Send {selectedGalleryImages.length > 0 ? `(${selectedGalleryImages.length})` : ""}
+                            Send{" "}
+                            {selectedGalleryImages.length > 0
+                              ? `(${selectedGalleryImages.length})`
+                              : ""}
                           </>
                         )}
                       </button>
@@ -1650,8 +1801,12 @@ function ChatArea({
                         </div>
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                           {templates
-                            .filter(t => t.displayName.toLowerCase().includes(templateSearch.toLowerCase()))
-                            .map(t => (
+                            .filter((t) =>
+                              t.displayName
+                                .toLowerCase()
+                                .includes(templateSearch.toLowerCase())
+                            )
+                            .map((t) => (
                               <button
                                 key={t.id}
                                 onClick={() => {
@@ -1659,16 +1814,25 @@ function ChatArea({
                                   const body = t.languages[0]?.body || "";
                                   const match = body.match(/{{\d+}}/g);
                                   const count = match ? new Set(match).size : 0;
-                                  setTemplateVariables(new Array(count).fill(""));
+                                  setTemplateVariables(
+                                    new Array(count).fill("")
+                                  );
                                 }}
                                 className="w-full text-left p-4 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group relative overflow-hidden"
                               >
                                 <div className="flex justify-between items-start mb-1">
-                                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">{t.displayName}</p>
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider ${t.category === 'MARKETING' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' :
-                                    t.category === 'UTILITY' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
-                                      'bg-muted text-muted-foreground'
-                                    }`}>
+                                  <p className="font-semibold text-sm group-hover:text-primary transition-colors">
+                                    {t.displayName}
+                                  </p>
+                                  <span
+                                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider ${
+                                      t.category === "MARKETING"
+                                        ? "bg-orange-100 text-orange-600 dark:bg-orange-900/30"
+                                        : t.category === "UTILITY"
+                                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30"
+                                        : "bg-muted text-muted-foreground"
+                                    }`}
+                                  >
                                     {t.category}
                                   </span>
                                 </div>
@@ -1685,8 +1849,12 @@ function ChatArea({
                               <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
                                 <MessageSquareIcon className="w-6 h-6 text-muted-foreground" />
                               </div>
-                              <p className="text-sm font-medium text-foreground">No approved templates</p>
-                              <p className="text-xs text-muted-foreground mt-1">Check your Meta Business Suite</p>
+                              <p className="text-sm font-medium text-foreground">
+                                No approved templates
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Check your Meta Business Suite
+                              </p>
                             </div>
                           )}
                         </div>
@@ -1701,8 +1869,12 @@ function ChatArea({
                             <ArrowLeft className="w-4 h-4" />
                           </button>
                           <div>
-                            <p className="font-semibold text-sm">{selectedTemplate.displayName}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{selectedTemplate.category}</p>
+                            <p className="font-semibold text-sm">
+                              {selectedTemplate.displayName}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                              {selectedTemplate.category}
+                            </p>
                           </div>
                         </div>
 
@@ -1710,14 +1882,18 @@ function ChatArea({
                           {/* Real-time Preview Bubble */}
                           <div className="space-y-4">
                             <div className="flex justify-between items-center px-1">
-                              <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Live Preview</label>
+                              <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                Live Preview
+                              </label>
                             </div>
 
                             {/* Mobile Frame Container */}
                             <div className="relative mx-auto max-w-[340px] border-[6px] border-[#1F2937] rounded-[30px] overflow-hidden shadow-2xl bg-[#0b141a]">
                               {/* Status Bar Mock */}
                               <div className="h-6 bg-[#0b141a] flex justify-between items-center px-4 pt-1 z-20 relative">
-                                <span className="text-[9px] text-white/60 font-medium">9:41</span>
+                                <span className="text-[9px] text-white/60 font-medium">
+                                  9:41
+                                </span>
                                 <div className="flex gap-1.5 opacity-60">
                                   <div className="w-2.5 h-2.5 rounded-full bg-white/20"></div>
                                   <div className="w-2.5 h-2.5 rounded-full bg-white/20"></div>
@@ -1732,81 +1908,142 @@ function ChatArea({
 
                                 {/* Message Bubble */}
                                 <div className="relative z-10 w-full max-w-[95%] self-start flex flex-col gap-1.5 mt-2 animate-in slide-in-from-bottom-2 fade-in duration-500">
-
                                   <div className="bg-[#202c33] rounded-lg rounded-tl-none shadow-sm relative overflow-hidden group">
                                     <div className="p-1">
                                       {/* Header Media */}
-                                      {(selectedTemplate.languages[0]?.headerType === "IMAGE" || selectedTemplate.languages[0]?.headerType === "VIDEO") && (() => {
-                                        const mediaItem = selectedTemplate.media?.find(m => m.language === selectedTemplate.languages[0].language);
-                                        if (mediaItem?.s3Url) {
-                                          if (selectedTemplate.languages[0].headerType === "VIDEO") {
+                                      {(selectedTemplate.languages[0]
+                                        ?.headerType === "IMAGE" ||
+                                        selectedTemplate.languages[0]
+                                          ?.headerType === "VIDEO") &&
+                                        (() => {
+                                          const mediaItem =
+                                            selectedTemplate.media?.find(
+                                              (m) =>
+                                                m.language ===
+                                                selectedTemplate.languages[0]
+                                                  .language
+                                            );
+                                          if (mediaItem?.s3Url) {
+                                            if (
+                                              selectedTemplate.languages[0]
+                                                .headerType === "VIDEO"
+                                            ) {
+                                              return (
+                                                <div className="rounded-md overflow-hidden bg-black/20">
+                                                  <video
+                                                    src={mediaItem.s3Url}
+                                                    controls
+                                                    className="w-full h-auto max-h-[180px] object-cover"
+                                                  />
+                                                </div>
+                                              );
+                                            }
                                             return (
                                               <div className="rounded-md overflow-hidden bg-black/20">
-                                                <video src={mediaItem.s3Url} controls className="w-full h-auto max-h-[180px] object-cover" />
+                                                <img
+                                                  src={mediaItem.s3Url}
+                                                  alt="Header"
+                                                  className="w-full h-auto max-h-[180px] object-cover hover:scale-105 transition-transform duration-500 will-change-transform"
+                                                />
                                               </div>
                                             );
                                           }
                                           return (
-                                            <div className="rounded-md overflow-hidden bg-black/20">
-                                              <img src={mediaItem.s3Url} alt="Header" className="w-full h-auto max-h-[180px] object-cover hover:scale-105 transition-transform duration-500 will-change-transform" />
+                                            <div className="h-28 bg-[#2a3942] flex items-center justify-center rounded-md text-slate-400 text-xs uppercase tracking-wider border border-white/5 mx-0.5 mt-0.5">
+                                              <ImageIcon className="w-5 h-5 mr-2 opacity-50" />
+                                              {
+                                                selectedTemplate.languages[0]
+                                                  .headerType
+                                              }
                                             </div>
                                           );
-                                        }
-                                        return (
-                                          <div className="h-28 bg-[#2a3942] flex items-center justify-center rounded-md text-slate-400 text-xs uppercase tracking-wider border border-white/5 mx-0.5 mt-0.5">
-                                            <ImageIcon className="w-5 h-5 mr-2 opacity-50" />
-                                            {selectedTemplate.languages[0].headerType}
-                                          </div>
-                                        );
-                                      })()}
+                                        })()}
 
                                       {/* Header Text */}
-                                      {selectedTemplate.languages[0]?.headerType === "TEXT" && selectedTemplate.languages[0]?.headerText && (
-                                        <p className="font-bold text-[15px] pt-2 px-2 text-[#e9edef]">{selectedTemplate.languages[0].headerText}</p>
-                                      )}
+                                      {selectedTemplate.languages[0]
+                                        ?.headerType === "TEXT" &&
+                                        selectedTemplate.languages[0]
+                                          ?.headerText && (
+                                          <p className="font-bold text-[15px] pt-2 px-2 text-[#e9edef]">
+                                            {
+                                              selectedTemplate.languages[0]
+                                                .headerText
+                                            }
+                                          </p>
+                                        )}
                                     </div>
 
                                     {/* Body */}
                                     <div className="px-3 pt-1 pb-3 text-[15px] leading-snug text-[#e9edef] whitespace-pre-wrap font-sans">
                                       {(() => {
-                                        let body = selectedTemplate.languages[0]?.body || "";
-                                        templateVariables.forEach((val, idx) => {
-                                          const placeholder = `{{${idx + 1}}}`;
-                                          body = body.replace(placeholder, val || `{{${idx + 1}}}`);
-                                        });
+                                        let body =
+                                          selectedTemplate.languages[0]?.body ||
+                                          "";
+                                        templateVariables.forEach(
+                                          (val, idx) => {
+                                            const placeholder = `{{${
+                                              idx + 1
+                                            }}}`;
+                                            body = body.replace(
+                                              placeholder,
+                                              val || `{{${idx + 1}}}`
+                                            );
+                                          }
+                                        );
                                         return body;
                                       })()}
                                     </div>
 
                                     {/* Footer */}
-                                    {selectedTemplate.languages[0]?.footerText && (
+                                    {selectedTemplate.languages[0]
+                                      ?.footerText && (
                                       <div className="px-3 pb-2">
-                                        <p className="text-[11px] text-[#8696a0]">{selectedTemplate.languages[0].footerText}</p>
+                                        <p className="text-[11px] text-[#8696a0]">
+                                          {
+                                            selectedTemplate.languages[0]
+                                              .footerText
+                                          }
+                                        </p>
                                       </div>
                                     )}
 
                                     {/* Time + Status */}
                                     <div className="absolute right-2 bottom-1.5 flex items-end gap-1">
-                                      <span className="text-[10px] text-[#8696a0]">12:00 PM</span>
+                                      <span className="text-[10px] text-[#8696a0]">
+                                        12:00 PM
+                                      </span>
                                     </div>
                                   </div>
 
                                   {/* Interactive Buttons (Native Look) */}
-                                  {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
-                                    <div className="space-y-1.5 pt-0.5 w-full">
-                                      {selectedTemplate.buttons.map((btn, i) => (
-                                        <div
-                                          key={i}
-                                          className="bg-[#202c33] rounded-md py-2.5 px-3 flex items-center justify-center gap-2.5 shadow-sm active:scale-[0.99] transition-all cursor-pointer hover:bg-[#2a3942]"
-                                        >
-                                          {btn.type === "PHONE_NUMBER" && <Phone className="w-4 h-4 text-[#00a884]" />}
-                                          {btn.type === "URL" && <Globe className="w-4 h-4 text-[#53bdeb]" />}
-                                          {btn.type === "QUICK_REPLY" && <div className="w-4 h-4 rounded-full border border-[#00a884] flex items-center justify-center"><div className="w-2 h-2 bg-[#00a884] rounded-full"></div></div>}
-                                          <span className="text-[#00a884] font-medium text-sm truncate max-w-[200px]">{btn.text}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
+                                  {selectedTemplate.buttons &&
+                                    selectedTemplate.buttons.length > 0 && (
+                                      <div className="space-y-1.5 pt-0.5 w-full">
+                                        {selectedTemplate.buttons.map(
+                                          (btn, i) => (
+                                            <div
+                                              key={i}
+                                              className="bg-[#202c33] rounded-md py-2.5 px-3 flex items-center justify-center gap-2.5 shadow-sm active:scale-[0.99] transition-all cursor-pointer hover:bg-[#2a3942]"
+                                            >
+                                              {btn.type === "PHONE_NUMBER" && (
+                                                <Phone className="w-4 h-4 text-[#00a884]" />
+                                              )}
+                                              {btn.type === "URL" && (
+                                                <Globe className="w-4 h-4 text-[#53bdeb]" />
+                                              )}
+                                              {btn.type === "QUICK_REPLY" && (
+                                                <div className="w-4 h-4 rounded-full border border-[#00a884] flex items-center justify-center">
+                                                  <div className="w-2 h-2 bg-[#00a884] rounded-full"></div>
+                                                </div>
+                                              )}
+                                              <span className="text-[#00a884] font-medium text-sm truncate max-w-[200px]">
+                                                {btn.text}
+                                              </span>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    )}
                                 </div>
                               </div>
 
@@ -1818,14 +2055,21 @@ function ChatArea({
                           {templateVariables.length > 0 && (
                             <div className="space-y-4">
                               <div className="flex items-center justify-between ml-1">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Personalize Variables</p>
-                                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">{templateVariables.length} Required</span>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                                  Personalize Variables
+                                </p>
+                                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                                  {templateVariables.length} Required
+                                </span>
                               </div>
                               <div className="grid grid-cols-1 gap-4">
                                 {templateVariables.map((val, idx) => (
-                                  <div key={idx} className="group flex flex-col gap-1.5 p-3 rounded-xl border border-border hover:border-primary/30 transition-colors">
+                                  <div
+                                    key={idx}
+                                    className="group flex flex-col gap-1.5 p-3 rounded-xl border border-border hover:border-primary/30 transition-colors"
+                                  >
                                     <label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider group-focus-within:text-primary transition-colors">
-                                      Variable {'{{' + (idx + 1) + '}}'}
+                                      Variable {"{{" + (idx + 1) + "}}"}
                                     </label>
                                     <input
                                       type="text"
@@ -1835,7 +2079,9 @@ function ChatArea({
                                         next[idx] = e.target.value;
                                         setTemplateVariables(next);
                                       }}
-                                      placeholder={`Enter value for placeholder ${idx + 1}...`}
+                                      placeholder={`Enter value for placeholder ${
+                                        idx + 1
+                                      }...`}
                                       className="w-full bg-transparent text-sm outline-none focus:ring-0 placeholder:text-muted-foreground/50 h-6"
                                     />
                                   </div>
@@ -1876,54 +2122,58 @@ function ChatArea({
                 )}
 
                 {/* Hidden file input for Send Media types (EXCLUDING gallery) */}
-                {mediaModal.type !== "template" && mediaModal.type !== "gallery" && (
-                  <div className="mt-6 border-t border-border pt-6">
-                    <input
-                      ref={genericInputRef}
-                      type="file"
-                      multiple
-                      accept={
-                        mediaModal.type === "video"
-                          ? "video/*"
-                          : mediaModal.type === "audio"
+                {mediaModal.type !== "template" &&
+                  mediaModal.type !== "gallery" && (
+                    <div className="mt-6 border-t border-border pt-6">
+                      <input
+                        ref={genericInputRef}
+                        type="file"
+                        multiple
+                        accept={
+                          mediaModal.type === "video"
+                            ? "video/*"
+                            : mediaModal.type === "audio"
                             ? "audio/*"
                             : "*"
-                      }
-                      className="hidden"
-                      onChange={async (e) => {
-                        if (!e.target.files?.length) return;
-
-                        try {
-                          for (const rawFile of Array.from(e.target.files)) {
-                            const { file } = await processMedia(rawFile);
-
-                            const form = new FormData();
-                            form.append("conversationId", conversation.id);
-                            form.append("file", file);
-
-                            await api.post("/vendor/whatsapp/send-media", form);
-                          }
-
-                          setMediaModal(null);
-                        } catch (err) {
-                          const message =
-                            err instanceof Error
-                              ? err.message
-                              : "An error occurred";
-                          toast.error(message);
                         }
-                      }}
-                    />
+                        className="hidden"
+                        onChange={async (e) => {
+                          if (!e.target.files?.length) return;
 
-                    <button
-                      onClick={() => genericInputRef.current?.click()}
-                      className="w-full bg-primary text-white py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                      Choose {mediaModal.type}s
-                    </button>
-                  </div>
-                )}
+                          try {
+                            for (const rawFile of Array.from(e.target.files)) {
+                              const { file } = await processMedia(rawFile);
+
+                              const form = new FormData();
+                              form.append("conversationId", conversation.id);
+                              form.append("file", file);
+
+                              await api.post(
+                                "/vendor/whatsapp/send-media",
+                                form
+                              );
+                            }
+
+                            setMediaModal(null);
+                          } catch (err) {
+                            const message =
+                              err instanceof Error
+                                ? err.message
+                                : "An error occurred";
+                            toast.error(message);
+                          }
+                        }}
+                      />
+
+                      <button
+                        onClick={() => genericInputRef.current?.click()}
+                        className="w-full bg-primary text-white py-3 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Paperclip className="w-4 h-4" />
+                        Choose {mediaModal.type}s
+                      </button>
+                    </div>
+                  )}
               </div>
             </motion.div>
           </>
@@ -2240,10 +2490,14 @@ export default function InboxPage() {
             status: m.status ?? "delivered",
 
             // TEMPLATE DATA (Look in outboundPayload.template first, then fallback)
-            template: m.outboundPayload?.template || (m.outboundPayload?.name ? {
-              footer: m.outboundPayload.footer,
-              buttons: m.outboundPayload.buttons
-            } : undefined),
+            template:
+              m.outboundPayload?.template ||
+              (m.outboundPayload?.name
+                ? {
+                    footer: m.outboundPayload.footer,
+                    buttons: m.outboundPayload.buttons,
+                  }
+                : undefined),
           };
         }
       );
@@ -2261,11 +2515,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              sessionStarted: res.data.sessionStarted,
-              sessionActive: res.data.sessionActive,
-              sessionExpiresAt: res.data.sessionExpiresAt,
-            }
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
             : c
         )
       );
@@ -2282,8 +2536,9 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
       <div
-        className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full`}
+        className={`${
+          showChat ? "hidden md:block" : "block"
+        } w-full md:w-auto h-full`}
       >
         <ConversationList
           conversations={conversations}
