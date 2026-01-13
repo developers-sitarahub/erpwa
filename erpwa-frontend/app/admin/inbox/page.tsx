@@ -220,9 +220,8 @@ function ConversationList({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => onSelect(conv.id)}
-            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${
-              selected === conv.id ? "bg-muted" : ""
-            }`}
+            className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${selected === conv.id ? "bg-muted" : ""
+              }`}
           >
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
@@ -250,11 +249,10 @@ function ConversationList({
                     )}
 
                     <p
-                      className={`text-sm truncate ${
-                        conv.hasUnread
-                          ? "text-foreground"
-                          : "text-muted-foreground"
-                      }`}
+                      className={`text-sm truncate ${conv.hasUnread
+                        ? "text-foreground"
+                        : "text-muted-foreground"
+                        }`}
                     >
                       {conv.lastMessage}
                     </p>
@@ -941,12 +939,32 @@ function ChatArea({
                   messages.find(
                     (m) => m.whatsappMessageId === msg.replyToMessageId
                   );
+
+                // Filter out the [image message] style placeholders
+                const cleanText = msg.text ? msg.text.replace(/^\[(image|video|audio|document)\s+message\]\s*/i, "").trim() : "";
+                const isImage = !!(msg.mediaUrl && msg.mimeType?.startsWith("image/"));
+                const isVideo = !!(msg.mediaUrl && msg.mimeType?.startsWith("video/"));
+                const isMedia = isImage || isVideo;
+                const hasTemplateButtons = !!(msg.template?.buttons && msg.template.buttons.length > 0);
+                const hasReply = !!repliedMessage;
+                const hasFooter = !!msg.template?.footer;
+
+                // If it's just an image/video with no text, reply, or buttons, use overlay style
+                const isMediaOnly = isMedia && !cleanText && !hasReply && !hasTemplateButtons && !hasFooter;
+
+                const formattedTime = new Date(msg.timestamp)
+                  .toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  })
+                  .toLowerCase();
                 return (
                   <div key={msg.id}>
                     {/* 📅 DATE SEPARATOR (WhatsApp style) */}
                     {showDateSeparator && (
                       <div className="flex justify-center my-4">
-                        <span className="px-3 py-1 text-xs rounded-full bg-muted text-muted-foreground shadow-sm">
+                        <span className="px-3 py-1 text-xs rounded-full bg-[#D1D7DB] dark:bg-[#182229] text-[#54656f] dark:text-[#8696a0] shadow-sm font-medium">
                           {getDateLabel(msg.timestamp)}
                         </span>
                       </div>
@@ -956,63 +974,79 @@ function ChatArea({
                       initial={{ opacity: 0, y: 20, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      className={`flex items-end gap-2 ${
-                        msg.sender === "executive"
-                          ? "justify-end"
-                          : "justify-start"
-                      }`}
+                      className={`flex items-end gap-2 ${msg.sender === "executive"
+                        ? "justify-end"
+                        : "justify-start"
+                        }`}
                     >
                       <div
                         className={`group relative shadow-sm overflow-hidden flex flex-col
-                                    ${
-                                      msg.template
-                                        ? "w-[300px] sm:w-[330px]"
-                                        : "max-w-[85%] md:max-w-md"
-                                    }
-                                    ${
-                                      msg.sender === "executive"
-                                        ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none self-end"
-                                        : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none self-start"
-                                    }
+                                    ${msg.template
+                            ? "w-[300px] sm:w-[330px]"
+                            : isMediaOnly ? "w-fit" : "max-w-[85%] md:max-w-md"
+                          }
+                                    ${msg.sender === "executive"
+                            ? "bg-[#DCF8C6] dark:bg-[#005C4B] text-black dark:text-[#E9EDEF] rounded-lg rounded-br-none self-end"
+                            : "bg-white dark:bg-[#202C33] text-foreground rounded-lg rounded-bl-none self-start"
+                          }
+                                    ${isMediaOnly ? "!rounded-lg" : ""}
                                   `}
                       >
                         {/* 🖼 MEDIA (IMAGE/VIDEO) */}
-                        {msg.mediaUrl &&
-                          (msg.mimeType?.startsWith("image/") ||
-                            msg.mimeType?.startsWith("video/")) && (
-                            <div className="w-full overflow-hidden">
-                              {msg.mimeType.startsWith("image/") ? (
-                                <div
-                                  className="relative w-full aspect-[4/3] cursor-pointer"
-                                  onClick={() =>
-                                    window.open(msg.mediaUrl, "_blank")
-                                  }
-                                >
-                                  <Image
+                        {isMedia && (
+                          <div className={`relative w-full overflow-hidden ${isMediaOnly ? "rounded-lg" : "rounded-t-lg"}`}>
+                            {isImage ? (
+                              <div
+                                className="relative w-[280px] sm:w-[330px] cursor-pointer"
+                                onClick={() =>
+                                  window.open(msg.mediaUrl, "_blank")
+                                }
+                              >
+                                {msg.mediaUrl && (
+                                  <img
                                     src={msg.mediaUrl}
                                     alt="Message media"
-                                    fill
-                                    sizes="(max-width: 768px) 85vw, 450px"
-                                    className="object-cover"
+                                    className="w-full h-auto block rounded-lg max-h-[500px] object-cover"
                                   />
-                                </div>
-                              ) : (
-                                <div className="w-full bg-black aspect-video flex items-center">
-                                  <video
-                                    src={msg.mediaUrl}
-                                    controls
-                                    className="w-full h-auto"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                )}
+                                {isMediaOnly && (
+                                  <>
+                                    {/* Subtle gradient for overlay text visibility */}
+                                    <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/50 to-transparent pointer-events-none rounded-b-lg" />
+                                    <div className="absolute bottom-1 right-2 flex items-center gap-1.5 pointer-events-none">
+                                      <span className="text-[11px] text-white/95 font-medium drop-shadow-sm">
+                                        {formattedTime}
+                                      </span>
+                                      {msg.sender === "executive" && (
+                                        <span className={msg.status === "read" ? "text-[#53bdeb]" : "text-white/80"}>
+                                          {getMessageStatusIcon(msg.status)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="w-[280px] sm:w-[330px] bg-black aspect-video flex items-center relative">
+                                <video
+                                  src={msg.mediaUrl}
+                                  controls
+                                  className="w-full h-auto"
+                                />
+                                {isMediaOnly && (
+                                  <div className="absolute bottom-2 right-2 bg-black/40 px-1.5 py-0.5 rounded text-[10px] text-white">
+                                    {formattedTime}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* 📄 DOCUMENT */}
                         {msg.mediaUrl &&
                           msg.mimeType &&
-                          !msg.mimeType.startsWith("image/") &&
-                          !msg.mimeType.startsWith("video/") &&
+                          !isMedia &&
                           !msg.mimeType.startsWith("audio/") && (
                             <div className="p-2">
                               <a
@@ -1037,91 +1071,87 @@ function ChatArea({
                           )}
 
                         {/* 📝 CONTENT AREA */}
-                        <div className="px-3 py-2 flex flex-col">
-                          {/* REPLIED MESSAGE PREVIEW (Internal) */}
-                          {(() => {
-                            const reply = getReplyPreview(
-                              msg.replyTo ?? repliedMessage
-                            );
-                            if (!reply) return null;
-                            return (
-                              <div className="mb-2 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-black/5 dark:bg-white/5 rounded text-[11px]">
-                                {reply.thumb && (
-                                  <div className="relative w-8 h-8 flex-shrink-0">
-                                    <Image
-                                      src={reply.thumb}
-                                      alt=""
-                                      fill
-                                      sizes="32px"
-                                      className="rounded object-cover"
-                                    />
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-[#25D366] truncate">
-                                    {reply.title}
-                                  </div>
-                                  <div className="text-muted-foreground truncate">
-                                    {reply.subtitle}
+                        {!isMediaOnly && (
+                          <div className="px-3 py-1.5 flex flex-col">
+                            {/* REPLIED MESSAGE PREVIEW */}
+                            {(() => {
+                              const reply = getReplyPreview(
+                                msg.replyTo ?? repliedMessage
+                              );
+                              if (!reply) return null;
+                              return (
+                                <div className="mb-2 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-black/5 dark:bg-white/5 rounded text-[11px]">
+                                  {reply.thumb && (
+                                    <div className="relative w-8 h-8 flex-shrink-0">
+                                      <Image
+                                        src={reply.thumb}
+                                        alt=""
+                                        fill
+                                        sizes="32px"
+                                        className="rounded object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[#25D366] truncate">
+                                      {reply.title}
+                                    </div>
+                                    <div className="text-muted-foreground truncate">
+                                      {reply.subtitle}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })()}
+                              );
+                            })()}
 
-                          {/* AUDIO */}
-                          {msg.mediaUrl &&
-                            msg.mimeType?.startsWith("audio/") && (
-                              <div className="mb-2">
-                                <audio
-                                  src={msg.mediaUrl}
-                                  controls
-                                  className="w-full h-8"
-                                />
-                              </div>
-                            )}
-
-                          {/* BODY TEXT */}
-                          {msg.text && (
-                            <p className="text-[14.2px] leading-[1.35] break-words whitespace-pre-wrap text-[#111b21] dark:text-[#e9edef]">
-                              {msg.text}
-                            </p>
-                          )}
-
-                          {/* FOOTER & TIMESTAMP ROW */}
-                          <div className="flex items-end justify-between gap-4 mt-1.5">
-                            {msg.template?.footer ? (
-                              <p className="text-[12px] text-[#667781] dark:text-[#8696a0] leading-none pb-0.5">
-                                {msg.template.footer}
-                              </p>
-                            ) : (
-                              <div />
-                            )}
-
-                            <div className="flex items-center gap-1 self-end pb-0.5">
-                              <span className="text-[11px] text-[#667781] dark:text-[#8696a0]">
-                                {new Date(msg.timestamp)
-                                  .toLocaleTimeString([], {
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                    hour12: true,
-                                  })
-                                  .toLowerCase()}
-                              </span>
-                              {msg.sender === "executive" && (
-                                <span
-                                  className={
-                                    msg.status === "read"
-                                      ? "text-[#53bdeb]"
-                                      : "text-[#8696a0]"
-                                  }
-                                >
-                                  {getMessageStatusIcon(msg.status)}
-                                </span>
+                            {/* AUDIO */}
+                            {msg.mediaUrl &&
+                              msg.mimeType?.startsWith("audio/") && (
+                                <div className="mb-2">
+                                  <audio
+                                    src={msg.mediaUrl}
+                                    controls
+                                    className="w-full h-8"
+                                  />
+                                </div>
                               )}
+
+                            {/* BODY TEXT */}
+                            {cleanText && (
+                              <p className="text-[14.2px] leading-[1.35] break-words whitespace-pre-wrap text-[#111b21] dark:text-[#e9edef]">
+                                {cleanText}
+                              </p>
+                            )}
+
+                            {/* FOOTER & TIMESTAMP ROW */}
+                            <div className="flex items-end justify-between gap-4 mt-1">
+                              {msg.template?.footer ? (
+                                <p className="text-[12px] text-[#667781] dark:text-[#8696a0] leading-none pb-0.5">
+                                  {msg.template.footer}
+                                </p>
+                              ) : (
+                                <div />
+                              )}
+
+                              <div className="flex items-center gap-1.5 self-end pb-0.5">
+                                <span className="text-[11px] text-[#667781] dark:text-[#8696a0]">
+                                  {formattedTime}
+                                </span>
+                                {msg.sender === "executive" && (
+                                  <span
+                                    className={
+                                      msg.status === "read"
+                                        ? "text-[#53bdeb]"
+                                        : "text-[#8696a0]"
+                                    }
+                                  >
+                                    {getMessageStatusIcon(msg.status)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* BUTTONS - Authentic WhatsApp Style */}
                         {msg.template?.buttons &&
@@ -1153,7 +1183,7 @@ function ChatArea({
                             </div>
                           )}
 
-                        {/* REACTION / MENU BUTTON (Floating) */}
+                        {/* MENU BUTTON (Floating) */}
                         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
@@ -1161,7 +1191,7 @@ function ChatArea({
                                 e.currentTarget.getBoundingClientRect();
                               setActionMenu({ message: msg, rect });
                             }}
-                            className="p-1 rounded-full bg-white/80 dark:bg-black/50 shadow-sm hover:bg-white dark:hover:bg-black transition-colors"
+                            className="p-1 rounded-full bg-white/80 dark:bg-[#1a1a1a]/80 shadow-sm hover:bg-white dark:hover:bg-[#1a1a1a] transition-colors"
                           >
                             <MoreVertical className="w-3.5 h-3.5" />
                           </button>
@@ -1365,9 +1395,9 @@ function ChatArea({
 
               const left = isIncoming
                 ? // LEFT-SIDE MESSAGE → open menu on RIGHT
-                  Math.min(window.innerWidth - menuWidth - 12, rect.left)
+                Math.min(window.innerWidth - menuWidth - 12, rect.left)
                 : // RIGHT-SIDE MESSAGE → open menu on LEFT
-                  Math.max(12, rect.right - menuWidth);
+                Math.max(12, rect.right - menuWidth);
 
               return (
                 <motion.div
@@ -1494,11 +1524,10 @@ function ChatArea({
                               setImageMode("single");
                               setSelectedGalleryImages([]);
                             }}
-                            className={`flex-1 py-2.5 rounded-lg ${
-                              imageMode === "single"
-                                ? "bg-primary text-white"
-                                : "bg-muted"
-                            }`}
+                            className={`flex-1 py-2.5 rounded-lg ${imageMode === "single"
+                              ? "bg-primary text-white"
+                              : "bg-muted"
+                              }`}
                           >
                             Single
                           </button>
@@ -1507,11 +1536,10 @@ function ChatArea({
                               setImageMode("bulk");
                               setSelectedGalleryImages([]);
                             }}
-                            className={`flex-1 py-2.5 rounded-lg ${
-                              imageMode === "bulk"
-                                ? "bg-primary text-white"
-                                : "bg-muted"
-                            }`}
+                            className={`flex-1 py-2.5 rounded-lg ${imageMode === "bulk"
+                              ? "bg-primary text-white"
+                              : "bg-muted"
+                              }`}
                           >
                             Bulk
                           </button>
@@ -1560,11 +1588,10 @@ function ChatArea({
                         <button
                           type="button"
                           onClick={() => handleGalleryCategoryClick(null)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${
-                            !selectedGalleryCategory
-                              ? "bg-primary text-white border-primary"
-                              : "bg-background border-border hover:bg-muted"
-                          }`}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${!selectedGalleryCategory
+                            ? "bg-primary text-white border-primary"
+                            : "bg-background border-border hover:bg-muted"
+                            }`}
                         >
                           All
                         </button>
@@ -1573,11 +1600,10 @@ function ChatArea({
                             type="button"
                             key={c.id}
                             onClick={() => handleGalleryCategoryClick(c.id)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${
-                              selectedGalleryCategory === c.id
-                                ? "bg-primary text-white border-primary"
-                                : "bg-background border-border hover:bg-muted"
-                            }`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${selectedGalleryCategory === c.id
+                              ? "bg-primary text-white border-primary"
+                              : "bg-background border-border hover:bg-muted"
+                              }`}
                           >
                             {c.name}
                           </button>
@@ -1597,11 +1623,10 @@ function ChatArea({
                                 setSelectedGallerySubcategory(null);
                                 loadGalleryImages(selectedGalleryCategory);
                               }}
-                              className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-                                !selectedGallerySubcategory
-                                  ? "bg-primary/20 text-primary"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-                              }`}
+                              className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedGallerySubcategory
+                                ? "bg-primary/20 text-primary"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
                             >
                               All
                             </button>
@@ -1616,11 +1641,10 @@ function ChatArea({
                                     sc.id
                                   );
                                 }}
-                                className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-                                  selectedGallerySubcategory === sc.id
-                                    ? "bg-primary/20 text-primary"
-                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                                }`}
+                                className={`px-3 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedGallerySubcategory === sc.id
+                                  ? "bg-primary/20 text-primary"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  }`}
                               >
                                 {sc.name}
                               </button>
@@ -1648,11 +1672,10 @@ function ChatArea({
                           return (
                             <div
                               key={img.id}
-                              className={`relative aspect-square cursor-pointer group rounded-lg overflow-hidden border-2 transition-all bg-muted/20 ${
-                                isSelected
-                                  ? "border-primary ring-2 ring-primary/20"
-                                  : "border-transparent"
-                              }`}
+                              className={`relative aspect-square cursor-pointer group rounded-lg overflow-hidden border-2 transition-all bg-muted/20 ${isSelected
+                                ? "border-primary ring-2 ring-primary/20"
+                                : "border-transparent"
+                                }`}
                               onClick={() => {
                                 if (imageMode === "single") {
                                   // Single Mode: replace selection
@@ -1682,11 +1705,10 @@ function ChatArea({
                                 sizes="(max-width: 768px) 33vw, 200px"
                               />
                               <div
-                                className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${
-                                  isSelected
-                                    ? "opacity-100"
-                                    : "opacity-0 group-hover:opacity-100"
-                                }`}
+                                className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200 ${isSelected
+                                  ? "opacity-100"
+                                  : "opacity-0 group-hover:opacity-100"
+                                  }`}
                               >
                                 {isSelected && (
                                   <Check className="w-6 h-6 text-white bg-primary rounded-full p-1 shadow-sm" />
@@ -1707,9 +1729,9 @@ function ChatArea({
                             className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
                           >
                             {galleryImages.length > 0 &&
-                            galleryImages.every((img) =>
-                              selectedGalleryImages.some((s) => s.id === img.id)
-                            )
+                              galleryImages.every((img) =>
+                                selectedGalleryImages.some((s) => s.id === img.id)
+                              )
                               ? "Deselect All"
                               : "Select All"}
                           </button>
@@ -1722,11 +1744,10 @@ function ChatArea({
                           className="flex items-center gap-2 cursor-pointer group"
                         >
                           <div
-                            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                              includeCaption
-                                ? "bg-primary border-primary"
-                                : "border-muted-foreground group-hover:border-primary"
-                            }`}
+                            className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${includeCaption
+                              ? "bg-primary border-primary"
+                              : "border-muted-foreground group-hover:border-primary"
+                              }`}
                           >
                             {includeCaption && (
                               <Check className="w-3 h-3 text-white" />
@@ -1825,13 +1846,12 @@ function ChatArea({
                                     {t.displayName}
                                   </p>
                                   <span
-                                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider ${
-                                      t.category === "MARKETING"
-                                        ? "bg-orange-100 text-orange-600 dark:bg-orange-900/30"
-                                        : t.category === "UTILITY"
+                                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider ${t.category === "MARKETING"
+                                      ? "bg-orange-100 text-orange-600 dark:bg-orange-900/30"
+                                      : t.category === "UTILITY"
                                         ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30"
                                         : "bg-muted text-muted-foreground"
-                                    }`}
+                                      }`}
                                   >
                                     {t.category}
                                   </span>
@@ -1981,9 +2001,8 @@ function ChatArea({
                                           "";
                                         templateVariables.forEach(
                                           (val, idx) => {
-                                            const placeholder = `{{${
-                                              idx + 1
-                                            }}}`;
+                                            const placeholder = `{{${idx + 1
+                                              }}}`;
                                             body = body.replace(
                                               placeholder,
                                               val || `{{${idx + 1}}}`
@@ -1997,15 +2016,15 @@ function ChatArea({
                                     {/* Footer */}
                                     {selectedTemplate.languages[0]
                                       ?.footerText && (
-                                      <div className="px-3 pb-2">
-                                        <p className="text-[11px] text-[#8696a0]">
-                                          {
-                                            selectedTemplate.languages[0]
-                                              .footerText
-                                          }
-                                        </p>
-                                      </div>
-                                    )}
+                                        <div className="px-3 pb-2">
+                                          <p className="text-[11px] text-[#8696a0]">
+                                            {
+                                              selectedTemplate.languages[0]
+                                                .footerText
+                                            }
+                                          </p>
+                                        </div>
+                                      )}
 
                                     {/* Time + Status */}
                                     <div className="absolute right-2 bottom-1.5 flex items-end gap-1">
@@ -2079,9 +2098,8 @@ function ChatArea({
                                         next[idx] = e.target.value;
                                         setTemplateVariables(next);
                                       }}
-                                      placeholder={`Enter value for placeholder ${
-                                        idx + 1
-                                      }...`}
+                                      placeholder={`Enter value for placeholder ${idx + 1
+                                        }...`}
                                       className="w-full bg-transparent text-sm outline-none focus:ring-0 placeholder:text-muted-foreground/50 h-6"
                                     />
                                   </div>
@@ -2133,8 +2151,8 @@ function ChatArea({
                           mediaModal.type === "video"
                             ? "video/*"
                             : mediaModal.type === "audio"
-                            ? "audio/*"
-                            : "*"
+                              ? "audio/*"
+                              : "*"
                         }
                         className="hidden"
                         onChange={async (e) => {
@@ -2494,9 +2512,9 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                    footer: m.outboundPayload.footer,
-                    buttons: m.outboundPayload.buttons,
-                  }
+                  footer: m.outboundPayload.footer,
+                  buttons: m.outboundPayload.buttons,
+                }
                 : undefined),
           };
         }
@@ -2515,11 +2533,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-                ...c,
-                sessionStarted: res.data.sessionStarted,
-                sessionActive: res.data.sessionActive,
-                sessionExpiresAt: res.data.sessionExpiresAt,
-              }
+              ...c,
+              sessionStarted: res.data.sessionStarted,
+              sessionActive: res.data.sessionActive,
+              sessionExpiresAt: res.data.sessionExpiresAt,
+            }
             : c
         )
       );
@@ -2536,9 +2554,8 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
       <div
-        className={`${
-          showChat ? "hidden md:block" : "block"
-        } w-full md:w-auto h-full`}
+        className={`${showChat ? "hidden md:block" : "block"
+          } w-full md:w-auto h-full`}
       >
         <ConversationList
           conversations={conversations}
