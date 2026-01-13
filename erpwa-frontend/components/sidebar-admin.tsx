@@ -17,7 +17,6 @@ import {
   Folder,
   Image,
   Megaphone,
-  Download,
   Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
