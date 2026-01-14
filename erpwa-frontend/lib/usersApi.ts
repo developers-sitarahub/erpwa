@@ -10,6 +10,7 @@ export interface User {
     status: string
     isOnline: boolean
     lastLoginAt?: string
+    activatedAt?: string
 }
 
 export const usersAPI = {
