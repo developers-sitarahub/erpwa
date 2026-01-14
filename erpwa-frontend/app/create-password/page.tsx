@@ -58,16 +58,33 @@ function CreatePasswordContent() {
 
     try {
       // Use the same forgot password endpoint to send OTP
+      // Include token in header to verify it's still valid
       await api.post("/auth/forgot-password", {
         email: email,
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       })
 
       setOtpRequested(true)
       setStep(1)
       toast.success("Verification code sent to your email!")
     } catch (error: any) {
+      const code = error.response?.data?.code
       const msg = error.response?.data?.message || "Failed to send verification code"
-      toast.error(msg)
+
+      // Show specific message for expired links
+      if (code === "INVITE_EXPIRED") {
+        toast.error("⏰ This invite link has expired. Please contact your administrator for a new invitation.")
+      } else if (code === "INVITE_INVALID") {
+        toast.error("❌ Invalid invite link. Please contact your administrator.")
+      } else if (code === "ALREADY_ACTIVATED") {
+        toast.error("✅ Account already activated! This link has been used. Please use 'Forgot Password' to reset your password.")
+      } else {
+        toast.error(msg)
+      }
+
       setErrors({ email: msg })
     } finally {
       setLoading(false)
@@ -133,7 +150,7 @@ function CreatePasswordContent() {
       setStep(3)
       toast.success("Password set successfully!")
     } catch (error: unknown) {
-      const msg = error instanceof Error && 'response' in error 
+      const msg = error instanceof Error && 'response' in error
         ? (error as { response?: { data?: { error?: string } } }).response?.data?.error || "Failed to set password"
         : "Failed to set password"
       toast.error(msg)
@@ -227,12 +244,6 @@ function CreatePasswordContent() {
                   {errors.email && <p className="text-destructive text-sm">{errors.email}</p>}
                 </div>
 
-                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
-                  <p className="text-xs text-blue-900 dark:text-blue-100">
-                    Click the button below to receive a verification code via email
-                  </p>
-                </div>
-
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Sending..." : "Send Verification Code"}
                 </Button>
@@ -278,12 +289,6 @@ function CreatePasswordContent() {
                     />
                   </div>
                   {errors.otp && <p className="text-destructive text-sm">{errors.otp}</p>}
-                </div>
-
-                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 rounded-lg">
-                  <p className="text-xs text-amber-900 dark:text-amber-100">
-                    ⏱️ The code is valid for 10 minutes. Check your email inbox (and spam folder).
-                  </p>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
@@ -353,12 +358,6 @@ function CreatePasswordContent() {
                   />
                 </div>
                 {errors.confirmPassword && <p className="text-destructive text-sm">{errors.confirmPassword}</p>}
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
-                <p className="text-xs text-blue-900 dark:text-blue-100">
-                  Password must be at least 8 characters long
-                </p>
               </div>
 
               {errors.form && <p className="text-destructive text-sm text-center">{errors.form}</p>}

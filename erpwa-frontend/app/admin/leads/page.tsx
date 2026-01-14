@@ -1185,7 +1185,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("manual")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "manual"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border !text-black dark:!text-grey hover:bg-muted"
+              : "bg-secondary border border-border !text-foreground hover:bg-muted"
               }`}
           >
             <FileText className="w-4 h-4 mr-2" />
@@ -1195,7 +1195,7 @@ export default function LeadsPage() {
             onClick={() => setCurrentMode("upload")}
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${currentMode === "upload"
               ? "bg-primary hover:bg-primary/90 text-white"
-              : "bg-secondary border border-border !text-black dark:!text-grey hover:bg-muted"
+              : "bg-secondary border border-border !text-foreground hover:bg-muted"
               }`}
           >
             <Upload className="w-4 h-4 mr-2" />
