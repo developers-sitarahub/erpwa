@@ -14,9 +14,11 @@ const ImageSkeleton = () => (
 export default function CreateImageCampaignModal({
   isOpen,
   onClose,
+  onSuccess,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     null
@@ -45,6 +47,7 @@ export default function CreateImageCampaignModal({
 
   const [campaignName, setCampaignName] = useState("");
   const [loadingImages, setLoadingImages] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -61,20 +64,26 @@ export default function CreateImageCampaignModal({
     categoryId?: number | null,
     subcategoryId?: number | null
   ) => {
-    const res = await api.get("/recipients/session-active", {
-      params: {
-        categoryId: categoryId ?? undefined,
-        subcategoryId: subcategoryId ?? undefined,
-      },
-    });
+    try {
+      const res = await api.get("/recipients/session-active", {
+        params: {
+          categoryId: categoryId ?? undefined,
+          subcategoryId: subcategoryId ?? undefined,
+        },
+      });
 
-    // IMPORTANT: this returns contacts WITH conversationId
-    setContacts(res.data.data);
+      // IMPORTANT: this returns contacts WITH conversationId
+      setContacts(res.data.data);
+    } catch (error) {
+      console.error("Failed to fetch session-active recipients:", error);
+      setContacts([]); // Set empty array on error
+    }
   };
 
   useEffect(() => {
+    if (!isOpen) return;
     fetchRecipients(recipientCategoryId, recipientSubcategoryId);
-  }, [recipientCategoryId, recipientSubcategoryId]);
+  }, [isOpen, recipientCategoryId, recipientSubcategoryId]);
 
   const handleRecipientCategoryChange = (categoryId: number | null) => {
     setRecipientCategoryId(categoryId);
@@ -196,6 +205,8 @@ export default function CreateImageCampaignModal({
     if (selectedRecipients.size === 0) return alert("Select recipients");
     if (!selectedCategoryId) return alert("Select image category");
 
+    setIsLaunching(true);
+
     try {
       // Convert selected contacts → conversationIds
       const conversationIds = contacts
@@ -217,11 +228,14 @@ export default function CreateImageCampaignModal({
         conversationIds,
       });
 
-      alert("Campaign created successfully 🚀");
+      // Success! Trigger refresh
+      onSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
       alert("Failed to create campaign");
+    } finally {
+      setIsLaunching(false);
     }
   };
 
@@ -371,11 +385,10 @@ export default function CreateImageCampaignModal({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => handleToggleImage(image.id)}
-                        className={`relative overflow-hidden rounded-lg cursor-pointer transition-all border-2 group ${
-                          selectedImages.has(image.id)
-                            ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
-                            : "border-border hover:border-primary/50 hover:shadow-md hover:shadow-primary/10"
-                        }`}
+                        className={`relative overflow-hidden rounded-lg cursor-pointer transition-all border-2 group ${selectedImages.has(image.id)
+                          ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
+                          : "border-border hover:border-primary/50 hover:shadow-md hover:shadow-primary/10"
+                          }`}
                       >
                         <Image
                           src={image.image_url || "/placeholder.svg"}
@@ -491,11 +504,10 @@ export default function CreateImageCampaignModal({
                           className="flex items-center gap-3 p-3 cursor-pointer transition-colors"
                         >
                           <div
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-                              selectedRecipients.has(contact.id)
-                                ? "bg-primary border-primary"
-                                : "border-primary hover:border-primary"
-                            }`}
+                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${selectedRecipients.has(contact.id)
+                              ? "bg-primary border-primary"
+                              : "border-primary hover:border-primary"
+                              }`}
                           >
                             {selectedRecipients.has(contact.id) && (
                               <Check className="w-2.5 h-2.5 text-foreground" />
@@ -553,18 +565,17 @@ export default function CreateImageCampaignModal({
               Cancel
             </button>
             <motion.button
-              whileHover={{ scale: canLaunch ? 1.02 : 1 }}
-              whileTap={{ scale: canLaunch ? 0.98 : 1 }}
+              whileHover={{ scale: canLaunch && !isLaunching ? 1.02 : 1 }}
+              whileTap={{ scale: canLaunch && !isLaunching ? 0.98 : 1 }}
               onClick={handleLaunch}
-              disabled={!canLaunch}
-              className={`px-6 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
-                canLaunch
+              disabled={!canLaunch || isLaunching}
+              className={`px-6 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${canLaunch && !isLaunching
                   ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/50"
                   : "bg-muted text-muted-foreground cursor-not-allowed"
-              }`}
+                }`}
             >
               <Zap className="w-4 h-4" />
-              Launch Campaign
+              {isLaunching ? "Launching..." : "Launch Campaign"}
             </motion.button>
           </div>
         </div>
