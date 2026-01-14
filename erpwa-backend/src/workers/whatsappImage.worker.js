@@ -21,6 +21,7 @@ export async function processImageQueue() {
   log("info", "WhatsApp Image Worker started");
 
   while (true) {
+    // 1️⃣ Pick next queued image message
     const message = await prisma.message.findFirst({
       where: {
         status: "queued",
@@ -31,7 +32,7 @@ export async function processImageQueue() {
       include: {
         vendor: true,
         conversation: { include: { lead: true } },
-        media: { include: { deliveries: true } },
+        media: true,
       },
     });
 
@@ -40,6 +41,7 @@ export async function processImageQueue() {
       continue;
     }
 
+    // 2️⃣ Lock message (prevent double sending)
     const locked = await prisma.message.updateMany({
       where: { id: message.id, status: "queued" },
       data: { status: "processing" },
@@ -47,20 +49,18 @@ export async function processImageQueue() {
 
     if (locked.count === 0) continue;
 
-    const media = message.media[0];
-    const delivery = media?.deliveries?.[0];
-
     try {
+      // 3️⃣ Validate media
+      const media = message.media?.[0];
       if (!media) throw new Error("Media not found");
-      if (!delivery) throw new Error("Delivery record missing");
 
+      // 4️⃣ Validate vendor WhatsApp config
       const vendor = message.vendor;
-
       if (!vendor.whatsappPhoneNumberId || !vendor.whatsappAccessToken) {
         throw new Error("WhatsApp not configured for vendor");
       }
 
-      // 🔐 DECRYPT TOKEN (CRITICAL)
+      // 5️⃣ Prepare WhatsApp payload
       const accessToken = decrypt(vendor.whatsappAccessToken);
 
       const raw = message.conversation.lead.phoneNumber.replace(/\D/g, "");
@@ -72,6 +72,7 @@ export async function processImageQueue() {
         mediaUrl: media.mediaUrl,
       });
 
+      // 6️⃣ Send image to WhatsApp
       const result = await sendWhatsAppImage({
         phoneNumberId: vendor.whatsappPhoneNumberId,
         accessToken,
@@ -82,19 +83,35 @@ export async function processImageQueue() {
 
       const whatsappMsgId = result.messages?.[0]?.id;
 
-      await prisma.$transaction([
-        prisma.message.update({
+      // 7️⃣ FINAL COMMIT (THIS MAKES MESSAGE VISIBLE IN UI)
+      await prisma.$transaction(async (tx) => {
+        // ✅ Update message (UI visibility source of truth)
+        await tx.message.update({
           where: { id: message.id },
-          data: { status: "sent" },
-        }),
-        prisma.messageDelivery.update({
-          where: { id: delivery.id },
+          data: {
+            status: "sent",
+            whatsappMessageId: whatsappMsgId,
+            updatedAt: new Date(),
+          },
+        });
+
+        // ✅ Update ALL deliveries safely
+        await tx.messageDelivery.updateMany({
+          where: { messageId: message.id },
           data: {
             status: "sent",
             whatsappMsgId,
           },
-        }),
-      ]);
+        });
+
+        // ✅ Update conversation ordering
+        await tx.conversation.update({
+          where: { id: message.conversationId },
+          data: {
+            lastMessageAt: new Date(),
+          },
+        });
+      });
 
       log("success", "Image sent successfully", {
         messageId: message.id,
@@ -114,7 +131,7 @@ export async function processImageQueue() {
         metaMessage: metaError?.message,
       });
 
-      // 🔴 Token invalid → disable vendor
+      // 🔴 Disable vendor if token invalid
       if (metaError?.code === 190) {
         await prisma.vendor.update({
           where: { id: message.vendorId },
@@ -125,6 +142,7 @@ export async function processImageQueue() {
         });
       }
 
+      // 8️⃣ Retry or fail message
       await prisma.$transaction([
         prisma.message.update({
           where: { id: message.id },

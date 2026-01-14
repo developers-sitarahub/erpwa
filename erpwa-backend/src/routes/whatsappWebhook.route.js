@@ -225,15 +225,27 @@ router.post("/", async (req, res) => {
        2️⃣ HANDLE MESSAGE STATUS UPDATES
     ===================================================== */
     if (value.statuses?.length) {
-      for (const status of value.statuses) {
-        const whatsappMessageId = status.id;
-        const newStatus = status.status;
+      for (const waStatus of value.statuses) {
+        const whatsappMessageId = waStatus.id;
+        const waState = waStatus.status; // sent | delivered | read | failed
 
+        // 🛑 Ignore statuses we don't care about
+        if (!["delivered", "read", "failed"].includes(waState)) continue;
+
+        // 🔒 Only update messages that are already SENT or DELIVERED
         const updated = await prisma.message.updateMany({
-          where: { whatsappMessageId },
+          where: {
+            whatsappMessageId,
+            status: { in: ["sent", "delivered"] },
+          },
           data: {
-            status: newStatus,
-            errorCode: status.errors?.[0]?.code?.toString() || null,
+            status:
+              waState === "read"
+                ? "read"
+                : waState === "delivered"
+                ? "delivered"
+                : "failed",
+            errorCode: waStatus.errors?.[0]?.code?.toString() || null,
           },
         });
 
@@ -246,33 +258,23 @@ router.post("/", async (req, res) => {
 
         if (!message) continue;
 
+        // ✅ Keep inbox ordering correct
         await prisma.conversation.update({
           where: { id: message.conversationId },
-          data: {
-            lastMessageAt: new Date(),
-          },
+          data: { lastMessageAt: new Date() },
         });
 
-        try {
-          const io = getIO();
-          io.to(`vendor:${vendor.id}`).emit("inbox:update", {
-            conversationId: message.conversationId,
-          });
-        } catch {}
-
-        /* 🔥 SAFE SOCKET STATUS EMIT */
+        // 🔥 Realtime status update to UI
         try {
           const io = getIO();
           io.to(`conversation:${message.conversationId}`).emit(
             "message:status",
             {
               whatsappMessageId,
-              status: newStatus,
+              status: waState,
             }
           );
-        } catch {
-          // ignore socket failures
-        }
+        } catch {}
       }
     }
 
