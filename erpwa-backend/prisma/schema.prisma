@@ -38,6 +38,7 @@ model User {
   status            String             @default("active") // active, inactive
   isOnline          Boolean            @default(false)
   lastLoginAt       DateTime?
+  activatedAt       DateTime?          // When user first set password via invite link
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   messages          Message[]          @relation("UserMessages")

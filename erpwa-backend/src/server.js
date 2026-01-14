@@ -21,6 +21,7 @@ import campaignRoutes from "./routes/campaign.routes.js";
 import recipientRoutes from "./routes/recipient.routes.js";
 import { initSocket } from "./socket.js";
 import userRoutes from "./routes/user.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
 import testUploadRoute from "./routes/testUpload.route.js";
 
 const app = express();
@@ -57,6 +58,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/leads-management", leadManagementRoutes);
 app.use("/api/gallery", galleryRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/campaign", campaignRoutes);
 app.use("/api/recipients", recipientRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
