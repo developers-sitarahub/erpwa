@@ -205,12 +205,6 @@ export default function ChangePasswordPage() {
                                     </div>
                                 </div>
 
-                                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
-                                    <p className="text-xs text-blue-900 dark:text-blue-100">
-                                        We'll send a 6-digit verification code to your email address
-                                    </p>
-                                </div>
-
                                 {errors.form && <p className="text-destructive text-sm">{errors.form}</p>}
 
                                 <Button type="submit" className="w-full" disabled={loading}>
@@ -258,12 +252,6 @@ export default function ChangePasswordPage() {
                                         />
                                     </div>
                                     {errors.otp && <p className="text-destructive text-sm">{errors.otp}</p>}
-                                </div>
-
-                                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 rounded-lg">
-                                    <p className="text-xs text-amber-900 dark:text-amber-100">
-                                        ⏱️ Code is valid for 15 minutes. Check your email inbox (and spam folder).
-                                    </p>
                                 </div>
 
                                 <Button type="submit" className="w-full" disabled={loading}>
@@ -334,12 +322,6 @@ export default function ChangePasswordPage() {
                                     />
                                 </div>
                                 {errors.confirmPassword && <p className="text-destructive text-sm">{errors.confirmPassword}</p>}
-                            </div>
-
-                            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
-                                <p className="text-xs text-blue-900 dark:text-blue-100">
-                                    Password must be at least 8 characters long
-                                </p>
                             </div>
 
                             {errors.form && <p className="text-destructive text-sm text-center">{errors.form}</p>}

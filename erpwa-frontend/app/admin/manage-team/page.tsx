@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Card } from "@/components/card"
 import { Button } from "@/components/button"
@@ -31,6 +31,12 @@ export default function ManageTeam() {
     role: "sales"
   })
 
+  // Keep latest user ID in ref to access inside socket handlers without re-binding
+  const userIdRef = useRef(user?.id)
+  useEffect(() => {
+    userIdRef.current = user?.id
+  }, [user?.id])
+
   useEffect(() => {
     fetchUsers()
   }, [])
@@ -57,9 +63,7 @@ export default function ManageTeam() {
 
     const handlePresence = (data: { userId: string; isOnline: boolean }) => {
       // 🛡️ Self-Immunity: If the event says I am offline, but I am here, ignore it.
-      // This prevents the "reload race condition" where the old socket disconnects
-      // after the new one connects, briefly marking us offline.
-      if (data.userId === user?.id && !data.isOnline) return
+      if (data.userId === userIdRef.current && !data.isOnline) return
 
       setTeam(prevTeam =>
         prevTeam.map(user =>
@@ -68,10 +72,21 @@ export default function ManageTeam() {
       )
     }
 
+    const handleActivated = (data: { userId: string; activatedAt: string }) => {
+      setTeam(prevTeam =>
+        prevTeam.map(user =>
+          user.id === data.userId ? { ...user, activatedAt: data.activatedAt } : user
+        )
+      )
+      toast.success("🎉 A team member just activated their account!")
+    }
+
     socket.on("user:presence", handlePresence)
+    socket.on("user:activated", handleActivated)
 
     return () => {
       socket.off("user:presence", handlePresence)
+      socket.off("user:activated", handleActivated)
     }
   }, [])
 
@@ -132,7 +147,7 @@ export default function ManageTeam() {
       } else {
         // Create user without password - backend will send invite
         await usersAPI.create(formData)
-        toast.success("Invite sent to team member")
+        toast.success("📧 Invitation email sent with setup instructions!")
       }
       setIsModalOpen(false)
       fetchUsers()
@@ -145,20 +160,72 @@ export default function ManageTeam() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this team member?")) return
+    // Create custom confirmation toast with action buttons
+    const confirmToast = (
+      <div className="flex flex-col gap-4 p-2">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <svg className="w-10 h-10 text-red-600 dark:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-foreground mb-1">Remove Team Member?</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              This action cannot be undone. The user will be permanently removed from the team.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-end pt-2">
+          <button
+            onClick={() => {
+              toast.dismiss()
+            }}
+            className="px-5 py-2.5 text-sm font-medium text-foreground bg-secondary hover:bg-muted border border-border rounded-lg transition-all duration-200 hover:shadow-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss()
+              try {
+                await usersAPI.delete(id)
+                toast.success("✅ Team member removed successfully")
+                fetchUsers()
+              } catch (error) {
+                toast.error("❌ Failed to delete user")
+              }
+            }}
+            className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    )
 
-    try {
-      await usersAPI.delete(id)
-      toast.success("User removed")
-      fetchUsers()
-    } catch (error) {
-      toast.error("Failed to delete user")
-    }
+    toast(confirmToast, {
+      autoClose: false,
+      closeButton: false,
+      icon: false,
+    })
   }
 
 
 
   const userRole = user?.role
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground mt-4 font-medium">Loading team members...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 overflow-auto">
@@ -187,19 +254,20 @@ export default function ManageTeam() {
                     <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Name</th>
                     <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Email</th>
                     <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Role</th>
+                    <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Account Status</th>
                     <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Created At</th>
-                    <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Status</th>
+                    <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Online Status</th>
                     <th className="text-left py-3 px-4 md:px-6 font-semibold text-foreground text-sm">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-muted-foreground">Loading team...</td>
+                      <td colSpan={7} className="text-center py-8 text-muted-foreground">Loading team...</td>
                     </tr>
                   ) : team.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-muted-foreground">No team members found. Add one to get started.</td>
+                      <td colSpan={7} className="text-center py-8 text-muted-foreground">No team members found. Add one to get started.</td>
                     </tr>
                   ) : (
                     team.map((member, index) => (
@@ -214,6 +282,17 @@ export default function ManageTeam() {
                         <td className="py-4 px-4 md:px-6 text-muted-foreground text-sm">{member.email}</td>
                         <td className="py-4 px-4 md:px-6">
                           <Badge variant="outline" className="capitalize">{member.role.replace('_', ' ')}</Badge>
+                        </td>
+                        <td className="py-4 px-4 md:px-6">
+                          {member.activatedAt ? (
+                            <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
+                              ✅ Activated
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                              ⏳ Pending Setup
+                            </Badge>
+                          )}
                         </td>
                         <td className="py-4 px-4 md:px-6 text-muted-foreground text-sm">
                           {new Date(member.createdAt).toLocaleDateString()}
@@ -333,11 +412,7 @@ export default function ManageTeam() {
                     </select>
                   </div>
 
-                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-                    <p className="text-sm text-blue-900 dark:text-blue-100">
-                      📧 An invitation email will be sent with instructions to set up their password.
-                    </p>
-                  </div>
+
                 </>
               )}
 

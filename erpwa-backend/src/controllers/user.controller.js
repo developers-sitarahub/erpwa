@@ -27,6 +27,7 @@ export const listUsers = async (req, res) => {
                 status: true,
                 isOnline: true,
                 lastLoginAt: true,
+                activatedAt: true,
                 createdAt: true,
             },
             orderBy: { createdAt: "desc" },
@@ -78,11 +79,11 @@ export const createUser = async (req, res) => {
             },
         });
 
-        // Generate invite token for the link (24 hours - long enough to set password)
+        // Generate invite token for the link (1 hour validity)
         const inviteToken = jwt.sign(
             { sub: user.id, type: "invite", email: email },
             process.env.PASSWORD_RESET_TOKEN_SECRET,
-            { expiresIn: "24h" }
+            { expiresIn: "1h" }
         );
 
         const inviteLink = `${process.env.FRONTEND_URL}/create-password?token=${inviteToken}`;
@@ -114,7 +115,7 @@ export const createUser = async (req, res) => {
                         </p>
                         
                         <p style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #999;">
-                            This link is valid for 24 hours.
+                            <strong style="color: #dc2626;">⚠️ This link is valid for 1 hour and can be used only once.</strong>
                         </p>
                     </div>
                 `
