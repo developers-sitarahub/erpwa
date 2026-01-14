@@ -24,6 +24,15 @@ class CampaignController {
       res.status(400).json({ error: err.message });
     }
   }
+
+  static async listCampaigns(req, res) {
+    try {
+      const result = await CampaignService.listCampaigns(req.user.vendorId);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
 }
 
 export default CampaignController;

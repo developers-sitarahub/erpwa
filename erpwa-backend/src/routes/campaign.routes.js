@@ -12,4 +12,7 @@ router.post("/template", CampaignController.createTemplateCampaign);
 // Image campaign
 router.post("/image", CampaignController.createImageCampaign);
 
+// List campaigns
+router.get("/", CampaignController.listCampaigns);
+
 export default router;
