@@ -49,9 +49,11 @@ interface Template {
 export default function CreateTemplateCampaignModal({
   isOpen,
   onClose,
+  onSuccess,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }) {
   const [campaignName, setCampaignName] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -67,6 +69,7 @@ export default function CreateTemplateCampaignModal({
   const [recipientSubcategoryId, setRecipientSubcategoryId] = useState<number | null>(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
 
   // Load Categories and Templates on Open
   useEffect(() => {
@@ -148,6 +151,8 @@ export default function CreateTemplateCampaignModal({
     if (!selectedTemplate) return alert("Select a template");
     if (selectedRecipients.size === 0) return alert("Select recipients");
 
+    setIsLaunching(true);
+
     try {
       const payload = {
         templateId: selectedTemplate.id,
@@ -156,19 +161,21 @@ export default function CreateTemplateCampaignModal({
           return contact?.mobile_number;
         }).filter(Boolean),
         bodyVariables: templateVariables,
-        campaign_name: campaignName, // Optional, depending on backend support
+        campaign_name: campaignName,
       };
 
       await api.post("/vendor/whatsapp/template/send-template", payload);
 
-      alert("Template campaign launched! 🚀");
+      onSuccess?.();
       onClose();
     } catch (err) {
       alert("Failed to launch campaign. Please try again.");
+    } finally {
+      setIsLaunching(false);
     }
   };
 
-  const canLaunch = campaignName.trim() && selectedTemplate && selectedRecipients.size > 0;
+  const canLaunch = campaignName.trim() && selectedTemplate && selectedRecipients.size > 0 && !isLaunching;
 
   if (!isOpen) return null;
 
@@ -562,7 +569,7 @@ export default function CreateTemplateCampaignModal({
                 }`}
             >
               <Zap className="w-4 h-4" />
-              Launch Campaign
+              {isLaunching ? "Launching..." : "Launch Campaign"}
             </motion.button>
           </div>
         </div>

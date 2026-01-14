@@ -72,6 +72,15 @@ class CampaignService {
 
     await Promise.all(messages);
 
+    // ✅ Update campaign stats
+    await prisma.campaign.update({
+      where: { id: campaign.id },
+      data: {
+        totalMessages: messages.length,
+        status: scheduledAt ? "scheduled" : "active", // Auto-activate if not scheduled
+      },
+    });
+
     return {
       success: true,
       campaignId: campaign.id,
@@ -159,8 +168,8 @@ class CampaignService {
           captionMode === "TITLE"
             ? image.title
             : captionMode === "DESCRIPTION"
-            ? image.description
-            : null;
+              ? image.description
+              : null;
 
         const message = await prisma.message.create({
           data: {
@@ -197,6 +206,15 @@ class CampaignService {
       }
     }
 
+    // ✅ Update campaign stats
+    await prisma.campaign.update({
+      where: { id: campaign.id },
+      data: {
+        totalMessages: totalQueued,
+        status: "active", // Auto-activate
+      },
+    });
+
     return {
       success: true,
       campaignId: campaign.id,
@@ -204,6 +222,88 @@ class CampaignService {
       imagesPerConversation: images.length,
       totalMessagesQueued: totalQueued,
     };
+  }
+
+  static async listCampaigns(vendorId) {
+    const campaigns = await prisma.campaign.findMany({
+      where: { vendorId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Enrich with actual message stats from Message table
+    const enriched = await Promise.all(
+      campaigns.map(async (c) => {
+        // Count distinct conversations (recipients)
+        const recipients = await prisma.message.groupBy({
+          by: ["conversationId"],
+          where: { campaignId: c.id },
+        });
+
+        // Count messages by status (compute actual sent/failed counts)
+        const messageStats = await prisma.message.groupBy({
+          by: ["status"],
+          where: { campaignId: c.id },
+          _count: { id: true },
+        });
+
+        // Calculate totals from actual database
+        const totalMessages = messageStats.reduce((sum, stat) => sum + stat._count.id, 0);
+        const sentMessages = messageStats
+          .filter(stat => stat.status === "sent" || stat.status === "delivered" || stat.status === "read")
+          .reduce((sum, stat) => sum + stat._count.id, 0);
+        const failedMessages = messageStats
+          .filter(stat => stat.status === "failed")
+          .reduce((sum, stat) => sum + stat._count.id, 0);
+
+        // Determine actual status based on real message completion
+        let actualStatus = c.status;
+
+        if (totalMessages > 0) {
+          // If all messages are sent/failed, mark as completed
+          if (sentMessages + failedMessages >= totalMessages) {
+            actualStatus = "completed";
+          }
+          // If NO messages sent yet, mark as pending (in queue, worker not started)
+          else if (sentMessages === 0 && failedMessages === 0) {
+            actualStatus = "pending";
+          }
+          // If some messages sent, mark as active (worker is processing)
+          else if (sentMessages > 0) {
+            actualStatus = "active";
+          }
+          // If scheduled for future
+          else if (c.scheduledAt && new Date(c.scheduledAt) > new Date()) {
+            actualStatus = "scheduled";
+          }
+        }
+
+        return {
+          ...c,
+          recipientCount: recipients.length,
+          totalMessages,      // Use computed value
+          sentMessages,       // Use computed value
+          failedMessages,     // Use computed value
+          status: actualStatus,
+        };
+      })
+    );
+
+    // Sort by status priority: Active > Pending > Draft > Completed
+    const statusPriority = {
+      active: 1,
+      scheduled: 2,
+      pending: 2,
+      draft: 3,
+      completed: 4,
+      failed: 5,
+    };
+
+    return enriched.sort((a, b) => {
+      const pA = statusPriority[a.status] || 99;
+      const pB = statusPriority[b.status] || 99;
+      if (pA !== pB) return pA - pB;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
   }
 }
 
