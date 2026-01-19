@@ -16,7 +16,7 @@ function log(level, message, meta = {}) {
       level,
       message,
       ...meta,
-    })
+    }),
   );
 }
 
@@ -68,23 +68,50 @@ export async function processWhatsappQueue() {
 
       // 4️⃣ Dispatch based on message type
       if (message.messageType === "image") {
-        whatsappMsgId = await processImageMessage(message, accessToken, to, vendor);
+        whatsappMsgId = await processImageMessage(
+          message,
+          accessToken,
+          to,
+          vendor,
+        );
       } else if (message.messageType === "template") {
-        whatsappMsgId = await processTemplateMessage(message, accessToken, to, vendor);
+        whatsappMsgId = await processTemplateMessage(
+          message,
+          accessToken,
+          to,
+          vendor,
+        );
       } else {
         throw new Error(`Unsupported message type: ${message.messageType}`);
       }
 
       // 5️⃣ FINAL COMMIT (Success)
       await prisma.$transaction(async (tx) => {
+        let sentProps = {};
+
+        if (typeof whatsappMsgId === "object" && whatsappMsgId.whatsappMsgId) {
+          sentProps = {
+            whatsappMessageId: whatsappMsgId.whatsappMsgId,
+            ...(whatsappMsgId.resolvedContent
+              ? { content: whatsappMsgId.resolvedContent }
+              : {}),
+            status: "sent",
+            updatedAt: new Date(),
+          };
+          // Unpack solely for logging/delivery update
+          whatsappMsgId = whatsappMsgId.whatsappMsgId;
+        } else {
+          sentProps = {
+            whatsappMessageId,
+            status: "sent",
+            updatedAt: new Date(),
+          };
+        }
+
         // ✅ Update message
         await tx.message.update({
           where: { id: message.id },
-          data: {
-            status: "sent",
-            whatsappMessageId: whatsappMsgId,
-            updatedAt: new Date(),
-          },
+          data: sentProps,
         });
 
         // ✅ Update ALL deliveries
@@ -92,7 +119,7 @@ export async function processWhatsappQueue() {
           where: { messageId: message.id },
           data: {
             status: "sent",
-            whatsappMsgId,
+            whatsappMsgId, // Now safe string
           },
         });
 
@@ -201,7 +228,7 @@ async function processImageMessage(message, accessToken, to, vendor) {
 
 async function processTemplateMessage(message, accessToken, to, vendor) {
   const { outboundPayload } = message;
-  
+
   if (!outboundPayload || !outboundPayload.templateId) {
     throw new Error("Missing template payload");
   }
@@ -244,13 +271,21 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
   }
 
   // B. Body
-  if (outboundPayload.bodyVariables && outboundPayload.bodyVariables.length > 0) {
-    components.push({
-      type: "body",
-      parameters: outboundPayload.bodyVariables.map((v) => ({
-        type: "text",
-        text: String(v),
-      })),
+  // C. Resolve Body Text for Database
+  let resolvedBody = templateLang.body || "";
+  log("info", "Resolving template body", {
+    originalBody: templateLang.body,
+    variables: outboundPayload.bodyVariables,
+  });
+  if (
+    outboundPayload.bodyVariables &&
+    outboundPayload.bodyVariables.length > 0
+  ) {
+    outboundPayload.bodyVariables.forEach((val, i) => {
+      resolvedBody = resolvedBody.replace(
+        new RegExp(`\\{\\{${i + 1}\\}\\}`, "g"),
+        val,
+      );
     });
   }
 
@@ -258,6 +293,7 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
     messageId: message.id,
     to,
     templateName: template.metaTemplateName,
+    resolvedBodyPreview: resolvedBody,
   });
 
   const result = await sendWhatsAppTemplate({
@@ -269,5 +305,8 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
     components,
   });
 
-  return result.messages?.[0]?.id;
+  return {
+    whatsappMsgId: result.messages?.[0]?.id,
+    resolvedContent: resolvedBody,
+  };
 }

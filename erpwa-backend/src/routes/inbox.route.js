@@ -123,13 +123,88 @@ router.get(
       !!conversation.sessionExpiresAt &&
       conversation.sessionExpiresAt.getTime() > now;
 
+    // ✅ ENRICH: Fetch template details for template messages
+    const templateIds = new Set();
+    conversation.messages.forEach((m) => {
+      if (m.messageType === "template" && m.outboundPayload?.templateId) {
+        templateIds.add(m.outboundPayload.templateId);
+      }
+    });
+
+    let templatesMap = new Map();
+    if (templateIds.size > 0) {
+      const templates = await prisma.template.findMany({
+        where: { id: { in: Array.from(templateIds) } },
+        include: {
+          languages: true,
+          buttons: true,
+          media: true, // ✅ Include media for headers
+        },
+      });
+      templates.forEach((t) => templatesMap.set(t.id, t));
+    }
+
+    // Map messages to include template details in outboundPayload
+    const enrichedMessages = conversation.messages.map((m) => {
+      if (m.messageType !== "template" || !m.outboundPayload?.templateId) {
+        return m;
+      }
+
+      const tmpl = templatesMap.get(m.outboundPayload.templateId);
+      if (!tmpl) return m;
+
+      const langCode = m.outboundPayload.language || "en_US";
+      const tmplLang =
+        tmpl.languages.find((l) => l.language === langCode) ||
+        tmpl.languages[0];
+
+      // Resolve Header
+      let header = null;
+      if (tmplLang?.headerType && tmplLang.headerType !== "NONE") {
+        if (tmplLang.headerType === "TEXT") {
+          header = {
+            type: "TEXT",
+            text: tmplLang.headerText,
+          };
+        } else {
+          // Media Header (Image, Video, Document)
+          const media =
+            tmpl.media.find((med) => med.language === langCode) ||
+            tmpl.media[0];
+
+          if (media) {
+            header = {
+              type: tmplLang.headerType, // IMAGE, VIDEO, DOCUMENT
+              mediaUrl: media.s3Url,
+            };
+          }
+        }
+      }
+
+      return {
+        ...m,
+        outboundPayload: {
+          ...m.outboundPayload,
+          template: {
+            header, // ✅ Added Header
+            footer: tmplLang?.footerText || null,
+            buttons: tmpl.buttons.map((b) => ({
+              type: b.type,
+              text: b.text,
+              value: b.value,
+            })),
+          },
+        },
+      };
+    });
+
     res.json({
       conversationId: conversation.id,
       lead: conversation.lead,
       sessionStarted,
       sessionActive,
       sessionExpiresAt: conversation.sessionExpiresAt,
-      messages: conversation.messages,
+      messages: enrichedMessages,
     });
   }),
 );

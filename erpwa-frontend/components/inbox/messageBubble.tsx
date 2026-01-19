@@ -73,6 +73,59 @@ export default function MessageBubble({
         }
         rounded-lg max-w-[85%] md:max-w-md`}
       >
+        {/* TEMPLATE HEADER (Rich Media) */}
+        {msg.template?.header && (
+          <div className="rounded-t-lg overflow-hidden">
+            {msg.template.header.type === "IMAGE" &&
+              msg.template.header.mediaUrl && (
+                <img
+                  src={msg.template.header.mediaUrl}
+                  alt="Header"
+                  className="w-full h-auto object-cover max-h-[300px]"
+                />
+              )}
+            {msg.template.header.type === "VIDEO" &&
+              msg.template.header.mediaUrl && (
+                <video
+                  src={msg.template.header.mediaUrl}
+                  controls
+                  className="w-full h-auto max-h-[300px]"
+                />
+              )}
+            {msg.template.header.type === "DOCUMENT" &&
+              msg.template.header.mediaUrl && (
+                <div className="flex items-center gap-2 p-3 bg-muted/20 border-b border-border/10">
+                  <div className="p-2 bg-red-100 rounded text-red-600">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                  </div>
+                  <a
+                    href={msg.template.header.mediaUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium hover:underline truncate"
+                  >
+                    Document
+                  </a>
+                </div>
+              )}
+            {msg.template.header.type === "TEXT" &&
+              msg.template.header.text && (
+                <div className="px-3 pt-3 pb-1 font-bold text-sm">
+                  {msg.template.header.text}
+                </div>
+              )}
+          </div>
+        )}
         {/* MEDIA */}
         {isImage && msg.mediaUrl && (
           <img

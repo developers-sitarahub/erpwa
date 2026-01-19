@@ -21,7 +21,7 @@ export default function CreateImageCampaignModal({
   onSuccess?: () => void;
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
-    null
+    null,
   );
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<
     number | null
@@ -34,12 +34,12 @@ export default function CreateImageCampaignModal({
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
   const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
   const isFetchingRef = useRef(false);
 
   const [recipientCategoryId, setRecipientCategoryId] = useState<number | null>(
-    null
+    null,
   );
   const [recipientSubcategoryId, setRecipientSubcategoryId] = useState<
     number | null
@@ -62,7 +62,7 @@ export default function CreateImageCampaignModal({
 
   const fetchRecipients = async (
     categoryId?: number | null,
-    subcategoryId?: number | null
+    subcategoryId?: number | null,
   ) => {
     try {
       const res = await api.get("/recipients/session-active", {
@@ -126,7 +126,7 @@ export default function CreateImageCampaignModal({
             limit: 12,
             page: pageNumber,
           },
-        }
+        },
       );
 
       const newImages = res.data.data.images;
@@ -181,7 +181,7 @@ export default function CreateImageCampaignModal({
           setPage((prev) => prev + 1);
         }
       },
-      { rootMargin: "100px" }
+      { rootMargin: "100px" },
     );
 
     observer.observe(loadMoreRef.current);
@@ -231,7 +231,7 @@ export default function CreateImageCampaignModal({
         name: campaignName,
         categoryId: selectedCategoryId,
         subCategoryId: selectedSubcategoryId,
-        captionMode: "TITLE",
+        captionMode: "DESCRIPTION",
         imageLimit: selectedImages.size,
         conversationIds,
       });
@@ -326,7 +326,7 @@ export default function CreateImageCampaignModal({
                       value={selectedSubcategoryId ?? ""}
                       onChange={(e) =>
                         handleSubcategoryChange(
-                          e.target.value ? Number(e.target.value) : null
+                          e.target.value ? Number(e.target.value) : null,
                         )
                       }
                       className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:border-border"
@@ -393,10 +393,11 @@ export default function CreateImageCampaignModal({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => handleToggleImage(image.id)}
-                        className={`relative overflow-hidden rounded-lg cursor-pointer transition-all border-2 group ${selectedImages.has(image.id)
-                          ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
-                          : "border-border hover:border-primary/50 hover:shadow-md hover:shadow-primary/10"
-                          }`}
+                        className={`relative overflow-hidden rounded-lg cursor-pointer transition-all border-2 group ${
+                          selectedImages.has(image.id)
+                            ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
+                            : "border-border hover:border-primary/50 hover:shadow-md hover:shadow-primary/10"
+                        }`}
                       >
                         <Image
                           src={image.image_url || "/placeholder.svg"}
@@ -457,7 +458,7 @@ export default function CreateImageCampaignModal({
                     value={recipientCategoryId ?? ""}
                     onChange={(e) =>
                       handleRecipientCategoryChange(
-                        e.target.value ? Number(e.target.value) : null
+                        e.target.value ? Number(e.target.value) : null,
                       )
                     }
                     className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground text-sm"
@@ -475,7 +476,7 @@ export default function CreateImageCampaignModal({
                     disabled={!recipientCategoryId}
                     onChange={(e) =>
                       handleRecipientSubcategoryChange(
-                        e.target.value ? Number(e.target.value) : null
+                        e.target.value ? Number(e.target.value) : null,
                       )
                     }
                     className="w-full px-3 py-2 bg-input border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
@@ -512,10 +513,11 @@ export default function CreateImageCampaignModal({
                           className="flex items-center gap-3 p-3 cursor-pointer transition-colors"
                         >
                           <div
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${selectedRecipients.has(contact.id)
-                              ? "bg-primary border-primary"
-                              : "border-primary hover:border-primary"
-                              }`}
+                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                              selectedRecipients.has(contact.id)
+                                ? "bg-primary border-primary"
+                                : "border-primary hover:border-primary"
+                            }`}
                           >
                             {selectedRecipients.has(contact.id) && (
                               <Check className="w-2.5 h-2.5 text-foreground" />
@@ -577,10 +579,11 @@ export default function CreateImageCampaignModal({
               whileTap={{ scale: canLaunch && !isLaunching ? 0.98 : 1 }}
               onClick={handleLaunch}
               disabled={!canLaunch || isLaunching}
-              className={`px-6 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${canLaunch && !isLaunching
-                ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/50"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
-                }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
+                canLaunch && !isLaunching
+                  ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/50"
+                  : "bg-muted text-muted-foreground cursor-not-allowed"
+              }`}
             >
               <Zap className="w-4 h-4" />
               {isLaunching ? "Launching..." : "Launch Campaign"}

@@ -64,6 +64,7 @@ interface ApiConversation {
   };
   messages: {
     content: string;
+    messageType?: string; // ✅ Added
     direction: "inbound" | "outbound";
     status?: "sent" | "delivered" | "read" | "failed" | "received";
     createdAt: string;
@@ -866,12 +867,19 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
     lastMessage: (() => {
       if (!lastMsg) return "";
 
+      // ✅ Check messageType first for reliable media indication
+      if (lastMsg.messageType === "image") return "📷 Photo";
+      if (lastMsg.messageType === "video") return "🎥 Video";
+      if (lastMsg.messageType === "audio") return "🎵 Audio";
+      if (lastMsg.messageType === "document") return "📄 Document";
+
+      // Fallback to content checks
       if (lastMsg.content?.startsWith("[image")) return "📷 Photo";
       if (lastMsg.content?.startsWith("[video")) return "🎥 Video";
       if (lastMsg.content?.startsWith("[audio")) return "🎵 Audio";
       if (lastMsg.content?.startsWith("[document")) return "📄 Document";
 
-      return lastMsg.content;
+      return lastMsg.content || "";
     })(),
     lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
       hour: "2-digit",
