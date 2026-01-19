@@ -32,7 +32,13 @@ import Image from "next/image";
 import { toast } from "react-toastify";
 import { galleryAPI } from "@/lib/galleryApi";
 import { categoriesAPI } from "@/lib/categoriesApi";
-import type { Category, GalleryImage, Message, Template, Conversation } from "@/lib/types";
+import type {
+  Category,
+  GalleryImage,
+  Message,
+  Template,
+  Conversation,
+} from "@/lib/types";
 import ChatMessages from "@/components/inbox/chatMessages";
 import ConversationList from "@/components/inbox/conversationList";
 import ChatHeader from "@/components/inbox/chatHeader";
@@ -90,7 +96,7 @@ interface ApiMessage {
 
 const getConversationTick = (
   direction?: "inbound" | "outbound",
-  status?: "sent" | "delivered" | "read" | "failed" | "received"
+  status?: "sent" | "delivered" | "read" | "failed" | "received",
 ) => {
   // 🔒 HARD RULE: ticks ONLY for outbound
   if (direction !== "outbound") return null;
@@ -113,8 +119,6 @@ const getConversationTick = (
   }
 };
 
-
-
 function ChatArea({
   conversation,
   messages,
@@ -129,7 +133,10 @@ function ChatArea({
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   readSentRef: React.MutableRefObject<Set<string>>;
   onBack?: () => void;
-  onUpdateConversationStatus?: (conversationId: string, status: Message["status"]) => void;
+  onUpdateConversationStatus?: (
+    conversationId: string,
+    status: Message["status"],
+  ) => void;
   onMarkAsRead?: (conversationId: string) => void;
 }) {
   const [inputValue, setInputValue] = useState("");
@@ -155,7 +162,7 @@ function ChatArea({
 
     try {
       const processed = await Promise.all(
-        Array.from(e.target.files).map((f) => processMedia(f))
+        Array.from(e.target.files).map((f) => processMedia(f)),
       );
 
       const files = processed.map((p) => p.file);
@@ -187,7 +194,7 @@ function ChatArea({
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
-    null
+    null,
   );
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
   const [isSendingTemplate, setIsSendingTemplate] = useState(false);
@@ -196,7 +203,7 @@ function ChatArea({
   // Gallery State
   const [galleryCategories, setGalleryCategories] = useState<Category[]>([]);
   const [gallerySubcategories, setGallerySubcategories] = useState<Category[]>(
-    []
+    [],
   );
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [selectedGalleryCategory, setSelectedGalleryCategory] = useState<
@@ -241,7 +248,9 @@ function ChatArea({
       api
         .get("/vendor/templates")
         .then((res) => {
-          const approved = res.data.filter((t: Template) => t.status === "approved");
+          const approved = res.data.filter(
+            (t: Template) => t.status === "approved",
+          );
           setTemplates(approved);
         })
         .catch((err) => console.error("Failed to load templates", err));
@@ -280,7 +289,7 @@ function ChatArea({
 
   const loadGalleryImages = async (
     categoryId?: number,
-    subCategoryId?: number
+    subCategoryId?: number,
   ) => {
     setGalleryLoading(true);
     try {
@@ -290,7 +299,7 @@ function ChatArea({
         1,
         50,
         "createdAt",
-        "desc"
+        "desc",
       );
       setGalleryImages(res.data?.images || []);
     } catch (err) {
@@ -305,14 +314,14 @@ function ChatArea({
 
     // Check if all visible images are selected
     const allVisibleSelected = galleryImages.every((img) =>
-      selectedGalleryImages.some((s) => s.id === img.id)
+      selectedGalleryImages.some((s) => s.id === img.id),
     );
 
     if (allVisibleSelected) {
       // Deselect all visible
       const visibleIds = new Set(galleryImages.map((i) => i.id));
       setSelectedGalleryImages((prev) =>
-        prev.filter((i) => !visibleIds.has(i.id))
+        prev.filter((i) => !visibleIds.has(i.id)),
       );
     } else {
       // Select all visible (merging with existing selection)
@@ -340,7 +349,7 @@ function ChatArea({
 
         // Fetch blob via proxy
         const blobResp = await fetch(
-          `/api/proxy?url=${encodeURIComponent(url)}`
+          `/api/proxy?url=${encodeURIComponent(url)}`,
         );
         const blob = await blobResp.blob();
 
@@ -390,7 +399,7 @@ function ChatArea({
         templateId: selectedTemplate.id,
         recipients: [conversation.phone],
         bodyVariables: templateVariables.map(
-          (v) => v.trim() || "Valued Customer"
+          (v) => v.trim() || "Valued Customer",
         ),
       });
       setMediaModal(null);
@@ -621,13 +630,9 @@ function ChatArea({
 
   return (
     <div className="flex-1 flex flex-col bg-muted/20 relative h-full overflow-hidden">
-      <ChatHeader
-        conversation={conversation}
-        onBack={onBack}
-      />
+      <ChatHeader conversation={conversation} onBack={onBack} />
 
       <SessionBanner
-        sessionStarted={sessionStarted}
         isSessionActive={isSessionActive}
         remainingTime={remainingTime}
       />
@@ -642,7 +647,7 @@ function ChatArea({
       bg-[url('/chat-bg.png')]
       bg-repeat
       bg-center
-      opacity-100 dark:opacity-[0.5]
+      opacity-50 dark:opacity-[0.5]
       pointer-events-none
     "
         />
@@ -652,14 +657,11 @@ function ChatArea({
           messages={messages}
           conversation={conversation}
           messagesEndRef={messagesEndRef}
-          onOpenMenu={(message, rect) =>
-            setActionMenu({ message, rect })
-          }
+          onOpenMenu={(message, rect) => setActionMenu({ message, rect })}
           onReply={(m) => setReplyTo(m)}
           setInputValue={setInputValue}
           inputRef={inputRef}
         />
-
       </div>
 
       <ChatFooter
@@ -688,13 +690,11 @@ function ChatArea({
         mediaModal={mediaModal}
         onClose={() => setMediaModal(null)}
         setMediaModal={setMediaModal}
-
         /* IMAGE */
         imageMode={imageMode}
         setImageMode={setImageMode}
         imageInputRef={imageInputRef}
         handleImageSelect={handleImageSelect}
-
         /* FILE */
         genericInputRef={genericInputRef}
         handleGenericFiles={async (files) => {
@@ -715,7 +715,6 @@ function ChatArea({
             toast.error("Failed to send media");
           }
         }}
-
         /* GALLERY */
         galleryCategories={galleryCategories}
         gallerySubcategories={gallerySubcategories}
@@ -724,7 +723,6 @@ function ChatArea({
         galleryLoading={galleryLoading}
         includeCaption={includeCaption}
         isPreparingMedia={isPreparingMedia}
-
         setSelectedGalleryImages={setSelectedGalleryImages}
         setIncludeCaption={setIncludeCaption}
         handleGalleryCategoryClick={handleGalleryCategoryClick}
@@ -734,7 +732,6 @@ function ChatArea({
         selectedGalleryCategory={selectedGalleryCategory}
         selectedGallerySubcategory={selectedGallerySubcategory}
         setSelectedGallerySubcategory={setSelectedGallerySubcategory}
-
         /* TEMPLATE */
         templates={templates}
         selectedTemplate={selectedTemplate}
@@ -785,7 +782,6 @@ function ChatArea({
         }
         onSend={sendImageFromPreview}
       />
-
     </div>
   );
 }
@@ -853,11 +849,15 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
   const lastMsg = c.messages?.[c.messages.length - 1];
 
   // ✅ Use backend's unreadCount if available, otherwise calculate from messages
-  const unreadCount = c.unreadCount ??
-    (c.messages?.filter((m) => m.direction === "inbound" && m.status !== "read")
-      .length ?? 0);
+  const unreadCount =
+    c.unreadCount ??
+    c.messages?.filter((m) => m.direction === "inbound" && m.status !== "read")
+      .length ??
+    0;
 
-  console.log(`📊 Conversation ${c.lead.companyName}: unreadCount = ${unreadCount} (from backend: ${c.unreadCount}), total messages = ${c.messages?.length}`);
+  console.log(
+    `📊 Conversation ${c.lead.companyName}: unreadCount = ${unreadCount} (from backend: ${c.unreadCount}), total messages = ${c.messages?.length}`,
+  );
 
   return {
     id: c.id,
@@ -895,16 +895,21 @@ export default function InboxPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
 
-  useEffect(() => {
-    const loadInbox = async () => {
-      try {
-        const res = await api.get<ApiConversation[]>("/inbox");
-        setConversations(res.data.map(mapApiConversation));
-      } catch (err) {
-        console.error("❌ Failed to load inbox", err);
-      }
-    };
+  const loadInbox = async () => {
+    console.time("⏱️ Load Inbox API Call");
+    try {
+      const res = await api.get<ApiConversation[]>("/inbox");
+      console.timeEnd("⏱️ Load Inbox API Call");
+      console.time("⏱️ Map Conversations");
+      setConversations(res.data.map(mapApiConversation));
+      console.timeEnd("⏱️ Map Conversations");
+      console.log(`📊 Loaded ${res.data.length} conversations`);
+    } catch (err) {
+      console.error("❌ Failed to load inbox", err);
+    }
+  };
 
+  useEffect(() => {
     loadInbox();
   }, []);
 
@@ -952,12 +957,12 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                  footer: m.outboundPayload.footer,
-                  buttons: m.outboundPayload.buttons,
-                }
+                    footer: m.outboundPayload.footer,
+                    buttons: m.outboundPayload.buttons,
+                  }
                 : undefined),
           };
-        }
+        },
       );
 
       setMessages((prev) => {
@@ -965,7 +970,7 @@ export default function InboxPage() {
         mappedMessages.forEach((m) => map.set(m.id, m));
         return Array.from(map.values()).sort(
           (a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
         );
       });
 
@@ -973,13 +978,13 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              sessionStarted: res.data.sessionStarted,
-              sessionActive: res.data.sessionActive,
-              sessionExpiresAt: res.data.sessionExpiresAt,
-            }
-            : c
-        )
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
+            : c,
+        ),
       );
     } catch (err) {
       console.error("Failed to load conversation", err);
@@ -988,13 +993,16 @@ export default function InboxPage() {
   };
 
   // ✅ Update conversation's last message status in real-time
-  const handleUpdateConversationStatus = (conversationId: string, status: Message["status"]) => {
+  const handleUpdateConversationStatus = (
+    conversationId: string,
+    status: Message["status"],
+  ) => {
     setConversations((prev) =>
       prev.map((c) =>
         c.id === conversationId && c.lastMessageDirection === "outbound"
           ? { ...c, lastMessageStatus: status }
-          : c
-      )
+          : c,
+      ),
     );
   };
 
@@ -1005,25 +1013,27 @@ export default function InboxPage() {
       prev.map((c) =>
         c.id === conversationId
           ? { ...c, unreadCount: 0, hasUnread: false }
-          : c
-      )
+          : c,
+      ),
     );
   };
 
   const currentConversation = conversations.find(
-    (c) => c.id === selectedConversation
+    (c) => c.id === selectedConversation,
   );
 
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
       <div
-        className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full`}
+        className={`${
+          showChat ? "hidden md:block" : "block"
+        } w-full md:w-auto h-full`}
       >
         <ConversationList
           conversations={conversations}
           selected={selectedConversation}
           onSelect={handleSelectConversation}
+          onReload={loadInbox}
         />
       </div>
       <div
