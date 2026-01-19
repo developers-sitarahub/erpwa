@@ -78,3 +78,78 @@ export interface Campaign {
   recipientCount: number;
   createdAt: string;
 }
+
+export interface Conversation {
+  id: string;
+  companyName: string;
+  phone: string;
+
+  lastMessage: string;
+  lastActivity: string;
+
+  lastMessageDirection?: "inbound" | "outbound";
+  lastMessageStatus?: "sent" | "delivered" | "read" | "received" | "failed";
+  unreadCount?: number;
+  hasUnread?: boolean;
+
+  sessionStarted?: boolean; // ✅ ADD
+  sessionActive?: boolean; // ✅ ADD
+  sessionExpiresAt?: string | null;
+  templateRequired?: boolean;
+}
+
+export interface Message {
+  id: string;
+  whatsappMessageId?: string;
+  replyToMessageId?: string;
+
+  replyTo?: {
+    sender: "customer" | "executive";
+    text?: string;
+    mediaUrl?: string;
+    mimeType?: string;
+    caption?: string;
+  };
+
+  text?: string;
+  mediaUrl?: string;
+  mimeType?: string;
+  caption?: string;
+
+  sender: "customer" | "executive";
+  timestamp: string;
+  status?: "sent" | "delivered" | "read" | "failed" | "received";
+
+  template?: {
+    footer?: string;
+    buttons?: Array<{ text: string; type: string; value?: string }>;
+  };
+  optimistic?: boolean;
+  clientTempId?: string;
+}
+
+export interface Template {
+  id: string;
+  metaTemplateName: string;
+  displayName: string;
+  category: string;
+  status: string;
+  languages: {
+    language: string;
+    body: string;
+    headerType: string;
+    footerText?: string;
+    headerText?: string;
+  }[];
+  media?: {
+    id: string;
+    mediaType: string;
+    s3Url: string;
+    language: string;
+  }[];
+  buttons?: {
+    type: string;
+    text: string;
+    value?: string;
+  }[];
+}

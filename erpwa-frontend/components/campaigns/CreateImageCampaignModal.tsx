@@ -145,23 +145,31 @@ export default function CreateImageCampaignModal({
   const handleCategoryChange = (categoryId: number) => {
     setSelectedCategoryId(categoryId);
     setSelectedSubcategoryId(null);
+    setSelectedImages(new Set()); // Clear selected images when category changes
     setImages([]);
     setPage(1);
     setHasMoreImages(true);
-    fetchImages(1, true);
+    isFetchingRef.current = false; // Reset fetching flag
   };
 
   const handleSubcategoryChange = (subcategoryId: number | null) => {
     setSelectedSubcategoryId(subcategoryId);
+    setSelectedImages(new Set()); // Clear selected images when subcategory changes
     setImages([]);
     setPage(1);
     setHasMoreImages(true);
-    fetchImages(1, true);
+    isFetchingRef.current = false; // Reset fetching flag
   };
 
   useEffect(() => {
     if (!selectedCategoryId) return;
-    fetchImages(page, page === 1);
+    // Only fetch if page > 1 (pagination), otherwise let the change handlers do it
+    if (page > 1) {
+      fetchImages(page, false);
+    } else {
+      // For page 1, fetch with reset
+      fetchImages(1, true);
+    }
   }, [page, selectedCategoryId, selectedSubcategoryId]);
 
   useEffect(() => {
@@ -570,8 +578,8 @@ export default function CreateImageCampaignModal({
               onClick={handleLaunch}
               disabled={!canLaunch || isLaunching}
               className={`px-6 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${canLaunch && !isLaunching
-                  ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/50"
-                  : "bg-muted text-muted-foreground cursor-not-allowed"
+                ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/50"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
                 }`}
             >
               <Zap className="w-4 h-4" />
