@@ -83,6 +83,8 @@ export interface Conversation {
   id: string;
   companyName: string;
   phone: string;
+  status?: "new" | "contacted" | "qualified" | "converted" | "lost";
+  leadId?: number;
 
   lastMessage: string;
   lastActivity: string;

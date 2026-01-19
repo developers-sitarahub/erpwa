@@ -31,6 +31,7 @@ router.get(
             id: true,
             phoneNumber: true,
             companyName: true,
+            status: true, // ✅ Status included
           },
         },
         messages: {
@@ -98,6 +99,7 @@ router.get(
             id: true,
             phoneNumber: true,
             companyName: true,
+            status: true, // ✅ Status included
           },
         },
         messages: {

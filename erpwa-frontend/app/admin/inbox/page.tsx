@@ -32,6 +32,7 @@ import Image from "next/image";
 import { toast } from "react-toastify";
 import { galleryAPI } from "@/lib/galleryApi";
 import { categoriesAPI } from "@/lib/categoriesApi";
+import { leadsAPI } from "@/lib/leadsApi";
 import type {
   Category,
   GalleryImage,
@@ -59,8 +60,10 @@ import { useInboxSocket } from "@/hooks/useInboxSocket";
 interface ApiConversation {
   id: string;
   lead: {
+    id: number;
     companyName: string | null;
     phoneNumber: string;
+    status?: "new" | "contacted" | "qualified" | "converted" | "lost";
   };
   messages: {
     content: string;
@@ -128,6 +131,7 @@ function ChatArea({
   onBack,
   onUpdateConversationStatus,
   onMarkAsRead,
+  onUpdateLeadStatus,
 }: {
   conversation: Conversation;
   messages: Message[];
@@ -139,6 +143,7 @@ function ChatArea({
     status: Message["status"],
   ) => void;
   onMarkAsRead?: (conversationId: string) => void;
+  onUpdateLeadStatus?: (leadId: number, status: string) => Promise<void>;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -630,8 +635,12 @@ function ChatArea({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-muted/20 relative h-full overflow-hidden">
-      <ChatHeader conversation={conversation} onBack={onBack} />
+    <div className="flex-1 flex flex-col relative h-full overflow-hidden">
+      <ChatHeader
+        conversation={conversation}
+        onBack={onBack}
+        onUpdateLeadStatus={onUpdateLeadStatus}
+      />
 
       <SessionBanner
         isSessionActive={isSessionActive}
@@ -644,14 +653,14 @@ function ChatArea({
         <div
           className="
       absolute inset-0
-      bg-[#ECE5DD] dark:bg-[#0B141A]
-      bg-[url('/chat-bg.png')]
-      bg-repeat
-      bg-center
-      opacity-50 dark:opacity-[0.5]
+      bg-wa-chat-bg
       pointer-events-none
     "
-        />
+        >
+          <div
+            className="absolute inset-0 bg-[url('/chat-bg.png')] bg-repeat bg-center opacity-30 dark:opacity-[0.5]"
+          />
+        </div>
 
         {/* SCROLLABLE MESSAGES */}
         <ChatMessages
@@ -864,6 +873,9 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
     id: c.id,
     companyName: c.lead.companyName || c.lead.phoneNumber,
     phone: c.lead.phoneNumber,
+    status: c.lead.status || "new",
+    leadId: c.lead.id,
+
     lastMessage: (() => {
       if (!lastMsg) return "";
 
@@ -965,9 +977,9 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                    footer: m.outboundPayload.footer,
-                    buttons: m.outboundPayload.buttons,
-                  }
+                  footer: m.outboundPayload.footer,
+                  buttons: m.outboundPayload.buttons,
+                }
                 : undefined),
           };
         },
@@ -986,11 +998,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-                ...c,
-                sessionStarted: res.data.sessionStarted,
-                sessionActive: res.data.sessionActive,
-                sessionExpiresAt: res.data.sessionExpiresAt,
-              }
+              ...c,
+              sessionStarted: res.data.sessionStarted,
+              sessionActive: res.data.sessionActive,
+              sessionExpiresAt: res.data.sessionExpiresAt,
+            }
             : c,
         ),
       );
@@ -1026,6 +1038,29 @@ export default function InboxPage() {
     );
   };
 
+  // ✅ Update lead status
+  const handleUpdateLeadStatus = async (leadId: number, status: string) => {
+    try {
+      if (!leadId) return;
+
+      const formData = new FormData();
+      formData.append("status", status);
+
+      await leadsAPI.update(leadId, formData);
+
+      // Update local state
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.leadId === leadId ? { ...c, status: status as any } : c
+        )
+      );
+      toast.success("Lead status updated");
+    } catch (err) {
+      console.error("Failed to update status", err);
+      toast.error("Failed to update status");
+    }
+  };
+
   const currentConversation = conversations.find(
     (c) => c.id === selectedConversation,
   );
@@ -1033,9 +1068,8 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
       <div
-        className={`${
-          showChat ? "hidden md:block" : "block"
-        } w-full md:w-auto h-full`}
+        className={`${showChat ? "hidden md:block" : "block"
+          } w-full md:w-auto h-full`}
       >
         <ConversationList
           conversations={conversations}
@@ -1056,6 +1090,7 @@ export default function InboxPage() {
             onBack={() => setShowChat(false)}
             onUpdateConversationStatus={handleUpdateConversationStatus}
             onMarkAsRead={handleMarkAsRead}
+            onUpdateLeadStatus={handleUpdateLeadStatus}
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-muted/20">
