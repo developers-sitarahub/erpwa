@@ -89,16 +89,16 @@ export default function WhatsAppSetupPage() {
   }, [user]);
 
   /* ================= PREFILL FORM ON EDIT ================= */
-
   useEffect(() => {
-    if (isEditing && config) {
-      setForm({
-        whatsappBusinessId: config.whatsappBusinessId || "",
-        whatsappPhoneNumberId: config.whatsappPhoneNumberId || "",
-        whatsappAccessToken: "", // never prefill token
-      });
-    }
-  }, [isEditing, config]);
+    if (!config.whatsappBusinessId || !config.whatsappPhoneNumberId) return;
+
+    setForm((prev) => ({
+      ...prev,
+      whatsappBusinessId: config.whatsappBusinessId!,
+      whatsappPhoneNumberId: config.whatsappPhoneNumberId!,
+      whatsappAccessToken: "", // never prefill token
+    }));
+  }, [config.whatsappBusinessId, config.whatsappPhoneNumberId]);
 
   /* ================= SUBMIT ================= */
 

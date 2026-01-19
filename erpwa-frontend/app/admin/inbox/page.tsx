@@ -766,21 +766,27 @@ function ChatArea({
     if (!inputValue.trim() || sending) return;
 
     const text = inputValue.trim();
+    // 1️⃣ Capture values needed for API
+    const currentReplyToId = replyTo?.whatsappMessageId;
+    
+    // 2️⃣ Reset ALL UI state immediately
     setInputValue("");
     setSending(true);
+    setReplyTo(null); // ✅ Clear reply context instantly
+    setMediaModal(null);
+    setShowAttachMenu(false);
+    setImagePreview(null);
 
     try {
       await api.post("/vendor/whatsapp/send-message", {
         conversationId: conversation.id,
         text,
-        replyToMessageId: replyTo?.whatsappMessageId,
+        replyToMessageId: currentReplyToId,
       });
 
-      setReplyTo(null);
       requestAnimationFrame(() => inputRef.current?.focus());
     } catch (err) {
       console.error("Failed to send message", err);
-      // optional: toast / snackbar
     } finally {
       setSending(false);
     }
@@ -1078,36 +1084,8 @@ function ChatArea({
                         {/* 📝 CONTENT AREA */}
                         {!isMediaOnly && (
                           <div className="px-3 py-1.5 flex flex-col">
-                            {/* REPLIED MESSAGE PREVIEW */}
-                            {(() => {
-                              const reply = getReplyPreview(
-                                msg.replyTo ?? repliedMessage
-                              );
-                              if (!reply) return null;
-                              return (
-                                <div className="mb-2 flex gap-2 px-2 py-1.5 border-l-4 border-[#25D366] bg-black/5 dark:bg-white/5 rounded text-[11px]">
-                                  {reply.thumb && (
-                                    <div className="relative w-8 h-8 flex-shrink-0">
-                                      <Image
-                                        src={reply.thumb}
-                                        alt=""
-                                        fill
-                                        sizes="32px"
-                                        className="rounded object-cover"
-                                      />
-                                    </div>
-                                  )}
-                                  <div className="min-w-0">
-                                    <div className="font-semibold text-[#25D366] truncate">
-                                      {reply.title}
-                                    </div>
-                                    <div className="text-muted-foreground truncate">
-                                      {reply.subtitle}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
+                            {/* REPLIED MESSAGE PREVIEW - DISABLED */}
+                            {/* Temporarily disabled to remove unwanted reply thumbnails */}
 
                             {/* AUDIO */}
                             {msg.mediaUrl &&

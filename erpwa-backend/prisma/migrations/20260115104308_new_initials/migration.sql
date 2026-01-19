@@ -36,6 +36,7 @@ CREATE TABLE "User" (
     "status" TEXT NOT NULL DEFAULT 'active',
     "isOnline" BOOLEAN NOT NULL DEFAULT false,
     "lastLoginAt" TIMESTAMP(3),
+    "activatedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -66,17 +67,6 @@ CREATE TABLE "PasswordResetOtp" (
 );
 
 -- CreateTable
-CREATE TABLE "LeadCategory" (
-    "id" TEXT NOT NULL,
-    "vendorId" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "parentId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "LeadCategory_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "Lead" (
     "id" TEXT NOT NULL,
     "vendorId" TEXT NOT NULL,
@@ -88,17 +78,15 @@ CREATE TABLE "Lead" (
     "optInAt" TIMESTAMP(3),
     "blockedAt" TIMESTAMP(3),
     "lastContactedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-    "category" TEXT NOT NULL DEFAULT 'standard',
     "city" TEXT,
     "companyName" TEXT,
     "email" TEXT,
-    "subcategory" TEXT,
-    "categoryId" INTEGER,
     "salesPersonName" TEXT,
+    "categoryId" INTEGER,
     "subCategoryId" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Lead_pkey" PRIMARY KEY ("id")
 );
@@ -261,17 +249,18 @@ CREATE TABLE "Message" (
     "conversationId" TEXT NOT NULL,
     "campaignId" TEXT,
     "senderId" TEXT,
+    "albumId" TEXT,
     "direction" TEXT NOT NULL,
     "channel" TEXT NOT NULL DEFAULT 'whatsapp',
     "messageType" TEXT,
     "content" TEXT,
-    "albumId" TEXT,
     "inboundPayload" JSONB,
     "outboundPayload" JSONB,
     "whatsappMessageId" TEXT,
     "replyToMessageId" TEXT,
     "status" TEXT,
     "errorCode" TEXT,
+    "retryCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -342,12 +331,6 @@ CREATE INDEX "PasswordResetOtp_userId_idx" ON "PasswordResetOtp"("userId");
 
 -- CreateIndex
 CREATE INDEX "Lead_email_idx" ON "Lead"("email");
-
--- CreateIndex
-CREATE INDEX "Lead_category_idx" ON "Lead"("category");
-
--- CreateIndex
-CREATE INDEX "Lead_subcategory_idx" ON "Lead"("subcategory");
 
 -- CreateIndex
 CREATE INDEX "Lead_categoryId_idx" ON "Lead"("categoryId");
@@ -431,12 +414,6 @@ ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY
 ALTER TABLE "PasswordResetOtp" ADD CONSTRAINT "PasswordResetOtp_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "LeadCategory" ADD CONSTRAINT "LeadCategory_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "LeadCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "LeadCategory" ADD CONSTRAINT "LeadCategory_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Lead" ADD CONSTRAINT "Lead_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -494,19 +471,19 @@ ALTER TABLE "Campaign" ADD CONSTRAINT "Campaign_templateId_fkey" FOREIGN KEY ("t
 ALTER TABLE "Campaign" ADD CONSTRAINT "Campaign_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Message" ADD CONSTRAINT "Message_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "MediaAlbum"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Message" ADD CONSTRAINT "Message_campaignId_fkey" FOREIGN KEY ("campaignId") REFERENCES "Campaign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Message" ADD CONSTRAINT "Message_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Message" ADD CONSTRAINT "Message_campaignId_fkey" FOREIGN KEY ("campaignId") REFERENCES "Campaign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Message" ADD CONSTRAINT "Message_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Message" ADD CONSTRAINT "Message_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "MediaAlbum"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MediaAlbum" ADD CONSTRAINT "MediaAlbum_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
