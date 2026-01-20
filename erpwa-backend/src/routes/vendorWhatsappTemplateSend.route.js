@@ -100,6 +100,27 @@ router.post(
       const currentButtonVars = msgButtonVars || buttonVariables;
 
       const to = String(rawTo).replace(/\D/g, ""); // Remove non-digits
+
+      /** 🛡️ ROLE-BASED CHECK */
+      if (req.user.role === "sales") {
+        const existingLead = await prisma.lead.findFirst({
+          where: { vendorId: vendor.id, phoneNumber: to },
+        });
+
+        if (
+          existingLead &&
+          existingLead.salesPersonName &&
+          existingLead.salesPersonName !== req.user.name
+        ) {
+          results.push({
+            to,
+            success: false,
+            error: "Lead is assigned to another sales person",
+          });
+          continue;
+        }
+      }
+
       try {
         const components = [];
 
@@ -186,13 +207,21 @@ router.post(
               phoneNumber: to,
             },
           },
-          update: { lastContactedAt: new Date() },
+          update: {
+            lastContactedAt: new Date(),
+            ...(req.user.role === "sales" && {
+              salesPersonName: req.user.name,
+            }), // Auto-assign if sending
+          },
           create: {
             vendorId: vendor.id,
             phoneNumber: to,
             whatsappOptIn: true,
             optInSource: "outbound_template",
             optInAt: new Date(),
+            ...(req.user.role === "sales" && {
+              salesPersonName: req.user.name,
+            }),
           },
         });
 

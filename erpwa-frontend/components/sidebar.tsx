@@ -3,16 +3,28 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/context/authContext"
-import { Home, MessageSquare, Send, Users, FileText, Settings, LogOut, ChevronRight, Menu, X } from "lucide-react"
+import {
+  LayoutDashboard,
+  MessageSquare,
+  FileText,
+  Megaphone,
+  Folder,
+  Image as ImageIcon,
+  Settings,
+  LogOut,
+  ChevronRight,
+  Menu,
+  X,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSidebar } from "@/context/sidebar-provider"
 import { useState, useEffect } from "react"
 
 interface SidebarProps {
-  userRole?: "admin" | "sales_executive"
+  userRole?: "vendor_owner" | "vendor_admin" | "sales"
 }
 
-export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
+export function Sidebar({ userRole = "sales" }: SidebarProps) {
   const pathname = usePathname()
   const { isCollapsed, toggleSidebar } = useSidebar()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -27,12 +39,12 @@ export function Sidebar({ userRole = "sales_executive" }: SidebarProps) {
   }, [])
 
   const menuItems = [
-    { href: "/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/inbox", icon: MessageSquare, label: "Inbox" },
-    { href: "/send-message", icon: Send, label: "Send Message" },
-    { href: "/leads", icon: Users, label: "Leads" },
     { href: "/templates", icon: FileText, label: "Templates" },
-    ...(userRole === "admin" ? [{ href: "/users", icon: Users, label: "Users" }] : []),
+    { href: "/campaigns", icon: Megaphone, label: "Campaigns" },
+    { href: "/categories", icon: Folder, label: "Categories" },
+    { href: "/gallery", icon: ImageIcon, label: "Gallery" },
     { href: "/settings", icon: Settings, label: "Settings" },
   ]
 

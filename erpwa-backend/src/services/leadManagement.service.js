@@ -10,12 +10,18 @@ class LeadManagementService {
    * List all leads with optional filtering
    * Returns leads array and total count
    */
-  static async list(vendorId, filters = {}) {
+  static async list(user, filters = {}) {
     const { category_id, subcategory_id, status } = filters;
+    const vendorId = user.vendorId;
 
     const where = {
       vendorId,
     };
+
+    // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
 
     if (subcategory_id && !isNaN(subcategory_id)) {
       where.subCategoryId = parseInt(subcategory_id);
@@ -88,12 +94,20 @@ class LeadManagementService {
   /**
    * Get lead by ID
    */
-  static async getById(vendorId, id) {
+  static async getById(user, id) {
+    const vendorId = user.vendorId;
+    const where = {
+      id,
+      vendorId,
+    };
+
+    // 🔒 ROLE-BASED FILTERING
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
+
     const lead = await prisma.lead.findFirst({
-      where: {
-        id,
-        vendorId,
-      },
+      where,
       include: {
         leadCategory: {
           select: {
@@ -134,7 +148,8 @@ class LeadManagementService {
   /**
    * Create a single lead
    */
-  static async create(vendorId, data) {
+  static async create(user, data) {
+    const vendorId = user.vendorId;
     const {
       company_name,
       mobile_number,
@@ -192,6 +207,9 @@ class LeadManagementService {
       }
     }
 
+    // 🛡️ ROLE-BASED: Auto-assign if salesperson is creating
+    const finalSalesPersonName = (user.role === "sales") ? user.name : (sales_person_name?.trim() || null);
+
     // Create lead
     const lead = await prisma.lead.create({
       data: {
@@ -202,7 +220,7 @@ class LeadManagementService {
         city: city?.trim() || null,
         categoryId: category_id ? parseInt(category_id) : null,
         subCategoryId: subcategory_id ? parseInt(subcategory_id) : null,
-        salesPersonName: sales_person_name?.trim() || null,
+        salesPersonName: finalSalesPersonName,
         status: status,
       },
       include: {
@@ -234,7 +252,7 @@ class LeadManagementService {
           companyName: company_name?.trim() || lead.companyName || "",
           categoryId: category_id ? parseInt(category_id) : null,
           subCategoryId: subcategory_id ? parseInt(subcategory_id) : null,
-          salesPersonName: sales_person_name?.trim() || lead.salesPersonName || null,
+          salesPersonName: finalSalesPersonName || lead.salesPersonName || null,
           status: status === "converted" ? "active" : status === "lost" ? "closed" : "pending",
           updatedAt: new Date(),
         },
@@ -244,7 +262,7 @@ class LeadManagementService {
           mobileNumber: mobile_number.trim(),
           categoryId: category_id ? parseInt(category_id) : null,
           subCategoryId: subcategory_id ? parseInt(subcategory_id) : null,
-          salesPersonName: sales_person_name?.trim() || null,
+          salesPersonName: finalSalesPersonName || null,
           status: status === "converted" ? "active" : status === "lost" ? "closed" : "pending",
         },
       });
@@ -275,7 +293,7 @@ class LeadManagementService {
   /**
    * Bulk create leads
    */
-  static async bulkCreate(vendorId, leadsData) {
+  static async bulkCreate(user, leadsData) {
     if (!Array.isArray(leadsData) || leadsData.length === 0) {
       throw new Error("Leads data is required");
     }
@@ -286,7 +304,7 @@ class LeadManagementService {
     for (let i = 0; i < leadsData.length; i++) {
       const leadData = leadsData[i];
       try {
-        const result = await this.create(vendorId, leadData);
+        const result = await this.create(user, leadData);
         results.push(result.lead);
       } catch (error) {
         errors.push({
@@ -307,68 +325,27 @@ class LeadManagementService {
   }
 
   /**
-   * Helper method to sync lead to contact (used internally)
-   */
-  static async syncLeadToContact(vendorId, leadData) {
-    const {
-      company_name,
-      mobile_number,
-      category_id,
-      subcategory_id,
-      sales_person_name,
-      status = "new",
-    } = leadData;
-
-    if (!mobile_number) {
-      return; // Skip if no mobile number
-    }
-
-    try {
-      await prisma.contact.upsert({
-        where: {
-          vendorId_mobileNumber: {
-            vendorId,
-            mobileNumber: mobile_number.trim(),
-          },
-        },
-        update: {
-          companyName: company_name?.trim() || "",
-          categoryId: category_id ? parseInt(category_id) : null,
-          subCategoryId: subcategory_id ? parseInt(subcategory_id) : null,
-          salesPersonName: sales_person_name?.trim() || null,
-          status: status === "converted" ? "active" : status === "lost" ? "closed" : "pending",
-          updatedAt: new Date(),
-        },
-        create: {
-          vendorId,
-          companyName: company_name?.trim() || "",
-          mobileNumber: mobile_number.trim(),
-          categoryId: category_id ? parseInt(category_id) : null,
-          subCategoryId: subcategory_id ? parseInt(subcategory_id) : null,
-          salesPersonName: sales_person_name?.trim() || null,
-          status: status === "converted" ? "active" : status === "lost" ? "closed" : "pending",
-        },
-      });
-    } catch (error) {
-      console.error("Failed to sync lead to contact:", error);
-      // Don't throw - allow lead creation to continue even if contact sync fails
-    }
-  }
-
-  /**
    * Update a lead
    */
-  static async update(vendorId, id, data) {
+  static async update(user, id, data) {
+    const vendorId = user.vendorId;
+    const where = {
+      id,
+      vendorId,
+      deletedAt: null,
+    };
+
+    // 🔒 ROLE-BASED PROTECTION
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
+
     const lead = await prisma.lead.findFirst({
-      where: {
-        id,
-        vendorId,
-        deletedAt: null,
-      },
+      where,
     });
 
     if (!lead) {
-      throw new Error("Lead not found");
+      throw new Error("Lead not found or unauthorized");
     }
 
     const updateData = {};
@@ -391,9 +368,12 @@ class LeadManagementService {
     if (data.subcategory_id !== undefined) {
       updateData.subCategoryId = data.subcategory_id ? parseInt(data.subcategory_id) : null;
     }
-    if (data.sales_person_name !== undefined) {
+
+    // 🛡️ Sales person cannot re-assign their own lead to someone else
+    if (data.sales_person_name !== undefined && user.role !== "sales") {
       updateData.salesPersonName = data.sales_person_name?.trim() || null;
     }
+
     if (data.status !== undefined) {
       updateData.status = data.status;
     }
@@ -472,18 +452,21 @@ class LeadManagementService {
   }
 
   /**
-   * Bulk update leads (e.g., update sales person for multiple leads)
+   * Bulk update leads
    */
-  static async bulkUpdate(vendorId, leadIds, data) {
+  static async bulkUpdate(user, leadIds, data) {
+    const vendorId = user.vendorId;
     if (!Array.isArray(leadIds) || leadIds.length === 0) {
       throw new Error("Lead IDs are required");
     }
 
     const updateData = {};
 
-    if (data.sales_person_name !== undefined) {
+    // 🛡️ ROLE-BASED PROTECTION: Sales person cannot re-assign
+    if (data.sales_person_name !== undefined && user.role !== "sales") {
       updateData.salesPersonName = data.sales_person_name?.trim() || null;
     }
+
     if (data.category_id !== undefined) {
       updateData.categoryId = data.category_id ? parseInt(data.category_id) : null;
     }
@@ -494,83 +477,20 @@ class LeadManagementService {
       updateData.status = data.status;
     }
 
-    // Get leads to sync to contacts
-    const leads = await prisma.lead.findMany({
-      where: {
-        id: {
-          in: leadIds,
-        },
-        vendorId,
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        phoneNumber: true,
-        companyName: true,
-        categoryId: true,
-        subCategoryId: true,
-        salesPersonName: true,
-        status: true,
-      },
-    });
+    const where = {
+      id: { in: leadIds },
+      vendorId,
+      deletedAt: null,
+    };
+
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
 
     const result = await prisma.lead.updateMany({
-      where: {
-        id: {
-          in: leadIds,
-        },
-        vendorId,
-        deletedAt: null,
-      },
+      where,
       data: updateData,
     });
-
-    // Sync updated leads to contacts
-    for (const lead of leads) {
-      try {
-        // Get the updated lead data after update
-        const updatedLead = await prisma.lead.findUnique({
-          where: { id: lead.id },
-          select: {
-            companyName: true,
-            categoryId: true,
-            subCategoryId: true,
-            salesPersonName: true,
-            status: true,
-          },
-        });
-
-        if (updatedLead) {
-          await prisma.contact.upsert({
-            where: {
-              vendorId_mobileNumber: {
-                vendorId,
-                mobileNumber: lead.phoneNumber,
-              },
-            },
-            update: {
-              companyName: updatedLead.companyName || "",
-              categoryId: updatedLead.categoryId,
-              subCategoryId: updatedLead.subCategoryId,
-              salesPersonName: updatedLead.salesPersonName || null,
-              status: updatedLead.status === "converted" ? "active" : updatedLead.status === "lost" ? "closed" : "pending",
-              updatedAt: new Date(),
-            },
-            create: {
-              vendorId,
-              companyName: updatedLead.companyName || "",
-              mobileNumber: lead.phoneNumber,
-              categoryId: updatedLead.categoryId,
-              subCategoryId: updatedLead.subCategoryId,
-              salesPersonName: updatedLead.salesPersonName || null,
-              status: updatedLead.status === "converted" ? "active" : updatedLead.status === "lost" ? "closed" : "pending",
-            },
-          });
-        }
-      } catch (contactError) {
-        console.error(`Failed to sync lead ${lead.id} to contact:`, contactError);
-      }
-    }
 
     return {
       success: true,
@@ -582,23 +502,24 @@ class LeadManagementService {
   /**
    * Delete a lead (hard delete)
    */
-  static async delete(vendorId, id) {
-    console.log('🗑️ LeadManagementService.delete called with:', { vendorId, id });
+  static async delete(user, id) {
+    const vendorId = user.vendorId;
+    const where = {
+      id,
+      vendorId,
+    };
 
-    const lead = await prisma.lead.findFirst({
-      where: {
-        id,
-        vendorId,
-      },
-    });
-
-    console.log('🔍 Found lead:', lead);
-
-    if (!lead) {
-      throw new Error("Lead not found");
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
     }
 
-    console.log('🗑️ Attempting to delete lead with id:', id);
+    const lead = await prisma.lead.findFirst({
+      where,
+    });
+
+    if (!lead) {
+      throw new Error("Lead not found or unauthorized");
+    }
 
     const deleteResult = await prisma.lead.delete({
       where: {
@@ -606,22 +527,17 @@ class LeadManagementService {
       },
     });
 
-    console.log('✅ Lead delete result:', deleteResult);
-
-    // Also delete the corresponding contact if it exists
+    // Also delete contact
     if (lead.phoneNumber) {
-      console.log('🗑️ Attempting to delete corresponding contact with phone:', lead.phoneNumber);
       try {
-        const contactDeleteResult = await prisma.contact.deleteMany({
+        await prisma.contact.deleteMany({
           where: {
             vendorId,
             mobileNumber: lead.phoneNumber,
           },
         });
-        console.log('✅ Contact delete result:', contactDeleteResult.count, 'contacts deleted');
       } catch (contactError) {
         console.error('⚠️ Failed to delete contact:', contactError.message);
-        // Don't fail the lead deletion if contact deletion fails
       }
     }
 
@@ -634,45 +550,37 @@ class LeadManagementService {
   /**
    * Bulk delete leads
    */
-  static async bulkDelete(vendorId, leadIds) {
+  static async bulkDelete(user, leadIds) {
+    const vendorId = user.vendorId;
     if (!Array.isArray(leadIds) || leadIds.length === 0) {
       throw new Error("Lead IDs are required");
     }
 
-    console.log('🗑️ LeadManagementService.bulkDelete called with:', { vendorId, leadIds });
+    const where = {
+      id: { in: leadIds },
+      vendorId,
+    };
 
-    // First, get the phone numbers of the leads to delete
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
+
     const leadsToDelete = await prisma.lead.findMany({
-      where: {
-        id: {
-          in: leadIds,
-        },
-        vendorId,
-      },
+      where,
       select: {
         phoneNumber: true,
       },
     });
 
     const phoneNumbers = leadsToDelete.map(l => l.phoneNumber).filter(Boolean);
-    console.log('📞 Phone numbers to delete contacts for:', phoneNumbers);
 
-    // Delete the leads
     const result = await prisma.lead.deleteMany({
-      where: {
-        id: {
-          in: leadIds,
-        },
-        vendorId,
-      },
+      where,
     });
 
-    console.log('✅ Deleted leads:', result.count);
-
-    // Also delete corresponding contacts
     if (phoneNumbers.length > 0) {
       try {
-        const contactDeleteResult = await prisma.contact.deleteMany({
+        await prisma.contact.deleteMany({
           where: {
             vendorId,
             mobileNumber: {
@@ -680,10 +588,8 @@ class LeadManagementService {
             },
           },
         });
-        console.log('✅ Deleted contacts:', contactDeleteResult.count);
       } catch (contactError) {
         console.error('⚠️ Failed to delete contacts:', contactError.message);
-        // Don't fail the lead deletion if contact deletion fails
       }
     }
 
@@ -696,4 +602,3 @@ class LeadManagementService {
 }
 
 export default LeadManagementService;
-

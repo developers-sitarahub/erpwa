@@ -1,10 +1,11 @@
 import prisma from "../prisma.js";
 
 class LeadService {
-  static async create(vendorId, data) {
+  static async create(user, data) {
     if (!data.phoneNumber) {
       throw new Error("phoneNumber is required");
     }
+    const vendorId = user.vendorId;
 
     const lead = await prisma.lead.upsert({
       where: {
@@ -13,17 +14,6 @@ class LeadService {
           phoneNumber: data.phoneNumber,
         },
       },
-
-      // update: {
-      //   companyName: data.companyName ?? undefined,
-      //   email: data.email ?? undefined,
-      //   city: data.city ?? undefined,
-      //   category: data.category ?? undefined,
-      //   subcategory: data.subcategory ?? undefined,
-      //   whatsappOptIn:
-      //     data.whatsappOptIn !== undefined ? data.whatsappOptIn : undefined,
-      //   updatedAt: new Date(),
-      // },
       update: {
         ...(data.companyName !== undefined && { companyName: data.companyName }),
         ...(data.email !== undefined && { email: data.email }),
@@ -33,9 +23,10 @@ class LeadService {
         ...(data.whatsappOptIn !== undefined && {
           whatsappOptIn: data.whatsappOptIn,
         }),
+        // 🔒 ROLE-BASED: Auto-assign if salesperson is updating unassigned
+        ...(user.role === "sales" && { salesPersonName: user.name }),
         updatedAt: new Date(),
       },
-
 
       create: {
         vendorId,
@@ -43,14 +34,15 @@ class LeadService {
         email: data.email ?? null,
         phoneNumber: data.phoneNumber,
         city: data.city ?? null,
-        category: data.category ?? "standard",
-        subcategory: data.subcategory ?? null,
+        // category: data.category ?? "standard", // Not in schema, skipping to avoid crash
+        // subcategory: data.subcategory ?? null, // Not in schema, skipping
         whatsappOptIn: data.whatsappOptIn ?? true,
         optInSource: "manual",
         optInAt: new Date(),
         status: "new",
+        // 🔒 ROLE-BASED: Auto-assign if salesperson is creating
+        ...(user.role === "sales" && { salesPersonName: user.name }),
       },
-
     });
 
     // 🔥 Ensure conversation exists
@@ -73,7 +65,7 @@ class LeadService {
     return lead;
   }
 
-  static async list(vendorId, query = {}) {
+  static async list(user, query = {}) {
     const {
       search,
       status,
@@ -83,44 +75,74 @@ class LeadService {
       limit = 50,
       offset = 0,
     } = query;
+    const vendorId = user.vendorId;
+
+    const where = {
+      vendorId,
+      deletedAt: null,
+      ...(status && { status }),
+      // ...(category && { category }), // Not in schema
+      // ...(subcategory && { subcategory }), // Not in schema
+      ...(city && { city }),
+      ...(search && {
+        OR: [
+          { companyName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { phoneNumber: { contains: search } },
+        ],
+      }),
+    };
+
+    // 🔒 ROLE-BASED FILTERING
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
 
     return prisma.lead.findMany({
-      where: {
-        vendorId,
-        deletedAt: null,
-        ...(status && { status }),
-        ...(category && { category }),
-        ...(subcategory && { subcategory }),
-        ...(city && { city }),
-        ...(search && {
-          OR: [
-            { companyName: { contains: search, mode: "insensitive" } },
-            { email: { contains: search, mode: "insensitive" } },
-            { phoneNumber: { contains: search } },
-          ],
-        }),
-      },
+      where,
       orderBy: { createdAt: "desc" },
       take: Number(limit),
       skip: Number(offset),
     });
   }
 
-  static async getById(vendorId, id) {
+  static async getById(user, id) {
+    const vendorId = user.vendorId;
+    const where = { id, vendorId, deletedAt: null };
+
+    // 🔒 ROLE-BASED FILTERING
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
+
     return prisma.lead.findFirst({
-      where: { id, vendorId, deletedAt: null },
+      where,
     });
   }
 
-  static async update(vendorId, id, data) {
+  static async update(user, id, data) {
+    const vendorId = user.vendorId;
+    const where = { id, vendorId, deletedAt: null };
+
+    // 🔒 ROLE-BASED PROTECTION
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
+
+    // Check if salesperson is allowed to update this lead
+    const existingLead = await prisma.lead.findFirst({ where });
+    if (!existingLead) {
+      throw new Error("Lead not found or unauthorized");
+    }
+
     return prisma.lead.update({
       where: { id },
       data: {
         companyName: data.companyName ?? undefined,
         email: data.email ?? undefined,
         city: data.city ?? undefined,
-        category: data.category ?? undefined,
-        subcategory: data.subcategory ?? undefined,
+        // category: data.category ?? undefined,
+        // subcategory: data.subcategory ?? undefined,
         status: data.status ?? undefined,
         whatsappOptIn:
           data.whatsappOptIn !== undefined ? data.whatsappOptIn : undefined,
@@ -130,9 +152,22 @@ class LeadService {
     });
   }
 
-  static async delete(vendorId, id) {
+  static async delete(user, id) {
+    const vendorId = user.vendorId;
+    const where = { id, vendorId };
+
+    // 🔒 ROLE-BASED PROTECTION
+    if (user.role === "sales") {
+      where.salesPersonName = user.name;
+    }
+
+    const existingLead = await prisma.lead.findFirst({ where });
+    if (!existingLead) {
+      throw new Error("Lead not found or unauthorized");
+    }
+
     const deletedLead = await prisma.lead.delete({
-      where: { id, vendorId }, // Add vendorId to ensure ownership
+      where: { id },
     });
     console.log(`Hard deleted lead with ID ${id}:`, deletedLead);
     return deletedLead;

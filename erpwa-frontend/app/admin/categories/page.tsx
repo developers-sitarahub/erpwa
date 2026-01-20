@@ -580,7 +580,10 @@ export default function CategoriesPage() {
 
         {/* Contacts Section */}
         <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader
+            className="flex flex-row items-center justify-between space-y-0 pb-2 cursor-pointer hover:bg-secondary/50 transition-colors"
+            onClick={() => setIsContactsExpanded(!isContactsExpanded)}
+          >
             <div className="flex flex-col">
               <h3 className="text-lg font-semibold text-foreground">Contacts</h3>
               {!isContactsExpanded && (
@@ -589,16 +592,13 @@ export default function CategoriesPage() {
                 </p>
               )}
             </div>
-            <button
-              onClick={() => setIsContactsExpanded(!isContactsExpanded)}
-              className="p-2 hover:bg-secondary rounded-lg transition-colors"
-            >
+            <div className="p-2 rounded-lg text-muted-foreground">
               {isContactsExpanded ? (
-                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                <ChevronUp className="w-5 h-5" />
               ) : (
-                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                <ChevronDown className="w-5 h-5" />
               )}
-            </button>
+            </div>
           </CardHeader>
 
           {isContactsExpanded && (

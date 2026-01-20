@@ -4,7 +4,7 @@ class LeadController {
   static async create(req, res) {
     try {
       const lead = await LeadService.create(
-        req.user.vendorId,
+        req.user,
         req.body
       );
       res.json(lead);
@@ -15,7 +15,7 @@ class LeadController {
 
   static async list(req, res) {
     const leads = await LeadService.list(
-      req.user.vendorId,
+      req.user,
       req.query
     );
     res.json(leads);
@@ -23,7 +23,7 @@ class LeadController {
 
   static async retrieve(req, res) {
     const lead = await LeadService.getById(
-      req.user.vendorId,
+      req.user,
       req.params.id
     );
 
@@ -36,7 +36,7 @@ class LeadController {
 
   static async update(req, res) {
     const lead = await LeadService.update(
-      req.user.vendorId,
+      req.user,
       req.params.id,
       req.body
     );
@@ -45,7 +45,7 @@ class LeadController {
 
   static async delete(req, res) {
     await LeadService.delete(
-      req.user.vendorId,
+      req.user,
       req.params.id
     );
     res.json({ success: true });
@@ -57,34 +57,34 @@ class LeadController {
 
 
   static async bulkCreate(req, res) {
-  try {
-    const { leads } = req.body;
+    try {
+      const { leads } = req.body;
 
-    if (!Array.isArray(leads) || !leads.length) {
-      return res.status(400).json({ message: "No leads provided" });
+      if (!Array.isArray(leads) || !leads.length) {
+        return res.status(400).json({ message: "No leads provided" });
+      }
+
+      const results = [];
+
+      for (const lead of leads) {
+        if (!lead.phoneNumber) continue;
+
+        const created = await LeadService.create(
+          req.user,
+          lead
+        );
+        results.push(created);
+      }
+
+      res.json({
+        success: true,
+        inserted: results.length,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Bulk import failed" });
     }
-
-    const results = [];
-
-    for (const lead of leads) {
-      if (!lead.phoneNumber) continue;
-
-      const created = await LeadService.create(
-        req.user.vendorId,
-        lead
-      );
-      results.push(created);
-    }
-
-    res.json({
-      success: true,
-      inserted: results.length,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Bulk import failed" });
   }
-}
 
 
 

@@ -25,24 +25,45 @@ router.get(
   asyncHandler(async (req, res) => {
     console.log(`🔍 Fetching templates for Vendor ID: ${req.user.vendorId}`);
 
+    const where = { vendorId: req.user.vendorId };
+
+    // 🔒 ROLE-BASED FILTERING: Sales users only see their own templates
+    // 🔒 ROLE-BASED FILTERING: Sales users only see their own templates
+    // if (req.user.role === "sales") {
+    //   where.createdBy = req.user.id;
+    // }
+
     const templates = await prisma.template.findMany({
-      where: { vendorId: req.user.vendorId },
+      where,
       include: {
         languages: true,
-        media: true, // Include header media info (linked by language in logic, but fetched at top level)
-        buttons: true, // Include buttons
+        media: true,
+        buttons: true,
       },
       orderBy: { createdAt: "desc" },
     });
 
-    console.log(`✅ Found ${templates.length} templates for this vendor.`);
+    // Fetch creator names
+    const creatorIds = [...new Set(templates.map((t) => t.createdBy).filter(Boolean))];
+    const creators = await prisma.user.findMany({
+      where: { id: { in: creatorIds } },
+      select: { id: true, name: true },
+    });
+    const creatorMap = Object.fromEntries(creators.map((u) => [u.id, u.name]));
+
+    const enrichedTemplates = templates.map((t) => {
+      const name = t.createdBy ? (creatorMap[t.createdBy] || "Unknown") : "System";
+      return { ...t, createdByName: name };
+    });
+
+    console.log(`✅ [${req.user.role}] Fetched ${enrichedTemplates.length} templates. Enriching with ${Object.keys(creatorMap).length} creator names.`);
 
     if (templates.length === 0) {
       const totalTemplates = await prisma.template.count();
       console.log(`⚠️ Total templates in DB: ${totalTemplates}. Possible Vendor ID mismatch.`);
     }
 
-    res.json(templates);
+    res.json(enrichedTemplates);
   })
 );
 
@@ -102,6 +123,7 @@ router.post(
         displayName,
         category,
         status: "draft",
+        createdBy: req.user.id, // 🔒 Track who created this template
       },
     });
 
