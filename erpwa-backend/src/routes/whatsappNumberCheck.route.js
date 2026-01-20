@@ -48,29 +48,40 @@ router.post(
       // Format phone number (remove spaces, dashes, etc.)
       const formattedNumber = phoneNumber.replace(/\D/g, "");
 
-      // Check if lead exists with this phone number
-      const existingLead = await prisma.lead.findFirst({
-        where: {
-          vendorId,
+      const whereLead = {
+        vendorId,
+        phoneNumber: formattedNumber,
+      };
+
+      const whereConversation = {
+        vendorId,
+        channel: "whatsapp",
+        lead: {
           phoneNumber: formattedNumber,
         },
+      };
+
+      // 🔒 ROLE-BASED FILTERING
+      if (req.user.role === "sales") {
+        whereLead.salesPersonName = req.user.name;
+        whereConversation.lead.salesPersonName = req.user.name;
+      }
+
+      // Check if lead exists with this phone number
+      const existingLead = await prisma.lead.findFirst({
+        where: whereLead,
       });
 
       // Check if conversation already exists
       const existingConversation = await prisma.conversation.findFirst({
-        where: {
-          vendorId,
-          channel: "whatsapp",
-          lead: {
-            phoneNumber: formattedNumber,
-          },
-        },
+        where: whereConversation,
         include: {
           lead: {
             select: {
               id: true,
               phoneNumber: true,
               companyName: true,
+              salesPersonName: true,
             },
           },
         },
@@ -137,13 +148,20 @@ router.post(
 
     const formattedNumber = phoneNumber.replace(/\D/g, "");
 
-    // Check if lead exists
+    // Check if lead exists globally in vendor
     let lead = await prisma.lead.findFirst({
       where: {
         vendorId,
         phoneNumber: formattedNumber,
       },
     });
+
+    // 🔒 ROLE-BASED PROTECTION
+    if (lead && req.user.role === "sales" && lead.salesPersonName && lead.salesPersonName !== req.user.name) {
+      return res.status(403).json({
+        message: "This lead is assigned to another sales person",
+      });
+    }
 
     // Create lead if it doesn't exist
     if (!lead) {
@@ -153,7 +171,14 @@ router.post(
           phoneNumber: formattedNumber,
           companyName: companyName || formattedNumber,
           status: "new",
+          ...(req.user.role === "sales" && { salesPersonName: req.user.name }),
         },
+      });
+    } else if (req.user.role === "sales" && !lead.salesPersonName) {
+      // Auto-assign if unassigned
+      lead = await prisma.lead.update({
+        where: { id: lead.id },
+        data: { salesPersonName: req.user.name },
       });
     }
 

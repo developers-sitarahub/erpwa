@@ -1,7 +1,8 @@
 import prisma from "../prisma.js";
 
 class CampaignService {
-  static async createTemplateCampaign(vendorId, payload) {
+  static async createTemplateCampaign(user, payload) {
+    const vendorId = user.vendorId;
     const {
       name,
       templateId,
@@ -109,6 +110,7 @@ class CampaignService {
         name,
         status: scheduledAt ? "scheduled" : "draft",
         scheduledAt,
+        createdBy: user.id, // 🔒 Track who created this campaign
       },
     });
 
@@ -167,12 +169,12 @@ class CampaignService {
       queuedMessages: messages.length,
     };
   }
-  static async createImageCampaign(vendorId, payload) {
+  static async createImageCampaign(user, payload) {
+    const vendorId = user.vendorId;
     const {
       name,
       categoryId,
       subCategoryId,
-      imageIds, // Array of specific image IDs selected by user
       imageLimit = 100,
       captionMode,
       conversationIds,
@@ -182,44 +184,25 @@ class CampaignService {
       throw new Error("Conversations required");
     }
 
-    if (!categoryId && !subCategoryId && (!imageIds || imageIds.length === 0)) {
-      throw new Error("Category, subcategory, or specific image IDs required");
+    if (!categoryId && !subCategoryId) {
+      throw new Error("Category or subcategory required");
     }
 
     // 1️⃣ Fetch images
     const MAX_IMAGES_PER_CONVERSATION = 30;
-    let safeImages;
+    const finalLimit = Math.min(imageLimit, MAX_IMAGES_PER_CONVERSATION);
 
-    if (imageIds && imageIds.length > 0) {
-      // Use specific image IDs selected by user
-      const selectedImages = await prisma.galleryImage.findMany({
-        where: {
-          id: { in: imageIds },
-          vendorId,
-        },
-        orderBy: { id: "asc" }, // Maintain order
-      });
+    // Fetch all images (no take here)
+    const images = await prisma.galleryImage.findMany({
+      where: {
+        vendorId,
+        ...(subCategoryId ? { subCategoryId } : { categoryId }),
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
-      if (!selectedImages.length) {
-        throw new Error("Selected images not found");
-      }
-
-      // Apply safety cap
-      safeImages = selectedImages.slice(0, MAX_IMAGES_PER_CONVERSATION);
-    } else {
-      // Fallback: fetch by category/subcategory
-      const finalLimit = Math.min(imageLimit, MAX_IMAGES_PER_CONVERSATION);
-
-      const images = await prisma.galleryImage.findMany({
-        where: {
-          vendorId,
-          ...(subCategoryId ? { subCategoryId } : { categoryId }),
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      safeImages = images.slice(0, finalLimit);
-    }
+    // 🚨 HARD SAFETY CAP
+    const safeImages = images.slice(0, finalLimit);
 
     if (!safeImages.length) {
       throw new Error("No images found");
@@ -256,6 +239,7 @@ class CampaignService {
         captionMode,
         name,
         status: "draft",
+        createdBy: user.id, // 🔒 Track who created this campaign
       },
     });
 
@@ -269,27 +253,14 @@ class CampaignService {
         if (captionMode === "TITLE") {
           caption = image.title;
         } else if (captionMode === "DESCRIPTION") {
-          caption = image.description;
-        } else if (captionMode === "FULL") {
-          // Build a comprehensive caption with all available information
+          // Construct full details: Title, Description, Price
           const parts = [];
+          if (image.title) parts.push(`*${image.title}*`);
+          if (image.description) parts.push(image.description);
+          if (image.price)
+            parts.push(`Price: ${image.price} ${image.priceCurrency || ""}`);
 
-          if (image.title) {
-            parts.push(`*${image.title}*`);
-          }
-
-          if (image.description) {
-            parts.push(image.description);
-          }
-
-          if (image.price) {
-            const currency = image.priceCurrency || "USD";
-            const priceSymbol =
-              currency === "INR" ? "₹" : currency === "USD" ? "$" : currency;
-            parts.push(`\n💰 Price: ${priceSymbol}${image.price}`);
-          }
-
-          caption = parts.length > 0 ? parts.join("\n\n") : null;
+          caption = parts.join("\n");
         }
 
         const message = await prisma.message.create({
@@ -340,14 +311,22 @@ class CampaignService {
       success: true,
       campaignId: campaign.id,
       conversations: conversations.length,
-      imagesPerConversation: safeImages.length,
+      imagesPerConversation: images.length,
       totalMessagesQueued: totalQueued,
     };
   }
 
-  static async listCampaigns(vendorId) {
+  static async listCampaigns(user) {
+    const vendorId = user.vendorId;
+    const where = { vendorId };
+
+    // 🔒 ROLE-BASED FILTERING: Sales users only see their own campaigns
+    if (user.role === "sales") {
+      where.createdBy = user.id;
+    }
+
     const campaigns = await prisma.campaign.findMany({
-      where: { vendorId },
+      where,
       orderBy: { createdAt: "desc" },
     });
 

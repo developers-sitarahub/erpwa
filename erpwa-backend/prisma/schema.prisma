@@ -220,8 +220,13 @@ model Template {
   languages        TemplateLanguage[]
   media            TemplateMedia[]
 
+  createdBy        String?            // User ID who created this template
+
+
   @@unique([vendorId, metaTemplateName])
   @@index([vendorId])
+  @@index([createdBy])
+
 }
 
 model TemplateButton {
@@ -313,6 +318,7 @@ model Campaign {
 
   status        String        @default("draft")
   scheduledAt   DateTime?
+  createdBy     String?       // User ID who created this campaign
   createdAt     DateTime      @default(now())
 
   vendor        Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -320,6 +326,7 @@ model Campaign {
 
   @@index([vendorId])
   @@index([type])
+  @@index([createdBy])
 }
 
 

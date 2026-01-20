@@ -6,6 +6,13 @@ import prisma from "../prisma.js";
 export const getDashboardStats = async (req, res) => {
     try {
         const vendorId = req.user.vendorId;
+        const user = req.user;
+
+        // Define filter for leads based on role
+        const leadFilter = { vendorId };
+        if (user.role === 'sales') {
+            leadFilter.salesPersonName = user.name;
+        }
 
         // Get counts in parallel
         const [
@@ -20,9 +27,9 @@ export const getDashboardStats = async (req, res) => {
                 where: { vendorId },
             }),
 
-            // Total leads count
+            // Total leads count (filtered)
             prisma.lead.count({
-                where: { vendorId },
+                where: leadFilter,
             }),
 
             // Templates count
@@ -32,13 +39,16 @@ export const getDashboardStats = async (req, res) => {
 
             // Campaigns count
             prisma.campaign.count({
-                where: { vendorId },
+                where: {
+                    vendorId,
+                    ...(user.role === 'sales' ? { createdBy: user.id } : {}),
+                },
             }),
 
-            // Leads by status
+            // Leads by status (filtered)
             prisma.lead.groupBy({
                 by: ["status"],
-                where: { vendorId },
+                where: leadFilter,
                 _count: {
                     status: true,
                 },
@@ -49,9 +59,9 @@ export const getDashboardStats = async (req, res) => {
         const convertedLeads = leadsStatusCount.find((s) => s.status === "converted")?._count.status || 0;
         const conversionRate = leadsCount > 0 ? Math.round((convertedLeads / leadsCount) * 100) : 0;
 
-        // Get recent lead activities (last 10)
+        // Get recent lead activities (last 10) (filtered)
         const recentLeadActivities = await prisma.lead.findMany({
-            where: { vendorId },
+            where: leadFilter,
             select: {
                 id: true,
                 companyName: true,

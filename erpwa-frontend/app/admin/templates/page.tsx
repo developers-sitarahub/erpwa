@@ -82,6 +82,7 @@ type Template = {
     s3Url: string;
     language: string;
   }[];
+  createdByName?: string;
 };
 
 export default function TemplatesPage() {
@@ -671,8 +672,15 @@ export default function TemplatesPage() {
                         <p className="line-clamp-4 whitespace-pre-wrap">
                           {t.languages[0]?.body || "No content"}
                         </p>
-                        <div className="text-[9px] text-muted-foreground text-right mt-1 font-medium">
-                          {formatTime(t.createdAt)}
+                        <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-dashed border-border/40">
+                          {t.createdByName && (
+                            <span className="text-[9px] text-muted-foreground font-medium">
+                              By {t.createdByName}
+                            </span>
+                          )}
+                          <span className="text-[9px] text-muted-foreground font-medium">
+                            {formatTime(t.createdAt)}
+                          </span>
                         </div>
                       </div>
                     </div>

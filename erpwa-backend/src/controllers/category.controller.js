@@ -140,7 +140,8 @@ class CategoryController {
       const result = await CategoryService.getContacts(
         req.user.vendorId,
         parsedCategoryId,
-        parsedSubcategoryId
+        parsedSubcategoryId,
+        req.user
       );
 
       res.json({ data: result });
