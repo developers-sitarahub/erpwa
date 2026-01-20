@@ -1,39 +1,14 @@
 "use client";
-
 import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
-import { getSocket, connectSocket } from "@/lib/socket";
 import { processMedia } from "@/lib/mediaProcessor";
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState, useRef } from "react";
-import api from "@/lib/api";
-import { getSocket, connectSocket } from "@/lib/socket";
-import { processMedia } from "@/lib/mediaProcessor";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Search,
-  Phone,
-  Video,
-  MoreVertical,
-  ArrowLeft,
-  Smile,
-  Paperclip,
-  Mic,
-  Send,
   Check,
   CheckCheck,
-  Clock,
-  ClockFading,
   AlertCircle,
   MessageSquareIcon,
-  Globe,
-  Loader2,
-  Filter,
-  Zap,
-  X,
-  Image as ImageIcon,
 } from "lucide-react";
-import Image from "next/image";
 import { toast } from "react-toastify";
 import { galleryAPI } from "@/lib/galleryApi";
 import { categoriesAPI } from "@/lib/categoriesApi";
@@ -972,9 +947,9 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                  footer: m.outboundPayload.footer,
-                  buttons: m.outboundPayload.buttons,
-                }
+                    footer: m.outboundPayload.footer,
+                    buttons: m.outboundPayload.buttons,
+                  }
                 : undefined),
           };
         },
@@ -993,11 +968,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              sessionStarted: res.data.sessionStarted,
-              sessionActive: res.data.sessionActive,
-              sessionExpiresAt: res.data.sessionExpiresAt,
-            }
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
             : c,
         ),
       );
@@ -1063,8 +1038,9 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden bg-background">
       <div
-        className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full flex-shrink-0`}
+        className={`${
+          showChat ? "hidden md:block" : "block"
+        } w-full md:w-auto h-full flex-shrink-0`}
       >
         <ConversationList
           conversations={conversations}
