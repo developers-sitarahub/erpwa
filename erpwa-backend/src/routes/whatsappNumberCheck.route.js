@@ -121,6 +121,7 @@ router.post(
  * CREATE NEW CONVERSATION
  * ===============================
  * Creates a new conversation for a WhatsApp number
+ * Auto-assigns lead to sales person if they create it
  */
 router.post(
   "/create-conversation",
@@ -128,6 +129,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const { phoneNumber, companyName } = req.body;
     const vendorId = req.user.vendorId;
+    const userId = req.user.id;
+    const userRole = req.user.role;
 
     if (!phoneNumber) {
       return res.status(400).json({
@@ -147,12 +150,30 @@ router.post(
 
     // Create lead if it doesn't exist
     if (!lead) {
+      // Determine assignment based on user role
+      let salesPersonId = null;
+      let salesPersonName = null;
+
+      // If the creator is a sales person, auto-assign to them
+      if (userRole === "sales") {
+        // Get the user's name
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true },
+        });
+        salesPersonId = userId;
+        salesPersonName = user?.name || null;
+      }
+      // If vendor_owner or vendor_admin, leave both fields as null
+
       lead = await prisma.lead.create({
         data: {
           vendorId,
           phoneNumber: formattedNumber,
           companyName: companyName || formattedNumber,
           status: "new",
+          salesPersonId, // Auto-assign ID for sales person, null for admins/owners
+          salesPersonName, // Auto-assign name for sales person, null for admins/owners
         },
       });
     }
@@ -184,6 +205,8 @@ router.post(
         id: lead.id,
         phoneNumber: lead.phoneNumber,
         companyName: lead.companyName,
+        salesPersonId: lead.salesPersonId,
+        salesPersonName: lead.salesPersonName,
       },
     });
   }),
