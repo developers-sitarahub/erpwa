@@ -48,8 +48,17 @@ router.post(
     /* ===============================
        2️⃣ Load conversation + relations
     =============================== */
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
+    const where = { id: conversationId, vendorId: req.user.vendorId };
+
+    // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
+    if (req.user.role === "sales") {
+      where.lead = {
+        salesPersonName: req.user.name,
+      };
+    }
+
+    const conversation = await prisma.conversation.findFirst({
+      where,
       include: {
         lead: true,
         vendor: true,
@@ -136,10 +145,10 @@ router.post(
           text: { body: text },
           ...(replyToMessageId
             ? {
-                context: {
-                  message_id: replyToMessageId,
-                },
-              }
+              context: {
+                message_id: replyToMessageId,
+              },
+            }
             : {}),
         }),
       },
@@ -248,8 +257,17 @@ router.post(
       });
     }
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
+    const where = { id: conversationId, vendorId: req.user.vendorId };
+
+    // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
+    if (req.user.role === "sales") {
+      where.lead = {
+        salesPersonName: req.user.name,
+      };
+    }
+
+    const conversation = await prisma.conversation.findFirst({
+      where,
       include: { lead: true, vendor: true },
     });
 

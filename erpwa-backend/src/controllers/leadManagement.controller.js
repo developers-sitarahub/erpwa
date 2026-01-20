@@ -13,7 +13,7 @@ class LeadManagementController {
         status: req.query.status,
       };
 
-      const result = await LeadManagementService.list(req.user.vendorId, filters);
+      const result = await LeadManagementService.list(req.user, filters);
       res.json({ data: result });
     } catch (err) {
       console.error("Error in leads list:", err);
@@ -28,7 +28,7 @@ class LeadManagementController {
   static async getById(req, res) {
     try {
       const lead = await LeadManagementService.getById(
-        req.user.vendorId,
+        req.user,
         req.params.id
       );
 
@@ -49,7 +49,7 @@ class LeadManagementController {
   static async create(req, res) {
     try {
       const result = await LeadManagementService.create(
-        req.user.vendorId,
+        req.user,
         req.body
       );
       res.json(result);
@@ -71,7 +71,7 @@ class LeadManagementController {
       }
 
       const result = await LeadManagementService.bulkCreate(
-        req.user.vendorId,
+        req.user,
         leads
       );
       res.json(result);
@@ -87,7 +87,7 @@ class LeadManagementController {
   static async update(req, res) {
     try {
       const result = await LeadManagementService.update(
-        req.user.vendorId,
+        req.user,
         req.params.id,
         req.body
       );
@@ -110,7 +110,7 @@ class LeadManagementController {
       }
 
       const result = await LeadManagementService.bulkUpdate(
-        req.user.vendorId,
+        req.user,
         lead_ids,
         updateData
       );
@@ -127,7 +127,7 @@ class LeadManagementController {
   static async delete(req, res) {
     try {
       const result = await LeadManagementService.delete(
-        req.user.vendorId,
+        req.user,
         req.params.id
       );
       res.json(result);
@@ -149,7 +149,7 @@ class LeadManagementController {
       }
 
       const result = await LeadManagementService.bulkDelete(
-        req.user.vendorId,
+        req.user,
         lead_ids
       );
       res.json(result);

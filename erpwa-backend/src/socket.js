@@ -87,12 +87,24 @@ export function initSocket(httpServer) {
     socket.on("join-conversation", async (conversationId) => {
       if (!conversationId) return;
 
-      const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
+      const where = {
+        id: conversationId,
+        vendorId,
+      };
+
+      // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
+      if (socket.user.role === "sales") {
+        where.lead = {
+          salesPersonName: socket.user.name,
+        };
+      }
+
+      const conversation = await prisma.conversation.findFirst({
+        where,
         select: { vendorId: true },
       });
 
-      if (!conversation || conversation.vendorId !== vendorId) {
+      if (!conversation) {
         console.warn("⚠️ SOCKET: Unauthorized conversation join blocked");
         return;
       }

@@ -490,10 +490,15 @@ class CategoryService {
    * Get contacts for a category/subcategory
    * Also includes leads with the same category/subcategory
    */
-  static async getContacts(vendorId, categoryId = null, subcategoryId = null) {
+  static async getContacts(vendorId, categoryId = null, subcategoryId = null, user = null) {
     const where = {
       vendorId,
     };
+
+    // Filter by sales person if applicable
+    if (user && user.role === 'sales') {
+      where.salesPersonName = user.name;
+    }
 
     // Add category filters if valid IDs are provided
     if (subcategoryId && !isNaN(subcategoryId)) {
@@ -528,14 +533,23 @@ class CategoryService {
     // Also get leads with same category/subcategory (non-deleted)
     let leads = [];
 
+    // Base lead where clause
+    const leadWhere = {
+      vendorId,
+      deletedAt: null,
+    };
+
+    // Filter by sales person if applicable
+    if (user && user.role === 'sales') {
+      leadWhere.salesPersonName = user.name;
+    }
+
     if (subcategoryId && !isNaN(subcategoryId)) {
       // If filtering by subcategory, get leads with this specific subcategory
+      leadWhere.subCategoryId = parseInt(subcategoryId);
+
       leads = await prisma.lead.findMany({
-        where: {
-          vendorId,
-          deletedAt: null,
-          subCategoryId: parseInt(subcategoryId),
-        },
+        where: leadWhere,
         include: {
           leadCategory: {
             select: {
@@ -568,15 +582,13 @@ class CategoryService {
       const subcatIds = subcats.map((sub) => sub.id);
 
       // Get leads with this category OR any of its subcategories
+      leadWhere.OR = [
+        { categoryId: parsedCategoryId },
+        ...(subcatIds.length > 0 ? [{ subCategoryId: { in: subcatIds } }] : []),
+      ];
+
       leads = await prisma.lead.findMany({
-        where: {
-          vendorId,
-          deletedAt: null,
-          OR: [
-            { categoryId: parsedCategoryId },
-            ...(subcatIds.length > 0 ? [{ subCategoryId: { in: subcatIds } }] : []),
-          ],
-        },
+        where: leadWhere,
         include: {
           leadCategory: {
             select: {
@@ -598,10 +610,7 @@ class CategoryService {
     } else {
       // No filter - get ALL leads for this vendor
       leads = await prisma.lead.findMany({
-        where: {
-          vendorId,
-          deletedAt: null,
-        },
+        where: leadWhere,
         include: {
           leadCategory: {
             select: {
