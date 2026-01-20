@@ -1,0 +1,426 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Vendor {
+  id                    String         @id @default(uuid())
+  name                  String
+  whatsappBusinessId    String?
+  whatsappPhoneNumberId String?
+  whatsappAccessToken   String?
+  whatsappStatus        String         @default("not_configured")
+  whatsappVerifiedAt    DateTime?
+  whatsappLastError     String?
+  createdAt             DateTime       @default(now())
+  campaigns             Campaign[]
+  categories            Category[]
+  contacts              Contact[]
+  conversations         Conversation[]
+  galleryImages         GalleryImage[]
+  leads                 Lead[]
+  mediaAlbums           MediaAlbum[]
+  messages              Message[]
+  templates             Template[]
+  users                 User[]
+}
+
+model User {
+  id                String             @id @default(uuid())
+  vendorId          String?
+  name              String
+  email             String             @unique
+  passwordHash      String
+  role              UserRole
+  status            String             @default("active") // active, inactive
+  isOnline          Boolean            @default(false)
+  lastLoginAt       DateTime?
+  activatedAt       DateTime?          // When user first set password via invite link
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  messages          Message[]          @relation("UserMessages")
+  passwordResetOtps PasswordResetOtp[]
+  refreshTokens     RefreshToken[]
+  vendor            Vendor?            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(uuid())
+  userId    String
+  otpHash   String
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+
+model Lead {
+  id              String         @id @default(uuid())
+  vendorId        String
+  phoneNumber     String
+  status          String         @default("new")
+
+  whatsappOptIn   Boolean        @default(true)
+  optInSource     String?
+  optInMessage    String?
+  optInAt         DateTime?
+  blockedAt       DateTime?
+  lastContactedAt DateTime?
+
+  city            String?
+  companyName     String?
+  email           String?
+  salesPersonName String?
+
+  categoryId      Int?
+  subCategoryId   Int?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  conversations   Conversation[]
+
+  leadCategory    Category? @relation("LeadCategory", fields: [categoryId], references: [id])
+  leadSubCategory Category? @relation("LeadSubCategory", fields: [subCategoryId], references: [id])
+
+  vendor          Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, phoneNumber])
+  @@index([email])
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@index([status])
+}
+
+
+model Category {
+  id             Int            @id @default(autoincrement())
+  vendorId       String
+  name           String
+  parentId       Int?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Self relation (tree)
+  parent         Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children       Category[]     @relation("CategoryTree")
+
+  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  // Leads
+  leads          Lead[]         @relation("LeadCategory")
+  leadSubcats    Lead[]         @relation("LeadSubCategory")
+
+  // Contacts
+  contacts       Contact[]      @relation("ContactCategory")
+  contactSubcats Contact[]      @relation("ContactSubCategory")
+
+  // Gallery
+  galleryImages  GalleryImage[] @relation("GalleryCategory")
+  gallerySubcats GalleryImage[] @relation("GallerySubCategory")
+
+  @@unique([vendorId, name, parentId])
+  @@index([vendorId])
+  @@index([parentId])
+}
+
+
+model Contact {
+  id              Int       @id @default(autoincrement())
+  vendorId        String
+  companyName     String
+  mobileNumber    String
+  categoryId      Int?
+  subCategoryId   Int?
+  salesPersonName String?
+  status          String    @default("pending")
+  assignedTo      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  category        Category? @relation("ContactCategory", fields: [categoryId], references: [id])
+  subCategory     Category? @relation("ContactSubCategory", fields: [subCategoryId], references: [id])
+  vendor          Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, mobileNumber])
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@index([status])
+}
+
+model GalleryImage {
+  id            Int       @id @default(autoincrement())
+  vendorId      String
+  categoryId    Int?
+  subCategoryId Int?
+  title         String?
+  description   String?
+  s3Url         String
+  s3Key         String?
+  price         Float?
+  priceCurrency String?   @default("USD")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  category      Category? @relation("GalleryCategory", fields: [categoryId], references: [id])
+  subCategory   Category? @relation("GallerySubCategory", fields: [subCategoryId], references: [id])
+  vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([categoryId])
+  @@index([subCategoryId])
+}
+
+model Conversation {
+  id               String    @id @default(uuid())
+  vendorId         String
+  leadId           String
+  channel          String    @default("whatsapp")
+  lastMessageAt    DateTime?
+  isOpen           Boolean   @default(true)
+  sessionStartedAt DateTime?
+  sessionExpiresAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+  lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  vendor           Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  messages         Message[]
+
+  @@unique([vendorId, leadId])
+}
+
+model Template {
+  id               String             @id @default(uuid())
+  vendorId         String
+  metaTemplateName String
+  displayName      String
+  category         String
+  status           String             @default("draft")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  campaigns        Campaign[]
+  vendor           Vendor             @relation(fields: [vendorId], references: [id])
+  buttons          TemplateButton[]
+  languages        TemplateLanguage[]
+  media            TemplateMedia[]
+
+  @@unique([vendorId, metaTemplateName])
+  @@index([vendorId])
+}
+
+model TemplateButton {
+  id         String   @id @default(uuid())
+  templateId String
+  type       String
+  text       String
+  value      String?
+  position   Int
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, position])
+}
+
+model TemplateMedia {
+  id              String    @id @default(uuid())
+  templateId      String
+  language        String
+  position        Int       @default(0)
+  mediaType       String
+  s3Url           String
+  mimeType        String
+  whatsappMediaId String?
+  uploadStatus    String    @default("pending")
+  uploadError     String?
+  uploadedAt      DateTime?
+  template        Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, language, position])
+}
+
+model TemplateLanguage {
+  id               String   @id @default(uuid())
+  templateId       String
+  language         String
+  body             String
+  footerText       String?
+  headerType       String?
+  headerText       String?
+  headerExampleUrl String?
+  headerFilename   String?
+  metaStatus       String   @default("draft")
+  metaReason       String?
+  metaId           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  template         Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, language])
+}
+
+enum CampaignType {
+  TEMPLATE
+  IMAGE
+}
+
+enum ImageCaptionMode {
+  NONE
+  TITLE
+  DESCRIPTION
+}
+
+model Campaign {
+  id            String        @id @default(uuid())
+  vendorId      String
+
+  type          CampaignType
+
+  // ✅ ADD THIS
+  templateId    String?
+  template      Template?     @relation(fields: [templateId], references: [id])
+
+  categoryId    Int?
+  subCategoryId Int?
+  imageLimit    Int?          @default(100)
+  captionMode   ImageCaptionMode?
+
+  name          String?
+  filters       Json?
+
+  // ✅ Campaign execution tracking
+  totalMessages  Int          @default(0)
+  sentMessages   Int          @default(0)
+  failedMessages Int          @default(0)
+
+  startedAt     DateTime?
+  completedAt   DateTime?
+
+  status        String        @default("draft")
+  scheduledAt   DateTime?
+  createdAt     DateTime      @default(now())
+
+  vendor        Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  messages      Message[]
+
+  @@index([vendorId])
+  @@index([type])
+}
+
+
+
+model Message {
+  id                String            @id @default(uuid())
+  vendorId          String
+  conversationId    String
+  campaignId        String?
+  senderId          String?
+  albumId           String?
+
+  direction         String
+  channel           String            @default("whatsapp")
+  messageType       String?
+  content           String?
+  inboundPayload    Json?
+  outboundPayload   Json?
+  whatsappMessageId String?
+  replyToMessageId  String?
+  status            String?
+  errorCode         String?
+
+  retryCount        Int               @default(0)
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  // ✅ RELATIONS (EXPLICIT & CORRECT)
+  vendor        Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  conversation  Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  campaign      Campaign?     @relation(fields: [campaignId], references: [id])
+  sender        User?         @relation("UserMessages", fields: [senderId], references: [id])
+  album         MediaAlbum?   @relation(fields: [albumId], references: [id])
+
+  media         MessageMedia[]
+  deliveries    MessageDelivery[]
+}
+
+
+model MediaAlbum {
+  id        String       @id @default(uuid())
+  vendorId  String
+  name      String?
+  createdAt DateTime     @default(now())
+  vendor    Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  assets    MediaAsset[]
+  messages  Message[]
+}
+
+model MediaAsset {
+  id        String      @id @default(uuid())
+  albumId   String?
+  mediaType MediaType
+  mimeType  String
+  mediaUrl  String
+  caption   String?
+  createdAt DateTime    @default(now())
+  album     MediaAlbum? @relation(fields: [albumId], references: [id], onDelete: Cascade)
+}
+
+model MessageMedia {
+  id         String            @id @default(uuid())
+  messageId  String
+  mediaType  MediaType
+  mimeType   String
+  mediaUrl   String
+  caption    String?
+  fileName   String?
+  assetId    String?
+  createdAt  DateTime          @default(now())
+  deliveries MessageDelivery[]
+  message    Message           @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model MessageDelivery {
+  id             String       @id @default(uuid())
+  messageId      String
+  messageMediaId String
+  conversationId String
+  whatsappMsgId  String?
+  status         String
+  error          String?
+  createdAt      DateTime     @default(now())
+  message        Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageMedia   MessageMedia @relation(fields: [messageMediaId], references: [id], onDelete: Cascade)
+
+  @@unique([messageMediaId, conversationId])
+}
+
+enum UserRole {
+  vendor_owner
+  owner
+  vendor_admin
+  sales
+}
+
+enum MediaType {
+  image
+  video
+  audio
+  document
+  sticker
+}
