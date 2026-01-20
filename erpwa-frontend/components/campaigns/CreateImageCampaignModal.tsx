@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ImageIcon, X, Zap, Check, Filter } from "lucide-react";
 import type { Category, WhatsAppRecipient, GalleryImage } from "@/lib/types";
+import { toast } from "react-toastify";
 
 const ImageSkeleton = () => (
   <div className="h-[120px] rounded-lg bg-gradient-to-br from-muted to-secondary animate-pulse" />
@@ -194,13 +195,27 @@ export default function CreateImageCampaignModal({
     if (selectedImages.size === images.length) {
       setSelectedImages(new Set());
     } else {
-      setSelectedImages(new Set(images.map((img) => img.id)));
+      const allIds = images.map((img) => img.id);
+      if (allIds.length > 30) {
+        toast.warning("Limit reached: Only the first 30 images have been selected.");
+        setSelectedImages(new Set(allIds.slice(0, 30)));
+      } else {
+        setSelectedImages(new Set(allIds));
+      }
     }
   };
 
   const handleToggleImage = (id: number) => {
     const newSelected = new Set(selectedImages);
-    newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      if (newSelected.size >= 30) {
+        toast.warning("You can select up to 30 images only.");
+        return;
+      }
+      newSelected.add(id);
+    }
     setSelectedImages(newSelected);
   };
 
@@ -208,6 +223,14 @@ export default function CreateImageCampaignModal({
     const newSelected = new Set(selectedRecipients);
     newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
     setSelectedRecipients(newSelected);
+  };
+
+  const handleSelectAllRecipients = () => {
+    if (selectedRecipients.size === contacts.length) {
+      setSelectedRecipients(new Set());
+    } else {
+      setSelectedRecipients(new Set(contacts.map((c) => c.id)));
+    }
   };
 
   const handleLaunch = async () => {
@@ -373,7 +396,7 @@ export default function CreateImageCampaignModal({
                       Images <span className="text-red-400">*</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {selectedImages.size} selected
+                      {selectedImages.size} selected (Max 30)
                     </p>
                   </div>
                   {images.length > 0 && (
@@ -416,11 +439,10 @@ export default function CreateImageCampaignModal({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => handleToggleImage(image.id)}
-                        className={`relative overflow-hidden rounded-lg cursor-pointer transition-all border-2 group ${
-                          selectedImages.has(image.id)
-                            ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
-                            : "border-border hover:border-primary/50 hover:shadow-md hover:shadow-primary/10"
-                        }`}
+                        className={`relative overflow-hidden rounded-lg cursor-pointer transition-all border-2 group ${selectedImages.has(image.id)
+                          ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
+                          : "border-border hover:border-primary/50 hover:shadow-md hover:shadow-primary/10"
+                          }`}
                       >
                         <Image
                           src={image.image_url || "/placeholder.svg"}
@@ -484,17 +506,15 @@ export default function CreateImageCampaignModal({
                 <button
                   type="button"
                   onClick={() => setWithCaption(!withCaption)}
-                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card ${
-                    withCaption
-                      ? "bg-primary shadow-lg shadow-primary/30"
-                      : "bg-muted border border-border"
-                  }`}
+                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card ${withCaption
+                    ? "bg-primary shadow-lg shadow-primary/30"
+                    : "bg-muted border border-border"
+                    }`}
                   aria-label="Toggle caption mode"
                 >
                   <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-all duration-200 ease-in-out ${
-                      withCaption ? "translate-x-6" : "translate-x-1"
-                    }`}
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-all duration-200 ease-in-out ${withCaption ? "translate-x-6" : "translate-x-1"
+                      }`}
                   />
                 </button>
               </div>
@@ -545,9 +565,21 @@ export default function CreateImageCampaignModal({
 
                 {/* Recipients List */}
                 <div className="flex-1 flex flex-col">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
-                    Recipients <span className="text-red-400">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Recipients <span className="text-red-400">*</span>
+                    </label>
+                    {contacts.length > 0 && (
+                      <button
+                        onClick={handleSelectAllRecipients}
+                        className="text-xs px-2 py-1 rounded bg-input hover:bg-secondary transition text-foreground border border-border"
+                      >
+                        {selectedRecipients.size === contacts.length
+                          ? "Clear All"
+                          : "Select All"}
+                      </button>
+                    )}
+                  </div>
                   <div className="border border-border rounded-lg overflow-hidden flex-1 overflow-y-auto bg-input/30 divide-y divide-border">
                     {contacts.length === 0 ? (
                       <div className="p-4 text-center text-muted-foreground text-sm">
@@ -564,11 +596,10 @@ export default function CreateImageCampaignModal({
                           className="flex items-center gap-3 p-3 cursor-pointer transition-colors"
                         >
                           <div
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-                              selectedRecipients.has(contact.id)
-                                ? "bg-primary border-primary"
-                                : "border-primary hover:border-primary"
-                            }`}
+                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${selectedRecipients.has(contact.id)
+                              ? "bg-primary border-primary"
+                              : "border-primary hover:border-primary"
+                              }`}
                           >
                             {selectedRecipients.has(contact.id) && (
                               <Check className="w-2.5 h-2.5 text-foreground" />
@@ -630,11 +661,10 @@ export default function CreateImageCampaignModal({
               whileTap={{ scale: canLaunch && !isLaunching ? 0.98 : 1 }}
               onClick={handleLaunch}
               disabled={!canLaunch || isLaunching}
-              className={`px-6 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
-                canLaunch && !isLaunching
-                  ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/50"
-                  : "bg-muted text-muted-foreground cursor-not-allowed"
-              }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${canLaunch && !isLaunching
+                ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/50"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
+                }`}
             >
               <Zap className="w-4 h-4" />
               {isLaunching ? "Launching..." : "Launch Campaign"}

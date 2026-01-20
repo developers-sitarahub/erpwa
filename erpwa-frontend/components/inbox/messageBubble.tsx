@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { MoreVertical, Check, CheckCheck, AlertCircle } from "lucide-react";
 import type { Message, Conversation } from "@/lib/types";
+import { useState, useRef } from "react";
 
 interface Props {
   message: Message;
@@ -13,6 +14,131 @@ interface Props {
   onReply: (message: Message) => void;
   setInputValue: (v: string) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
+}
+
+// Audio Player Component
+function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Calculate remaining time and progress percentage
+  const remainingTime = duration - currentTime;
+  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  // Handle seeking
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    const newTime = percentage * duration;
+
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 min-w-[250px]">
+      {/* Play/Pause Button */}
+      <button
+        onClick={togglePlay}
+        className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+      >
+        {isPlaying ? (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            className="text-primary"
+          >
+            <rect x="4" y="3" width="3" height="10" />
+            <rect x="9" y="3" width="3" height="10" />
+          </svg>
+        ) : (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            className="text-primary ml-0.5"
+          >
+            <path d="M11.596 8.697l-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Progress Bar & Audio */}
+      <div className="flex-1 flex items-center gap-2">
+        {/* Interactive Waveform Progress Bar */}
+        <div
+          className="flex-1 h-8 flex items-center gap-0.5 cursor-pointer"
+          onClick={handleSeek}
+        >
+          {[3, 5, 4, 6, 3, 7, 4, 5, 3, 6, 4, 5, 3, 4, 6, 3, 5, 4].map(
+            (height, i) => {
+              // Calculate if this bar should be filled based on progress
+              const barPercentage = ((i + 1) / 18) * 100;
+              const isFilled = barPercentage <= progressPercentage;
+
+              return (
+                <div
+                  key={i}
+                  className={`flex-1 rounded-full transition-all ${
+                    isFilled
+                      ? "bg-primary"
+                      : "bg-primary/30 hover:bg-primary/40"
+                  }`}
+                  style={{ height: `${height * 3}px`, minWidth: "2px" }}
+                />
+              );
+            },
+          )}
+        </div>
+
+        {/* Hidden Audio Element */}
+        <audio
+          ref={audioRef}
+          src={mediaUrl}
+          onEnded={() => setIsPlaying(false)}
+          onLoadedMetadata={(e) => {
+            const audio = e.currentTarget;
+            setDuration(audio.duration);
+          }}
+          onTimeUpdate={(e) => {
+            const audio = e.currentTarget;
+            setCurrentTime(audio.currentTime);
+          }}
+        />
+      </div>
+
+      {/* Remaining Time */}
+      <span className="text-xs text-muted-foreground flex-shrink-0">
+        {formatTime(remainingTime)}
+      </span>
+    </div>
+  );
 }
 
 export default function MessageBubble({
@@ -37,7 +163,13 @@ export default function MessageBubble({
 
   const isImage = !!(msg.mediaUrl && msg.mimeType?.startsWith("image/"));
   const isVideo = !!(msg.mediaUrl && msg.mimeType?.startsWith("video/"));
-  const isMedia = isImage || isVideo;
+  const isAudio = !!(msg.mediaUrl && msg.mimeType?.startsWith("audio/"));
+  const isDocument = !!(
+    msg.mediaUrl &&
+    (msg.mimeType?.startsWith("application/") ||
+      msg.mimeType?.includes("document"))
+  );
+  const isMedia = isImage || isVideo || isAudio || isDocument;
 
   const formattedTime = new Date(msg.timestamp)
     .toLocaleTimeString([], {
@@ -136,9 +268,76 @@ export default function MessageBubble({
         {isImage && msg.mediaUrl && (
           <img
             src={msg.mediaUrl}
+            alt="Image"
             className="w-full max-h-[500px] object-cover cursor-pointer"
             onClick={() => window.open(msg.mediaUrl!, "_blank")}
           />
+        )}
+
+        {isVideo && msg.mediaUrl && (
+          <video
+            src={msg.mediaUrl}
+            controls
+            className="w-full max-h-[500px] object-cover"
+          />
+        )}
+
+        {isAudio && msg.mediaUrl && <AudioPlayer mediaUrl={msg.mediaUrl} />}
+
+        {isDocument && msg.mediaUrl && (
+          <div className="flex items-center gap-3 px-3 py-3 bg-muted/30 dark:bg-muted/10 rounded-lg mx-2 my-1">
+            {/* Document Icon */}
+            <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-primary"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </div>
+
+            {/* File Info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {msg.caption || "Document"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {msg.mimeType?.split("/")[1]?.toUpperCase() || "FILE"} •{" "}
+                {msg.mediaUrl ? "Tap to view" : "Unknown size"}
+              </p>
+            </div>
+
+            {/* Download Button */}
+            <a
+              href={msg.mediaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-primary"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </a>
+          </div>
         )}
 
         {/* REPLY BUBBLE */}
