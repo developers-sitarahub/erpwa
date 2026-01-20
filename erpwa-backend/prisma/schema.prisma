@@ -282,6 +282,7 @@ enum ImageCaptionMode {
   NONE
   TITLE
   DESCRIPTION
+  FULL
 }
 
 model Campaign {

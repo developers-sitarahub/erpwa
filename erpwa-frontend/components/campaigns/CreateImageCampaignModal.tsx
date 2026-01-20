@@ -48,6 +48,7 @@ export default function CreateImageCampaignModal({
   const [campaignName, setCampaignName] = useState("");
   const [loadingImages, setLoadingImages] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [withCaption, setWithCaption] = useState(true);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -107,6 +108,7 @@ export default function CreateImageCampaignModal({
       setCampaignName("");
       setRecipientCategoryId(null);
       setRecipientSubcategoryId(null);
+      setWithCaption(true);
     }
   }, [isOpen]);
 
@@ -248,7 +250,7 @@ export default function CreateImageCampaignModal({
         name: campaignName,
         categoryId: selectedCategoryId,
         subCategoryId: selectedSubcategoryId,
-        captionMode: "TITLE",
+        captionMode: withCaption ? "FULL" : "NONE",
         imageIds: imageIdsArray, // Send actual image IDs
         conversationIds,
       });
@@ -467,6 +469,34 @@ export default function CreateImageCampaignModal({
                   onChange={(e) => setCampaignName(e.target.value)}
                   className="w-full px-4 py-2.5 bg-input border border-border rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all"
                 />
+              </div>
+
+              {/* With Caption Toggle */}
+              <div className="flex items-center justify-between p-4 bg-secondary/50 border border-border rounded-lg hover:bg-secondary/70 transition-colors">
+                <div className="flex-1">
+                  <label className="text-sm font-semibold text-foreground block cursor-pointer">
+                    Send with Caption
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Include title, description, and price
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWithCaption(!withCaption)}
+                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card ${
+                    withCaption
+                      ? "bg-primary shadow-lg shadow-primary/30"
+                      : "bg-muted border border-border"
+                  }`}
+                  aria-label="Toggle caption mode"
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-all duration-200 ease-in-out ${
+                      withCaption ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
 
               {/* Recipients Section */}
