@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ImageIcon, Send, RefreshCw } from "lucide-react";
+import { ImageIcon, Send } from "lucide-react";
 
 import CampaignCard from "@/components/campaigns/campaignCard";
 import CampaignImage from "@/components/campaigns/CreateImageCampaignModal";
@@ -14,6 +14,9 @@ interface Campaign {
   id: string | number;
   type: string;
   createdAt: string;
+  name: string;
+  status: "draft" | "active" | "completed" | "paused" | "scheduled" | "failed" | "pending";
+  recipientCount: number;
   [key: string]: unknown;
 }
 
@@ -79,7 +82,7 @@ export default function CampaignsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
             onClick={() => setIsImageModalOpen(true)}
-            className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg hover:border-primary/40 transition-all group"
+            className="p-6 bg-linear-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg hover:border-primary/40 transition-all group"
           >
             <div className="flex items-center gap-3 mb-2">
               <ImageIcon className="w-6 h-6 text-primary" />
@@ -92,7 +95,7 @@ export default function CampaignsPage() {
 
           <button
             onClick={() => setIsTemplateModalOpen(true)}
-            className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg hover:border-primary/40 transition-all group"
+            className="p-6 bg-linear-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg hover:border-primary/40 transition-all group"
           >
             <div className="flex items-center gap-3 mb-2">
               <Send className="w-6 h-6 text-primary" />
@@ -117,7 +120,8 @@ export default function CampaignsPage() {
                   key={c.id}
                   campaign={{
                     ...c,
-                    type: c.type.toLowerCase(),
+                    id: String(c.id),
+                    type: c.type.toLowerCase() as "image" | "template",
                     createdAt: new Date(c.createdAt).toLocaleDateString(),
                   }}
                   index={i}

@@ -35,7 +35,7 @@ interface MediaModalProps {
     handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
 
     conversation: Conversation;
-    setMediaModal: (v: null) => void;
+    setMediaModal: (v: { type: "image" | "video" | "audio" | "document" | "template" | "gallery" } | null) => void;
 
     /* GALLERY */
     galleryCategories: Category[];

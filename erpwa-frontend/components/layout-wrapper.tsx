@@ -6,10 +6,10 @@ import { Sidebar } from "./sidebar"
 
 interface LayoutWrapperProps {
   children: React.ReactNode
-  userRole?: "admin" | "sales_executive"
+  userRole?: "vendor_owner" | "vendor_admin" | "sales"
 }
 
-export function LayoutWrapper({ children, userRole = "sales_executive" }: LayoutWrapperProps) {
+export function LayoutWrapper({ children, userRole = "sales" }: LayoutWrapperProps) {
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar userRole={userRole} />
