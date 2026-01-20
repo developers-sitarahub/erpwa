@@ -16,13 +16,13 @@ export default function PrivacyPolicy() {
       <p>
         WAERP is a business SaaS platform that provides ERP features and
         WhatsApp-based communication tools to businesses. We act as a{" "}
-        <strong>data processor</strong>
+        <strong>data processor </strong>
         on behalf of our customers, who are the data controllers.
       </p>
 
       <h2>2. Data We Collect</h2>
       <ul>
-        <li>User account details (name, email, phone number)</li>
+        <li>User account details (name, email, phone number, city)</li>
         <li>Business information provided by our customers</li>
         <li>
           WhatsApp messages, media, and metadata processed on behalf of
