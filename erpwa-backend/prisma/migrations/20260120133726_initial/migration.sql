@@ -2,7 +2,7 @@
 CREATE TYPE "CampaignType" AS ENUM ('TEMPLATE', 'IMAGE');
 
 -- CreateEnum
-CREATE TYPE "ImageCaptionMode" AS ENUM ('NONE', 'TITLE', 'DESCRIPTION');
+CREATE TYPE "ImageCaptionMode" AS ENUM ('NONE', 'TITLE', 'DESCRIPTION', 'FULL');
 
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('vendor_owner', 'owner', 'vendor_admin', 'sales');
@@ -81,6 +81,7 @@ CREATE TABLE "Lead" (
     "city" TEXT,
     "companyName" TEXT,
     "email" TEXT,
+    "salesPersonId" TEXT,
     "salesPersonName" TEXT,
     "categoryId" INTEGER,
     "subCategoryId" INTEGER,
@@ -165,6 +166,7 @@ CREATE TABLE "Template" (
     "status" TEXT NOT NULL DEFAULT 'draft',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
 
     CONSTRAINT "Template_pkey" PRIMARY KEY ("id")
 );
@@ -237,6 +239,7 @@ CREATE TABLE "Campaign" (
     "completedAt" TIMESTAMP(3),
     "status" TEXT NOT NULL DEFAULT 'draft',
     "scheduledAt" TIMESTAMP(3),
+    "createdBy" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Campaign_pkey" PRIMARY KEY ("id")
@@ -384,6 +387,9 @@ CREATE UNIQUE INDEX "Conversation_vendorId_leadId_key" ON "Conversation"("vendor
 CREATE INDEX "Template_vendorId_idx" ON "Template"("vendorId");
 
 -- CreateIndex
+CREATE INDEX "Template_createdBy_idx" ON "Template"("createdBy");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Template_vendorId_metaTemplateName_key" ON "Template"("vendorId", "metaTemplateName");
 
 -- CreateIndex
@@ -400,6 +406,9 @@ CREATE INDEX "Campaign_vendorId_idx" ON "Campaign"("vendorId");
 
 -- CreateIndex
 CREATE INDEX "Campaign_type_idx" ON "Campaign"("type");
+
+-- CreateIndex
+CREATE INDEX "Campaign_createdBy_idx" ON "Campaign"("createdBy");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MessageDelivery_messageMediaId_conversationId_key" ON "MessageDelivery"("messageMediaId", "conversationId");
