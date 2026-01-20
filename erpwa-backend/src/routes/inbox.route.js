@@ -101,13 +101,7 @@ router.get(
       channel: "whatsapp",
     };
 
-    // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
-    if (req.user.role === "sales") {
-      where.lead = {
-        salesPersonId: req.user.id,
-      };
-    }
-
+    // 1️⃣ Fetch conversation WITHOUT role restrictions first
     const conversation = await prisma.conversation.findFirst({
       where,
       include: {
@@ -116,6 +110,7 @@ router.get(
             id: true,
             phoneNumber: true,
             companyName: true,
+            salesPersonId: true, // ✅ Ensure we select this for checking
           },
         },
         messages: {
@@ -131,6 +126,19 @@ router.get(
       return res.status(404).json({
         message: "Conversation not found",
       });
+    }
+
+    // 2️⃣ Manually validate Sales permissions
+    if (req.user.role === "sales") {
+      const assignedId = conversation.lead?.salesPersonId;
+      const userId = req.user.id;
+
+      if (assignedId !== userId) {
+        console.warn(`⛔ ACCESS DENIED: Sales user ${userId} tried to access lead assigned to ${assignedId}`);
+        return res.status(403).json({
+          message: "You do not have permission to view this conversation (Lead not assigned to you).",
+        });
+      }
     }
 
     // 24-hour session check (ONLY for sending logic)

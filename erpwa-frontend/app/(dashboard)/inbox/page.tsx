@@ -5,11 +5,7 @@ import api from "@/lib/api";
 import { getSocket, connectSocket } from "@/lib/socket";
 import { processMedia } from "@/lib/mediaProcessor";
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState, useRef } from "react";
-import api from "@/lib/api";
-import { getSocket, connectSocket } from "@/lib/socket";
-import { processMedia } from "@/lib/mediaProcessor";
-import { motion, AnimatePresence } from "framer-motion";
+
 import {
   Search,
   Phone,
