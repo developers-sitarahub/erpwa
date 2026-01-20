@@ -71,6 +71,20 @@ router.post(
       });
     }
 
+    // 🔒 ROLE-BASED ACCESS: Sales persons can only message their assigned leads
+    // Admins and owners can message anyone
+    if (req.user.role === "sales") {
+      // Allow if assigned to this sales person OR if no assignment (backward compatibility)
+      if (
+        conversation.lead.salesPersonId &&
+        conversation.lead.salesPersonId !== req.user.id
+      ) {
+        return res.status(403).json({
+          message: "You don't have access to this conversation",
+        });
+      }
+    }
+
     if (!conversation.isOpen) {
       return res.status(400).json({
         message: "Conversation is closed",
@@ -137,7 +151,7 @@ router.post(
             }
             : {}),
         }),
-      }
+      },
     );
 
     const metaData = await response.json();
@@ -219,7 +233,7 @@ router.post(
       message: "Message sent",
       data: message,
     });
-  })
+  }),
 );
 
 router.post(
@@ -261,6 +275,20 @@ router.post(
       return res.status(404).json({ message: "Conversation not found" });
     }
 
+    // 🔒 ROLE-BASED ACCESS: Sales persons can only send media to their assigned leads
+    // Admins and owners can send to anyone
+    if (req.user.role === "sales") {
+      // Allow if assigned to this sales person OR if no assignment (backward compatibility)
+      if (
+        conversation.lead.salesPersonId &&
+        conversation.lead.salesPersonId !== req.user.id
+      ) {
+        return res.status(403).json({
+          message: "You don't have access to this conversation",
+        });
+      }
+    }
+
     if (
       !conversation.sessionExpiresAt ||
       conversation.sessionExpiresAt < new Date()
@@ -299,7 +327,7 @@ router.post(
           ...waForm.getHeaders(),
         },
         body: waForm,
-      }
+      },
     );
 
     const uploadData = await uploadRes.json();
@@ -346,7 +374,7 @@ router.post(
             context: { message_id: replyToMessageId },
           }),
         }),
-      }
+      },
     );
 
     const sendData = await sendRes.json();
@@ -450,7 +478,7 @@ router.post(
     io.to(`vendor:${conversation.vendorId}`).emit("inbox:update");
 
     res.json({ success: true });
-  })
+  }),
 );
 
 export default router;

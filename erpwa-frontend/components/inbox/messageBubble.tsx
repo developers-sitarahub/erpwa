@@ -62,16 +62,18 @@ export default function MessageBubble({
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className={`flex items-end gap-2 ${msg.sender === "executive" ? "justify-end" : "justify-start"
-        }`}
+      className={`flex items-end gap-2 ${
+        msg.sender === "executive" ? "justify-end" : "justify-start"
+      }`}
     >
       <div
         className={`group relative shadow-sm overflow-hidden flex flex-col
-        ${msg.sender === "executive"
+        ${
+          msg.sender === "executive"
             ? "bg-wa-outbound rounded-br-none"
             : "bg-wa-inbound rounded-bl-none"
-          }
-        rounded-lg max-w-[85%] md:max-w-md`}
+        }
+        rounded-lg max-w-[50%] sm:max-w-[40%] md:max-w-[35%] lg:max-w-[30%] xl:max-w-[25%]`}
       >
         {/* TEMPLATE HEADER (Rich Media) */}
         {msg.template?.header && (

@@ -13,6 +13,7 @@ import { leadsAPI } from "@/lib/leadsApi"
 import type { Category, Lead } from "@/lib/types"
 import { toast } from "react-toastify"
 import { usersAPI, User } from "@/lib/usersApi"
+import { Select, SelectOption } from "@/components/select"
 
 function StatusBadge({ status }: { status: Lead["status"] }) {
   const styles: Record<Lead["status"], string> = {
@@ -1279,7 +1280,7 @@ export default function LeadsPage() {
                 </div>
 
                 {/* Filter By */}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <GlobalFilterDropdown
                     leads={leads}
                     onSelect={(field, value) => {
@@ -1295,24 +1296,25 @@ export default function LeadsPage() {
                   />
 
                   {/* Sort By */}
-                  <select
-                    className="px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm min-w-[180px]"
-                    value={`${sortBy}:${sortOrder}`}
-                    onChange={(e) => {
-                      const [field, order] = e.target.value.split(":")
-                      setSortBy(field)
-                      setSortOrder(order as "asc" | "desc")
-                    }}
-                  >
-                    <option value="created_at:desc">Sort: Newest First</option>
-                    <option value="created_at:asc">Sort: Oldest First</option>
-                    <option value="company_name:asc">Sort: Name (A-Z)</option>
-                    <option value="company_name:desc">Sort: Name (Z-A)</option>
-                    <option value="status:asc">Sort: Status (New → Lost)</option>
-                    <option value="status:desc">Sort: Status (Lost → New)</option>
-                    <option value="category_name:asc">Sort: Category (A-Z)</option>
-                    <option value="category_name:desc">Sort: Category (Z-A)</option>
-                  </select>
+                  <div className="w-full sm:w-[200px]">
+                    <Select
+                      value={`${sortBy}:${sortOrder}`}
+                      onChange={(e) => {
+                        const [field, order] = e.target.value.split(":")
+                        setSortBy(field)
+                        setSortOrder(order as "asc" | "desc")
+                      }}
+                    >
+                      <SelectOption value="created_at:desc">Sort: Newest First</SelectOption>
+                      <SelectOption value="created_at:asc">Sort: Oldest First</SelectOption>
+                      <SelectOption value="company_name:asc">Sort: Name (A-Z)</SelectOption>
+                      <SelectOption value="company_name:desc">Sort: Name (Z-A)</SelectOption>
+                      <SelectOption value="status:asc">Sort: Status (New → Lost)</SelectOption>
+                      <SelectOption value="status:desc">Sort: Status (Lost → New)</SelectOption>
+                      <SelectOption value="category_name:asc">Sort: Category (A-Z)</SelectOption>
+                      <SelectOption value="category_name:desc">Sort: Category (Z-A)</SelectOption>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
@@ -1909,7 +1911,7 @@ export default function LeadsPage() {
 
                 {/* Pagination - Bottom */}
                 {(totalPages > 0 || true) && (
-                  <div className="flex justify-center items-center gap-3 mt-8 pt-6 border-t border-border">
+                  <div className="flex flex-wrap justify-center items-center gap-3 mt-8 pt-6 border-t border-border">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1973,20 +1975,21 @@ export default function LeadsPage() {
 
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">Rows per page:</span>
-                        <select
-                          className="px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                          value={itemsPerPage}
-                          onChange={(e) => {
-                            setItemsPerPage(Number(e.target.value))
-                            setCurrentPageNum(1)
-                          }}
-                        >
-                          <option value={10}>10</option>
-                          <option value={20}>20</option>
-                          <option value={30}>30</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
+                        <div className="w-[80px]">
+                          <Select
+                            value={itemsPerPage.toString()}
+                            onChange={(e) => {
+                              setItemsPerPage(Number(e.target.value))
+                              setCurrentPageNum(1)
+                            }}
+                          >
+                            <SelectOption value="10">10</SelectOption>
+                            <SelectOption value="20">20</SelectOption>
+                            <SelectOption value="30">30</SelectOption>
+                            <SelectOption value="50">50</SelectOption>
+                            <SelectOption value="100">100</SelectOption>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   </div>

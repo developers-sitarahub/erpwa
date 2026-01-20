@@ -28,7 +28,7 @@ router.get(
     // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
     if (req.user.role === "sales") {
       where.lead = {
-        salesPersonName: req.user.name,
+        salesPersonId: req.user.id,
       };
     }
 
@@ -104,7 +104,7 @@ router.get(
     // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
     if (req.user.role === "sales") {
       where.lead = {
-        salesPersonName: req.user.name,
+        salesPersonId: req.user.id,
       };
     }
 
@@ -201,7 +201,10 @@ router.get(
 
       // Resolve Body
       let bodyText = tmplLang.body || "";
-      if (m.outboundPayload.bodyVariables && Array.isArray(m.outboundPayload.bodyVariables)) {
+      if (
+        m.outboundPayload.bodyVariables &&
+        Array.isArray(m.outboundPayload.bodyVariables)
+      ) {
         m.outboundPayload.bodyVariables.forEach((val, idx) => {
           bodyText = bodyText.replace(`{{${idx + 1}}}`, val);
         });
@@ -269,7 +272,7 @@ router.post(
     // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
     if (req.user.role === "sales") {
       where.lead = {
-        salesPersonName: req.user.name,
+        salesPersonId: req.user.id,
       };
     }
 

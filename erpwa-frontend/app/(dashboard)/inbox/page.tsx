@@ -5,6 +5,11 @@ import api from "@/lib/api";
 import { getSocket, connectSocket } from "@/lib/socket";
 import { processMedia } from "@/lib/mediaProcessor";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import api from "@/lib/api";
+import { getSocket, connectSocket } from "@/lib/socket";
+import { processMedia } from "@/lib/mediaProcessor";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   Phone,
@@ -32,6 +37,7 @@ import Image from "next/image";
 import { toast } from "react-toastify";
 import { galleryAPI } from "@/lib/galleryApi";
 import { categoriesAPI } from "@/lib/categoriesApi";
+import { leadsAPI } from "@/lib/leadsApi";
 import type {
   Category,
   GalleryImage,
@@ -59,12 +65,13 @@ import { useInboxSocket } from "@/hooks/useInboxSocket";
 interface ApiConversation {
   id: string;
   lead: {
+    id: number;
     companyName: string | null;
     phoneNumber: string;
+    status?: "new" | "contacted" | "qualified" | "converted" | "lost";
   };
   messages: {
     content: string;
-    messageType?: string; // ✅ Added
     direction: "inbound" | "outbound";
     status?: "sent" | "delivered" | "read" | "failed" | "received";
     createdAt: string;
@@ -128,6 +135,7 @@ function ChatArea({
   onBack,
   onUpdateConversationStatus,
   onMarkAsRead,
+  onUpdateLeadStatus,
 }: {
   conversation: Conversation;
   messages: Message[];
@@ -139,6 +147,7 @@ function ChatArea({
     status: Message["status"],
   ) => void;
   onMarkAsRead?: (conversationId: string) => void;
+  onUpdateLeadStatus?: (leadId: number, status: string) => Promise<void>;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -630,8 +639,12 @@ function ChatArea({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-muted/20 relative h-full overflow-hidden">
-      <ChatHeader conversation={conversation} onBack={onBack} />
+    <div className="flex-1 flex flex-col relative h-full overflow-hidden">
+      <ChatHeader
+        conversation={conversation}
+        onBack={onBack}
+        onUpdateLeadStatus={onUpdateLeadStatus}
+      />
 
       <SessionBanner
         isSessionActive={isSessionActive}
@@ -644,14 +657,12 @@ function ChatArea({
         <div
           className="
       absolute inset-0
-      bg-[#ECE5DD] dark:bg-[#0B141A]
-      bg-[url('/chat-bg.png')]
-      bg-repeat
-      bg-center
-      opacity-50 dark:opacity-[0.5]
+      bg-wa-chat-bg
       pointer-events-none
     "
-        />
+        >
+          <div className="absolute inset-0 bg-[url('/chat-bg.png')] bg-repeat bg-center opacity-30 dark:opacity-[0.5]" />
+        </div>
 
         {/* SCROLLABLE MESSAGES */}
         <ChatMessages
@@ -864,22 +875,18 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
     id: c.id,
     companyName: c.lead.companyName || c.lead.phoneNumber,
     phone: c.lead.phoneNumber,
+    status: c.lead.status || "new",
+    leadId: c.lead.id,
+
     lastMessage: (() => {
       if (!lastMsg) return "";
 
-      // ✅ Check messageType first for reliable media indication
-      if (lastMsg.messageType === "image") return "📷 Photo";
-      if (lastMsg.messageType === "video") return "🎥 Video";
-      if (lastMsg.messageType === "audio") return "🎵 Audio";
-      if (lastMsg.messageType === "document") return "📄 Document";
-
-      // Fallback to content checks
       if (lastMsg.content?.startsWith("[image")) return "📷 Photo";
       if (lastMsg.content?.startsWith("[video")) return "🎥 Video";
       if (lastMsg.content?.startsWith("[audio")) return "🎵 Audio";
       if (lastMsg.content?.startsWith("[document")) return "📄 Document";
 
-      return lastMsg.content || "";
+      return lastMsg.content;
     })(),
     lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
       hour: "2-digit",
@@ -1026,15 +1033,38 @@ export default function InboxPage() {
     );
   };
 
+  // ✅ Update lead status
+  const handleUpdateLeadStatus = async (leadId: number, status: string) => {
+    try {
+      if (!leadId) return;
+
+      const formData = new FormData();
+      formData.append("status", status);
+
+      await leadsAPI.update(leadId, formData);
+
+      // Update local state
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.leadId === leadId ? { ...c, status: status as any } : c,
+        ),
+      );
+      toast.success("Lead status updated");
+    } catch (err) {
+      console.error("Failed to update status", err);
+      toast.error("Failed to update status");
+    }
+  };
+
   const currentConversation = conversations.find(
     (c) => c.id === selectedConversation,
   );
 
   return (
-    <div className="flex flex-col md:flex-row h-full overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full overflow-hidden bg-background">
       <div
         className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full`}
+          } w-full md:w-auto h-full flex-shrink-0`}
       >
         <ConversationList
           conversations={conversations}
@@ -1044,7 +1074,7 @@ export default function InboxPage() {
         />
       </div>
       <div
-        className={`${showChat ? "block" : "hidden md:block"} flex-1 h-full`}
+        className={`${showChat ? "block" : "hidden md:block"} flex-1 h-full min-w-0`}
       >
         {currentConversation ? (
           <ChatArea
@@ -1055,17 +1085,18 @@ export default function InboxPage() {
             onBack={() => setShowChat(false)}
             onUpdateConversationStatus={handleUpdateConversationStatus}
             onMarkAsRead={handleMarkAsRead}
+            onUpdateLeadStatus={handleUpdateLeadStatus}
           />
         ) : (
-          <div className="h-full flex items-center justify-center bg-muted/20">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                <MessageSquareIcon />
+          <div className="h-full flex items-center justify-center bg-muted/10">
+            <div className="text-center px-4 max-w-md">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4 sm:mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                <MessageSquareIcon className="w-10 h-10 sm:w-12 sm:h-12 text-primary" />
               </div>
-              <h3 className="text-lg font-medium text-foreground">
+              <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
                 Select a conversation
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Choose a chat from the left to start messaging
               </p>
             </div>
