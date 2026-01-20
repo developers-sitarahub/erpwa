@@ -128,7 +128,9 @@ export interface Message {
       text?: string;
       mediaUrl?: string;
     };
-    body?: string;
+    body?: {
+      text?: string;
+    };
     footer?: string;
     buttons?: Array<{ text: string; type: string; value?: string }>;
   };

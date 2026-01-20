@@ -10,12 +10,13 @@ import {
   CardContent,
 } from "@/components/card"
 import { Badge } from "@/components/badge"
-import { Plus, Edit2, Trash2, Eye, EyeOff, X, FolderOpen, Check, AlertTriangle, Search, Filter, ChevronDown } from "lucide-react"
+import { Plus, Edit2, Trash2, Eye, EyeOff, X, FolderOpen, Check, AlertTriangle, Search, Filter, ChevronDown, ChevronUp } from "lucide-react"
 import { categoriesAPI } from "@/lib/categoriesApi"
 import type { Category, Contact } from "@/lib/types"
 import { toast } from "react-toastify"
 import { Checkbox } from "@/components/checkbox"
 import { CoolTooltip } from "../../../components/ui/cool-tooltip"
+import { Select, SelectOption } from "@/components/select"
 
 function StatusBadge({ status, isLead }: { status: string; isLead?: boolean }) {
   // Lead statuses
@@ -98,6 +99,7 @@ export default function CategoriesPage() {
     id?: number;
     title?: string;
   }>({ isOpen: false, type: 'category' });
+  const [isContactsExpanded, setIsContactsExpanded] = useState(false)
 
 
 
@@ -174,6 +176,7 @@ export default function CategoriesPage() {
   const handleCategoryClick = (categoryId: number) => {
     setSelectedCategory(categoryId)
     setSelectedSubcategory(null)
+    setIsContactsExpanded(true)
     loadSubcategories(categoryId)
   }
 
@@ -573,394 +576,415 @@ export default function CategoriesPage() {
           </CardContent>
         </Card>
 
+
+
         {/* Contacts Section */}
         <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <h3 className="text-lg font-semibold text-foreground">Contacts</h3>
-
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="flex flex-col">
+              <h3 className="text-lg font-semibold text-foreground">Contacts</h3>
+              {!isContactsExpanded && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Expand to view and manage contacts
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setIsContactsExpanded(!isContactsExpanded)}
+              className="p-2 hover:bg-secondary rounded-lg transition-colors"
+            >
+              {isContactsExpanded ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
           </CardHeader>
-          <CardContent>
-            {/* Filter by Category */}
-            {categories.length > 0 && (
-              <div className="mb-6 p-4 bg-card border border-border rounded-lg">
-                <label className="text-sm font-medium text-foreground block mb-3">
-                  Filter by Category:
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      className={`px-4 py-2 rounded text-sm transition-colors ${selectedCategory === cat.id
-                        ? "bg-primary text-white"
-                        : "bg-secondary text-foreground hover:bg-primary/20"
-                        }`}
-                      onClick={() => {
-                        // Toggle: if already selected, deselect it
-                        if (selectedCategory === cat.id) {
-                          setSelectedCategory(null)
-                          setSelectedSubcategory(null)
-                          setContacts([])
-                          setContactCount(0)
-                        } else {
-                          handleCategoryClick(cat.id)
-                        }
-                      }}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
 
-                {/* Subcategories - Always visible */}
-                <div className="mt-4 pt-4 border-t border-border">
+          {isContactsExpanded && (
+            <CardContent>
+              {/* Filter by Category */}
+              {categories.length > 0 && (
+                <div className="mb-6 p-4 bg-card border border-border rounded-lg">
                   <label className="text-sm font-medium text-foreground block mb-3">
-                    Sub-Category
+                    Filter by Category:
                   </label>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={() => setSelectedSubcategory(null)}
-                      disabled={!selectedCategory}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${!selectedSubcategory
-                        ? "bg-primary text-white shadow-md"
-                        : "bg-secondary border border-border text-foreground hover:bg-muted/70"
-                        } ${!selectedCategory ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      <span>-</span>
-                      All
-                    </button>
-                    {subcategories.map((subcat) => (
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((cat) => (
                       <button
-                        key={subcat.id}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${selectedSubcategory === subcat.id
-                          ? "bg-primary text-white shadow-md"
-                          : "bg-secondary border border-border text-foreground hover:bg-muted/70"
+                        key={cat.id}
+                        className={`px-4 py-2 rounded text-sm transition-colors ${selectedCategory === cat.id
+                          ? "bg-primary text-white"
+                          : "bg-secondary text-foreground hover:bg-primary/20"
                           }`}
                         onClick={() => {
                           // Toggle: if already selected, deselect it
-                          if (selectedSubcategory === subcat.id) {
+                          if (selectedCategory === cat.id) {
+                            setSelectedCategory(null)
                             setSelectedSubcategory(null)
+                            setContacts([])
+                            setContactCount(0)
                           } else {
-                            handleSubcategoryClick(subcat.id)
+                            handleCategoryClick(cat.id)
                           }
                         }}
                       >
-                        <span>•</span>
-                        {subcat.name}
+                        {cat.name}
                       </button>
                     ))}
-                    {selectedCategory && subcategories.length === 0 && (
-                      <span className="text-xs text-muted-foreground self-center ml-2">No subcategories</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Contact Count, Search, and Filters - Always show */}
-            <div className="space-y-4 mb-6">
-              {/* Total Count and Search Bar */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-card border border-border rounded-lg">
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <strong className="text-foreground">
-                      {selectedCategory || selectedSubcategory ? "Filtered" : "Total"} Contacts:
-                    </strong>
-                    <span className="text-primary font-semibold text-2xl">{contactCount}</span>
-                  </div>
-                  {selectedCategoryData && (selectedCategory || selectedSubcategory) && (
-                    <small className="text-muted-foreground block mt-1">
-                      in {selectedCategoryData.name}
-                      {selectedSubcategory &&
-                        ` > ${subcategories.find((s) => s.id === selectedSubcategory)?.name}`}
-                    </small>
-                  )}
-                  {!selectedCategory && !selectedSubcategory && (
-                    <small className="text-muted-foreground block mt-1">
-                      Across all categories
-                    </small>
-                  )}
-                </div>
-
-                {/* Search */}
-                <div className="relative flex-1 max-w-md w-full">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search contacts..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="w-full pl-10 pr-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Sort and Clear Filters */}
-              <div className="flex flex-wrap gap-2 items-center">
-                {/* Sort */}
-                <select
-                  className="px-4 py-2 bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                  value={`${sortBy}:${sortOrder}`}
-                  onChange={(e) => {
-                    const [field, order] = e.target.value.split(":")
-                    setSortBy(field)
-                    setSortOrder(order as "asc" | "desc")
-                  }}
-                >
-                  <option value="created_at:desc">Sort: Latest First</option>
-                  <option value="created_at:asc">Sort: Oldest First</option>
-                  <option value="company_name:asc">Sort: Name (A-Z)</option>
-                  <option value="company_name:desc">Sort: Name (Z-A)</option>
-                  <option value="category_name:asc">Sort: Category (A-Z)</option>
-                  <option value="category_name:desc">Sort: Category (Z-A)</option>
-                  <option value="status:asc">Sort: Status (A-Z)</option>
-                  <option value="status:desc">Sort: Status (Z-A)</option>
-                </select>
-
-                {/* Clear Search */}
-                {searchQuery && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("")
-                      setCurrentPage(1)
-                    }}
-                    className="text-xs text-destructive hover:underline px-3 py-2 bg-destructive/10 rounded-lg"
-                  >
-                    Clear Search
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Contacts Table - Always visible */}
-            {(() => {
-              // Filter contacts
-              let filteredContacts = [...contacts]
-
-              // Search filter
-              if (searchQuery.trim()) {
-                const query = searchQuery.toLowerCase()
-                filteredContacts = filteredContacts.filter(
-                  (contact) =>
-                    contact.company_name?.toLowerCase().includes(query) ||
-                    contact.mobile_number?.toString().includes(query) ||
-                    contact.category_name?.toLowerCase().includes(query) ||
-                    contact.sub_category_name?.toLowerCase().includes(query) ||
-                    contact.sales_person_name?.toLowerCase().includes(query)
-                )
-              }
-
-              // Sort contacts
-              filteredContacts.sort((a: any, b: any) => {
-                const aValue = a[sortBy] || ""
-                const bValue = b[sortBy] || ""
-
-                // Handle date sorting for created_at
-                if (sortBy === "created_at") {
-                  const aDate = aValue ? new Date(aValue).getTime() : 0
-                  const bDate = bValue ? new Date(bValue).getTime() : 0
-                  return sortOrder === "asc" ? aDate - bDate : bDate - aDate
-                }
-
-                // Handle string sorting
-                if (typeof aValue === "string" && typeof bValue === "string") {
-                  return sortOrder === "asc"
-                    ? aValue.localeCompare(bValue)
-                    : bValue.localeCompare(aValue)
-                }
-
-                // Handle numeric sorting
-                return sortOrder === "asc" ? aValue - bValue : bValue - aValue
-              })
-
-              // Pagination
-              const totalPages = Math.ceil(filteredContacts.length / itemsPerPage)
-              const startIndex = (currentPage - 1) * itemsPerPage
-              const paginatedContacts = filteredContacts.slice(startIndex, startIndex + itemsPerPage)
-
-              return (
-                <div className="mt-4">
-                  <div className="overflow-x-auto">
-                    <table className="text-sm table-fixed bg-card">
-                      <thead>
-                        <tr className="border-b border-border bg-secondary/30">
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">
-                            Company Name
-                          </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">
-                            Mobile Number
-                          </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32 hidden md:table-cell">
-                            Category
-                          </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32 hidden md:table-cell">
-                            Sub-Category
-                          </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32 hidden md:table-cell">
-                            Sales Person
-                          </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground w-32">Status</th>
-                          <th className="text-right py-3 px-4 font-medium text-muted-foreground w-24">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedContacts && paginatedContacts.length > 0 ? (
-                          paginatedContacts.map((contact: any) => (
-                            <tr key={contact.id || `${contact.mobile_number}-${contact.company_name}`} className="border-b border-border hover:bg-muted/30">
-                              <td className="py-3 px-4">
-                                <CoolTooltip content={contact.company_name}>
-                                  <div className="truncate w-full max-w-[120px] text-foreground">
-                                    {contact.company_name || "--"}
-                                  </div>
-                                </CoolTooltip>
-                              </td>
-                              <td className="py-3 px-4">
-                                <CoolTooltip content={contact.mobile_number}>
-                                  <div className="truncate w-full max-w-[120px] text-muted-foreground">
-                                    {contact.mobile_number || "--"}
-                                  </div>
-                                </CoolTooltip>
-                              </td>
-                              <td className="py-3 px-4 hidden md:table-cell">
-                                <CoolTooltip content={contact.category_name}>
-                                  <div className="truncate w-full max-w-[120px] text-foreground">
-                                    {contact.category_name || "--"}
-                                  </div>
-                                </CoolTooltip>
-                              </td>
-                              <td className="py-3 px-4 hidden md:table-cell">
-                                <CoolTooltip content={contact.sub_category_name}>
-                                  <div className="truncate w-full max-w-[120px] text-foreground">
-                                    {contact.sub_category_name || "--"}
-                                  </div>
-                                </CoolTooltip>
-                              </td>
-                              <td className="py-3 px-4 hidden md:table-cell">
-                                <CoolTooltip content={contact.sales_person_name}>
-                                  <div className="truncate w-full max-w-[120px] text-foreground">
-                                    {contact.sales_person_name || "--"}
-                                  </div>
-                                </CoolTooltip>
-                              </td>
-                              <td className="py-3 px-4">
-                                <StatusBadge status={contact.status || (contact.is_lead ? "new" : "pending")} isLead={contact.is_lead} />
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <div className="flex justify-end gap-2">
-                                  {contact.is_lead ? (
-                                    <span className="text-xs text-muted-foreground px-2 py-1 bg-blue-500/10 rounded">
-                                      Lead
-                                    </span>
-                                  ) : (
-                                    <button
-                                      className="p-1 hover:bg-destructive/10 rounded transition-colors"
-                                      onClick={() => {
-                                        if (contact.id) {
-                                          handleDeleteContact(contact.id, contact.company_name || "contact")
-                                        } else {
-                                          toast.error("Cannot delete lead from here. Please use the Leads page.")
-                                        }
-                                      }}
-                                      title="Delete"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-destructive" />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={7} className="text-center py-6 text-muted-foreground">
-                              {searchQuery
-                                ? "No contacts match your search"
-                                : "No contacts found for this category" + (selectedSubcategory ? " / subcategory" : "")}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
                   </div>
 
-                  {/* Pagination */}
-                  {totalPages > 0 && (
-                    <div className="flex justify-center items-center gap-3 mt-6 pt-4 border-t border-border">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className="bg-secondary border-border text-foreground hover:bg-muted"
+                  {/* Subcategories - Always visible */}
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <label className="text-sm font-medium text-foreground block mb-3">
+                      Sub-Category
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={() => setSelectedSubcategory(null)}
+                        disabled={!selectedCategory}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${!selectedSubcategory
+                          ? "bg-primary text-white shadow-md"
+                          : "bg-secondary border border-border text-foreground hover:bg-muted/70"
+                          } ${!selectedCategory ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
-                        ← Previous
-                      </Button>
-
-                      <div className="flex gap-2">
-                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                          let pageNum
-                          if (totalPages <= 5) {
-                            pageNum = i + 1
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i
-                          } else {
-                            pageNum = currentPage - 2 + i
-                          }
-
-                          return (
-                            <Button
-                              key={pageNum}
-                              size="sm"
-                              onClick={() => setCurrentPage(pageNum)}
-                              className={`min-w-10 ${pageNum === currentPage
-                                ? "bg-primary hover:bg-primary/90 text-white"
-                                : "bg-secondary border-border text-foreground hover:bg-muted"
-                                }`}
-                            >
-                              {pageNum}
-                            </Button>
-                          )
-                        })}
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                        className="bg-secondary border-border text-foreground hover:bg-muted"
-                      >
-                        Next →
-                      </Button>
-
-                      <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
-                        <span className="text-sm text-muted-foreground">Rows:</span>
-                        <select
-                          className="px-2 py-1 bg-secondary border border-border rounded text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                          value={itemsPerPage}
-                          onChange={(e) => {
-                            setItemsPerPage(Number(e.target.value))
-                            setCurrentPage(1)
+                        <span>-</span>
+                        All
+                      </button>
+                      {subcategories.map((subcat) => (
+                        <button
+                          key={subcat.id}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${selectedSubcategory === subcat.id
+                            ? "bg-primary text-white shadow-md"
+                            : "bg-secondary border border-border text-foreground hover:bg-muted/70"
+                            }`}
+                          onClick={() => {
+                            // Toggle: if already selected, deselect it
+                            if (selectedSubcategory === subcat.id) {
+                              setSelectedSubcategory(null)
+                            } else {
+                              handleSubcategoryClick(subcat.id)
+                            }
                           }}
                         >
-                          <option value={10}>10</option>
-                          <option value={20}>20</option>
-                          <option value={30}>30</option>
-                          <option value={50}>50</option>
-                        </select>
-                      </div>
+                          <span>•</span>
+                          {subcat.name}
+                        </button>
+                      ))}
+                      {selectedCategory && subcategories.length === 0 && (
+                        <span className="text-xs text-muted-foreground self-center ml-2">No subcategories</span>
+                      )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Contact Count, Search, and Filters - Always show */}
+              <div className="space-y-4 mb-6">
+                {/* Total Count and Search Bar */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-card border border-border rounded-lg">
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <strong className="text-foreground">
+                        {selectedCategory || selectedSubcategory ? "Filtered" : "Total"} Contacts:
+                      </strong>
+                      <span className="text-primary font-semibold text-2xl">{contactCount}</span>
+                    </div>
+                    {selectedCategoryData && (selectedCategory || selectedSubcategory) && (
+                      <small className="text-muted-foreground block mt-1">
+                        in {selectedCategoryData.name}
+                        {selectedSubcategory &&
+                          ` > ${subcategories.find((s) => s.id === selectedSubcategory)?.name}`}
+                      </small>
+                    )}
+                    {!selectedCategory && !selectedSubcategory && (
+                      <small className="text-muted-foreground block mt-1">
+                        Across all categories
+                      </small>
+                    )}
+                  </div>
+
+                  {/* Search */}
+                  <div className="relative flex-1 max-w-md w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search contacts..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="w-full pl-10 pr-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Sort and Clear Filters */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {/* Sort */}
+                  <div className="w-[200px]">
+                    <Select
+                      value={`${sortBy}:${sortOrder}`}
+                      onChange={(e) => {
+                        const [field, order] = e.target.value.split(":")
+                        setSortBy(field)
+                        setSortOrder(order as "asc" | "desc")
+                      }}
+                    >
+                      <SelectOption value="created_at:desc">Sort: Latest First</SelectOption>
+                      <SelectOption value="created_at:asc">Sort: Oldest First</SelectOption>
+                      <SelectOption value="company_name:asc">Sort: Name (A-Z)</SelectOption>
+                      <SelectOption value="company_name:desc">Sort: Name (Z-A)</SelectOption>
+                      <SelectOption value="category_name:asc">Sort: Category (A-Z)</SelectOption>
+                      <SelectOption value="category_name:desc">Sort: Category (Z-A)</SelectOption>
+                      <SelectOption value="status:asc">Sort: Status (A-Z)</SelectOption>
+                      <SelectOption value="status:desc">Sort: Status (Z-A)</SelectOption>
+                    </Select>
+                  </div>
+
+                  {/* Clear Search */}
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("")
+                        setCurrentPage(1)
+                      }}
+                      className="text-xs text-destructive hover:underline px-3 py-2 bg-destructive/10 rounded-lg"
+                    >
+                      Clear Search
+                    </button>
                   )}
                 </div>
-              )
-            })()}
+              </div>
 
+              {/* Contacts Table - Always visible */}
+              {(() => {
+                // Filter contacts
+                let filteredContacts = [...contacts]
 
-          </CardContent>
+                // Search filter
+                if (searchQuery.trim()) {
+                  const query = searchQuery.toLowerCase()
+                  filteredContacts = filteredContacts.filter(
+                    (contact) =>
+                      contact.company_name?.toLowerCase().includes(query) ||
+                      contact.mobile_number?.toString().includes(query) ||
+                      contact.category_name?.toLowerCase().includes(query) ||
+                      contact.sub_category_name?.toLowerCase().includes(query) ||
+                      contact.sales_person_name?.toLowerCase().includes(query)
+                  )
+                }
+
+                // Sort contacts
+                filteredContacts.sort((a: any, b: any) => {
+                  const aValue = a[sortBy] || ""
+                  const bValue = b[sortBy] || ""
+
+                  // Handle date sorting for created_at
+                  if (sortBy === "created_at") {
+                    const aDate = aValue ? new Date(aValue).getTime() : 0
+                    const bDate = bValue ? new Date(bValue).getTime() : 0
+                    return sortOrder === "asc" ? aDate - bDate : bDate - aDate
+                  }
+
+                  // Handle string sorting
+                  if (typeof aValue === "string" && typeof bValue === "string") {
+                    return sortOrder === "asc"
+                      ? aValue.localeCompare(bValue)
+                      : bValue.localeCompare(aValue)
+                  }
+
+                  // Handle numeric sorting
+                  return sortOrder === "asc" ? aValue - bValue : bValue - aValue
+                })
+
+                // Pagination
+                const totalPages = Math.ceil(filteredContacts.length / itemsPerPage)
+                const startIndex = (currentPage - 1) * itemsPerPage
+                const paginatedContacts = filteredContacts.slice(startIndex, startIndex + itemsPerPage)
+
+                return (
+                  <div className="mt-4">
+                    <div className="overflow-x-auto">
+                      <table className="text-sm w-full bg-card">
+                        <thead>
+                          <tr className="border-b border-border bg-secondary/30">
+                            <th className="text-left py-3 px-4 font-medium text-muted-foreground whitespace-nowrap">
+                              Company Name
+                            </th>
+                            <th className="text-left py-3 px-4 font-medium text-muted-foreground whitespace-nowrap">
+                              Mobile Number
+                            </th>
+                            <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">
+                              Category
+                            </th>
+                            <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">
+                              Sub-Category
+                            </th>
+                            <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell whitespace-nowrap">
+                              Sales Person
+                            </th>
+                            <th className="text-left py-3 px-4 font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                            <th className="text-right py-3 px-4 font-medium text-muted-foreground whitespace-nowrap">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedContacts && paginatedContacts.length > 0 ? (
+                            paginatedContacts.map((contact: any) => (
+                              <tr key={contact.id || `${contact.mobile_number}-${contact.company_name}`} className="border-b border-border hover:bg-muted/30">
+                                <td className="py-3 px-4">
+                                  <CoolTooltip content={contact.company_name}>
+                                    <div className="truncate max-w-[150px] text-foreground">
+                                      {contact.company_name || "--"}
+                                    </div>
+                                  </CoolTooltip>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <CoolTooltip content={contact.mobile_number}>
+                                    <div className="truncate max-w-[150px] text-muted-foreground">
+                                      {contact.mobile_number || "--"}
+                                    </div>
+                                  </CoolTooltip>
+                                </td>
+                                <td className="py-3 px-4 hidden md:table-cell">
+                                  <CoolTooltip content={contact.category_name}>
+                                    <div className="truncate max-w-[150px] text-foreground">
+                                      {contact.category_name || "--"}
+                                    </div>
+                                  </CoolTooltip>
+                                </td>
+                                <td className="py-3 px-4 hidden md:table-cell">
+                                  <CoolTooltip content={contact.sub_category_name}>
+                                    <div className="truncate max-w-[150px] text-foreground">
+                                      {contact.sub_category_name || "--"}
+                                    </div>
+                                  </CoolTooltip>
+                                </td>
+                                <td className="py-3 px-4 hidden md:table-cell">
+                                  <CoolTooltip content={contact.sales_person_name}>
+                                    <div className="truncate max-w-[150px] text-foreground">
+                                      {contact.sales_person_name || "--"}
+                                    </div>
+                                  </CoolTooltip>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <StatusBadge status={contact.status || (contact.is_lead ? "new" : "pending")} isLead={contact.is_lead} />
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    {contact.is_lead ? (
+                                      <span className="text-xs text-muted-foreground px-2 py-1 bg-blue-500/10 rounded">
+                                        Lead
+                                      </span>
+                                    ) : (
+                                      <button
+                                        className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                                        onClick={() => {
+                                          if (contact.id) {
+                                            handleDeleteContact(contact.id, contact.company_name || "contact")
+                                          } else {
+                                            toast.error("Cannot delete lead from here. Please use the Leads page.")
+                                          }
+                                        }}
+                                        title="Delete"
+                                      >
+                                        <Trash2 className="w-4 h-4 text-destructive" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={7} className="text-center py-6 text-muted-foreground">
+                                {searchQuery
+                                  ? "No contacts match your search"
+                                  : "No contacts found for this category" + (selectedSubcategory ? " / subcategory" : "")}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {totalPages > 0 && (
+                      <div className="flex flex-wrap justify-center items-center gap-3 mt-6 pt-4 border-t border-border">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="bg-secondary border-border text-foreground hover:bg-muted"
+                        >
+                          ← Previous
+                        </Button>
+
+                        <div className="flex gap-2">
+                          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                            let pageNum
+                            if (totalPages <= 5) {
+                              pageNum = i + 1
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i
+                            } else {
+                              pageNum = currentPage - 2 + i
+                            }
+
+                            return (
+                              <Button
+                                key={pageNum}
+                                size="sm"
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`min-w-10 ${pageNum === currentPage
+                                  ? "bg-primary hover:bg-primary/90 text-white"
+                                  : "bg-secondary border-border text-foreground hover:bg-muted"
+                                  }`}
+                              >
+                                {pageNum}
+                              </Button>
+                            )
+                          })}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="bg-secondary border-border text-foreground hover:bg-muted"
+                        >
+                          Next →
+                        </Button>
+
+                        <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+                          <span className="text-sm text-muted-foreground">Rows:</span>
+                          <div className="w-[70px]">
+                            <Select
+                              value={itemsPerPage.toString()}
+                              onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value))
+                                setCurrentPage(1)
+                              }}
+                            >
+                              <SelectOption value="10">10</SelectOption>
+                              <SelectOption value="20">20</SelectOption>
+                              <SelectOption value="30">30</SelectOption>
+                              <SelectOption value="50">50</SelectOption>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+            </CardContent>
+          )}
         </Card>
       </div>
 
