@@ -21,7 +21,7 @@
 //   });
 
 //   const resp = await fetch(
-//     `https://graph.facebook.com/v19.0/${phoneNumberId}/media`,
+//     `https://graph.facebook.com/v24.0/${phoneNumberId}/media`,
 //     {
 //       method: "POST",
 //       headers: {
@@ -56,7 +56,7 @@ export async function uploadMediaToWhatsApp({
   form.append("messaging_product", "whatsapp");
 
   const res = await fetch(
-    `https://graph.facebook.com/v19.0/${phoneNumberId}/media`,
+    `https://graph.facebook.com/v24.0/${phoneNumberId}/media`,
     {
       method: "POST",
       headers: {
