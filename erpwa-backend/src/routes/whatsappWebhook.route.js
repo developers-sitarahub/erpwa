@@ -33,6 +33,14 @@ router.post("/", async (req, res) => {
 
     if (!value) return res.sendStatus(200);
 
+      /* ===============================
+       🔍 DEBUG: LOG META PHONE NUMBER ID
+    =============================== */
+    console.log(
+      "📩 Incoming webhook phone_number_id:",
+      value.metadata?.phone_number_id
+    );
+
     /* ===============================
        Resolve Vendor by phone_number_id
     =============================== */
@@ -45,6 +53,13 @@ router.post("/", async (req, res) => {
 
     if (!vendor) return res.sendStatus(200);
 
+    /* ===============================
+       🔍 DEBUG: LOG VENDOR MATCH
+    =============================== */
+    console.log(
+      "🏢 Vendor lookup result:",
+      vendor ? "FOUND ✅" : "NOT FOUND ❌"
+    );
     /* =====================================================
        1️⃣ HANDLE INBOUND CUSTOMER MESSAGES
     ===================================================== */
