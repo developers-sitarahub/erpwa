@@ -211,6 +211,7 @@ router.post(
             lastContactedAt: new Date(),
             ...(req.user.role === "sales" && {
               salesPersonName: req.user.name,
+              salesPersonId: req.user.id,
             }), // Auto-assign if sending
           },
           create: {
@@ -221,6 +222,7 @@ router.post(
             optInAt: new Date(),
             ...(req.user.role === "sales" && {
               salesPersonName: req.user.name,
+              salesPersonId: req.user.id,
             }),
           },
         });

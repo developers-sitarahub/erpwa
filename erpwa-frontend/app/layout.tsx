@@ -13,9 +13,9 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "WhatsApp Sales Dashboard",
+  title: "GPS erp",
   description:
-    "Professional sales and support management dashboard for WhatsApp Business",
+    "Professional sales and support management dashboard",
 };
 
 export default function RootLayout({

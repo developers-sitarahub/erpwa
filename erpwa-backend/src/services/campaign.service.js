@@ -178,6 +178,7 @@ class CampaignService {
       imageLimit = 100,
       captionMode,
       conversationIds,
+      imageIds, // ✅ Extract imageIds
     } = payload;
 
     if (!conversationIds?.length) {
@@ -190,14 +191,23 @@ class CampaignService {
 
     // 1️⃣ Fetch images
     const MAX_IMAGES_PER_CONVERSATION = 30;
-    const finalLimit = Math.min(imageLimit, MAX_IMAGES_PER_CONVERSATION);
+    const finalLimit = Math.min(imageIds?.length || imageLimit, MAX_IMAGES_PER_CONVERSATION);
 
-    // Fetch all images (no take here)
+    const where = {
+      vendorId,
+    };
+
+    // If specific images selected, use them. Otherwise fallback to category
+    if (imageIds && imageIds.length > 0) {
+      where.id = { in: imageIds };
+    } else {
+      if (subCategoryId) where.subCategoryId = subCategoryId;
+      else where.categoryId = categoryId;
+    }
+
+    // Fetch images
     const images = await prisma.galleryImage.findMany({
-      where: {
-        vendorId,
-        ...(subCategoryId ? { subCategoryId } : { categoryId }),
-      },
+      where,
       orderBy: { createdAt: "desc" },
     });
 
@@ -253,14 +263,27 @@ class CampaignService {
         if (captionMode === "TITLE") {
           caption = image.title;
         } else if (captionMode === "DESCRIPTION") {
-          // Construct full details: Title, Description, Price
+          caption = image.description;
+        } else if (captionMode === "FULL") {
+          // Build a comprehensive caption with all available information
           const parts = [];
-          if (image.title) parts.push(`*${image.title}*`);
-          if (image.description) parts.push(image.description);
-          if (image.price)
-            parts.push(`Price: ${image.price} ${image.priceCurrency || ""}`);
 
-          caption = parts.join("\n");
+          if (image.title) {
+            parts.push(`*${image.title}*`);
+          }
+
+          if (image.description) {
+            parts.push(image.description);
+          }
+
+          if (image.price) {
+            const currency = image.priceCurrency || "USD";
+            const priceSymbol =
+              currency === "INR" ? "₹" : currency === "USD" ? "$" : currency;
+            parts.push(`\n💰 Price: ${priceSymbol}${image.price}`);
+          }
+
+          caption = parts.length > 0 ? parts.join("\n\n") : null;
         }
 
         const message = await prisma.message.create({

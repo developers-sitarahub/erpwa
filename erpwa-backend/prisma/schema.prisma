@@ -26,6 +26,7 @@ model Vendor {
   messages              Message[]
   templates             Template[]
   users                 User[]
+  activityLogs          ActivityLog[]
 }
 
 model User {
@@ -432,4 +433,33 @@ enum MediaType {
   audio
   document
   sticker
+}
+model ActivityLog {
+  id              String   @id @default(uuid())
+  vendorId        String?
+  conversationId  String?
+  messageId       String?  // WhatsApp message ID
+  phoneNumber     String?
+  type            String   // Message type or "webhook"
+  status          String   // read, delivered, failed, template_approved, approved, received, success, error, ignored
+  event           String?  // Operation name (send, receive, delivery_update, template_approval, verification, etc.)
+  category        String?  // Category from payload
+  error           String?  // Only populated if there's an actual error
+  payload         Json?    // Full payload for reference
+  
+  // Webhook specific fields
+  direction       String?  // "inbound" | "outbound_status"
+  responseCode    Int?     // HTTP response code
+  processingMs    Int?     // Processing time in ms
+
+  createdAt       DateTime @default(now())
+  
+  vendor          Vendor?  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  
+  @@index([vendorId])
+  @@index([conversationId])
+  @@index([messageId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([type])
 }

@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useAuth } from "@/context/authContext"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/authContext";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -15,190 +15,169 @@ import {
   ChevronRight,
   Menu,
   X,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import { useSidebar } from "@/context/sidebar-provider"
-import { useState, useEffect } from "react"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useSidebar } from "@/context/sidebar-provider";
+import { useEffect, useState } from "react";
+import { Logo } from "@/components/logo";
 
-interface SidebarProps {
-  userRole?: "vendor_owner" | "vendor_admin" | "sales"
-}
+/* ✅ Menu config matching Sales routes */
+const menuItems = [
+  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/inbox", icon: MessageSquare, label: "Inbox" },
+  { href: "/templates", icon: FileText, label: "Templates" },
+  { href: "/campaigns", icon: Megaphone, label: "Campaigns" },
+  { href: "/categories", icon: Folder, label: "Categories" },
+  { href: "/gallery", icon: ImageIcon, label: "Gallery" },
+  { href: "/settings", icon: Settings, label: "Settings" },
+];
 
-export function Sidebar({ userRole = "sales" }: SidebarProps) {
-  const pathname = usePathname()
-  const { isCollapsed, toggleSidebar } = useSidebar()
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const { logout } = useAuth()
+export function Sidebar() {
+  const pathname = usePathname();
+  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { logout } = useAuth();
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  /* ✅ Detect mobile safely */
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
-  const menuItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/inbox", icon: MessageSquare, label: "Inbox" },
-    { href: "/templates", icon: FileText, label: "Templates" },
-    { href: "/campaigns", icon: Megaphone, label: "Campaigns" },
-    { href: "/categories", icon: Folder, label: "Categories" },
-    { href: "/gallery", icon: ImageIcon, label: "Gallery" },
-    { href: "/settings", icon: Settings, label: "Settings" },
-  ]
+  const renderMenuItems = (collapsed = false) =>
+    menuItems.map((item) => {
+      const Icon = item.icon;
+      const isActive = pathname.startsWith(item.href);
 
+      return (
+        <div key={item.href} className="group relative">
+          <Link
+            href={item.href}
+            onClick={() => {
+              if (isMobile) setIsMobileOpen(false); // ✅ close only on user action
+            }}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+              isActive
+                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+              collapsed && "justify-center px-0"
+            )}
+            title={collapsed ? item.label : undefined}
+          >
+            <Icon className="w-5 h-5 shrink-0" />
+            {!collapsed && <span className="truncate">{item.label}</span>}
+          </Link>
+
+          {/* Tooltip when collapsed */}
+          {collapsed && (
+            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap">
+                {item.label}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    });
+
+  /* ================= MOBILE ================= */
   if (isMobile) {
     return (
       <>
         <button
-          onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="fixed top-4 left-4 z-50 p-2 bg-sidebar rounded-lg text-sidebar-foreground md:hidden"
+          onClick={() => setIsMobileOpen((v) => !v)}
+          className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-sidebar text-sidebar-foreground md:hidden"
         >
-          {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          {isMobileOpen ? <X /> : <Menu />}
         </button>
 
         {isMobileOpen && (
-          <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileOpen(false)} />
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setIsMobileOpen(false)}
+          />
         )}
 
         <aside
           className={cn(
-            "fixed left-0 top-0 bg-sidebar border-r border-sidebar-border h-screen flex flex-col transition-transform duration-300 ease-in-out z-40 w-64",
-            isMobileOpen ? "translate-x-0" : "-translate-x-full",
-            "md:translate-x-0",
+            "fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border transition-transform duration-300",
+            isMobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <div className="flex items-center justify-between px-4 py-6 border-b border-sidebar-border">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-md">
-                <MessageSquare className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <h1 className="text-lg font-bold text-sidebar-foreground">WhatsApp</h1>
-            </div>
+          <div className="flex items-center justify-center px-2 h-16 border-b border-sidebar-border">
+            <Logo className="h-12 w-full max-w-[220px]" />
           </div>
 
-          <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
-            {menuItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname.startsWith(item.href)
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full",
-                    isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-                  )}
-                >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              )
-            })}
+          <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+            {renderMenuItems(false)}
           </nav>
 
           <div className="border-t border-sidebar-border p-3">
             <button
               onClick={logout}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg
-             text-sm font-medium text-sidebar-foreground
-             hover:bg-sidebar-accent/50 w-full transition-all"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-sidebar-accent/50 w-full"
             >
               <LogOut className="w-5 h-5" />
-              <span>Logout</span>
+              Logout
             </button>
           </div>
-        </aside>
+        </aside >
       </>
-    )
+    );
   }
 
+  /* ================= DESKTOP ================= */
   return (
     <aside
       className={cn(
-        "hidden md:flex fixed left-0 top-0 bg-sidebar border-r border-sidebar-border h-screen flex-col transition-all duration-300 ease-in-out z-40",
-        isCollapsed ? "w-20" : "w-64",
+        "hidden md:flex fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border flex-col transition-all duration-300",
+        isCollapsed ? "w-20" : "w-64"
       )}
     >
-      <div className="flex items-center justify-between px-4 py-6 border-b border-sidebar-border">
-        <div className={cn("flex items-center", isCollapsed ? "w-full justify-center" : "gap-2")}>
-          <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-md">
-            <MessageSquare className="w-5 h-5 text-primary-foreground" />
-          </div>
-          {!isCollapsed && <h1 className="text-lg font-bold text-sidebar-foreground">WhatsApp</h1>}
+      <div className="flex items-center justify-between px-2 h-16 border-b border-sidebar-border">
+        <div className={cn("flex items-center transition-all duration-300", isCollapsed ? "justify-center w-full" : "justify-start pl-4 flex-1")}>
+          <Logo collapsed={isCollapsed} isSidebar={true} className={cn("transition-all duration-300", isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-[220px]")} />
         </div>
 
-        <button
-          onClick={toggleSidebar}
-          className="p-1.5 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200 ml-2"
-          title={isCollapsed ? "Expand" : "Collapse"}
-        >
-          <ChevronRight className={cn("w-4 h-4 transition-transform duration-300", isCollapsed && "rotate-180")} />
-        </button>
+        {!isCollapsed && (
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg hover:bg-sidebar-accent ml-1"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+        {isCollapsed && (
+          <button
+            onClick={toggleSidebar}
+            className="absolute right-2 top-5 p-1.5 rounded-lg hover:bg-sidebar-accent"
+          >
+            <ChevronRight className="w-4 h-4 rotate-180" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-hide">
-        {menuItems.map((item) => {
-          const Icon = item.icon
-          const isActive = pathname.startsWith(item.href)
-
-          return (
-            <div key={item.href} className="group relative">
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full",
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-                  isCollapsed && "justify-center px-0",
-                )}
-                title={isCollapsed ? item.label : ""}
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {!isCollapsed && <span className="truncate">{item.label}</span>}
-              </Link>
-
-              {isCollapsed && (
-                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                  <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs font-medium whitespace-nowrap shadow-lg">
-                    {item.label}
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
+      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+        {renderMenuItems(isCollapsed)}
       </nav>
 
       <div className="border-t border-sidebar-border p-3">
-        <div className="group relative">
-          <button
-            onClick={logout}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-all duration-200",
-              isCollapsed && "justify-center px-0",
-            )}
-            title={isCollapsed ? "Logout" : ""}
-          >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && <span>Logout</span>}
-          </button>
-
-          {isCollapsed && (
-            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-              <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs font-medium whitespace-nowrap shadow-lg">
-                Logout
-              </div>
-            </div>
+        <button
+          onClick={logout}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-sidebar-accent/50 w-full",
+            isCollapsed && "justify-center px-0"
           )}
-        </div>
+        >
+          <LogOut className="w-5 h-5" />
+          {!isCollapsed && "Logout"}
+        </button>
       </div>
     </aside>
-  )
+  );
 }

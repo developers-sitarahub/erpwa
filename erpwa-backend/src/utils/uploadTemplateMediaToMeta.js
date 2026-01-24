@@ -32,7 +32,7 @@ export async function uploadTemplateMediaToMeta({
     // STEP 1: Create Upload Session
     // =========================================
     const sessionRes = await fetch(
-        `https://graph.facebook.com/v24.0/${appId}/uploads?` +
+        `https://graph.facebook.com/v19.0/${appId}/uploads?` +
         new URLSearchParams({
             file_name: fileName,
             file_length: buffer.length.toString(),
@@ -60,7 +60,7 @@ export async function uploadTemplateMediaToMeta({
     // STEP 2: Upload the file bytes
     // =========================================
     const uploadRes = await fetch(
-        `https://graph.facebook.com/v24.0/${uploadSessionId}`,
+        `https://graph.facebook.com/v19.0/${uploadSessionId}`,
         {
             method: "POST",
             headers: {

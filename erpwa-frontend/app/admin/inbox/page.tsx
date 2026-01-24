@@ -898,9 +898,18 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
   };
 };
 
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+
 export default function InboxPage() {
-  const [selectedConversation, setSelectedConversation] = useState<string>("");
-  const [showChat, setShowChat] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const chatId = searchParams.get("chatId");
+
+  const [selectedConversation, setSelectedConversation] = useState<string>(
+    chatId || ""
+  );
+  const [showChat, setShowChat] = useState(!!chatId);
   const readSentRef = useRef<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -921,6 +930,9 @@ export default function InboxPage() {
 
   useEffect(() => {
     loadInbox();
+    if (chatId) {
+      handleSelectConversation(chatId);
+    }
   }, []);
 
   useInboxSocket({
@@ -934,6 +946,11 @@ export default function InboxPage() {
      SELECT CONVERSATION
   ======================= */
   const handleSelectConversation = async (id: string) => {
+    // Update URL
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("chatId", id);
+    router.replace(`${pathname}?${params.toString()}`);
+
     readSentRef.current.delete(id);
 
     setMessages([]);
@@ -967,9 +984,9 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                    footer: m.outboundPayload.footer,
-                    buttons: m.outboundPayload.buttons,
-                  }
+                  footer: m.outboundPayload.footer,
+                  buttons: m.outboundPayload.buttons,
+                }
                 : undefined),
           };
         },
@@ -988,11 +1005,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-                ...c,
-                sessionStarted: res.data.sessionStarted,
-                sessionActive: res.data.sessionActive,
-                sessionExpiresAt: res.data.sessionExpiresAt,
-              }
+              ...c,
+              sessionStarted: res.data.sessionStarted,
+              sessionActive: res.data.sessionActive,
+              sessionExpiresAt: res.data.sessionExpiresAt,
+            }
             : c,
         ),
       );
@@ -1058,9 +1075,8 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden bg-background">
       <div
-        className={`${
-          showChat ? "hidden md:block" : "block"
-        } w-full md:w-auto h-full flex-shrink-0`}
+        className={`${showChat ? "hidden md:block" : "block"
+          } w-full md:w-auto h-full flex-shrink-0`}
       >
         <ConversationList
           conversations={conversations}

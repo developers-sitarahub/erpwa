@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { useAuth } from "@/context/authContext"
+import { Logo } from "@/components/logo"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -31,14 +32,15 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-xl bg-card text-foreground shadow-xl p-8 border border-border">
 
         {/* Header */}
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-primary/15 flex items-center justify-center">
-            <span className="text-primary text-2xl font-bold">W</span>
+        <div className="mb-8 w-full">
+          <div className="flex flex-col items-center w-full">
+            <div className="flex justify-end w-full pr-4 mb-4">
+              <Logo className="w-64 h-auto max-h-32" />
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              Sign in to continue
+            </p>
           </div>
-          <h1 className="text-2xl font-semibold">WhatsApp ERP</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Sign in to continue
-          </p>
         </div>
 
         {/* Form */}
@@ -118,7 +120,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} WhatsApp ERP
+          © {new Date().getFullYear()} GPS erp
         </p>
       </div>
     </div>

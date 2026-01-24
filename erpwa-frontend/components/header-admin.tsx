@@ -2,8 +2,8 @@
 
 import { Bell, Search, User, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/button"
-import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/context/authContext"
 
@@ -12,11 +12,24 @@ export function HeaderAdmin() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const showSearch = pathname === "/admin/dashboard"
   const { logout, user } = useAuth()
-  const userEmail = typeof window !== "undefined" ? localStorage.getItem("userEmail") : null
-  const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") : null
+  const searchParams = useSearchParams();
+  const isChatOpen = !!searchParams.get("chatId");
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   return (
-    <header className="border-b border-sidebar-border bg-card sticky top-0 z-10">
+    <header className="border-b border-sidebar-border bg-card sticky top-0 z-40">
       <div className="flex items-center justify-between px-6 py-4 h-16">
         {/* Title */}
         <h2 className="text-xl font-semibold text-foreground">Admin Dashboard</h2>
@@ -40,11 +53,12 @@ export function HeaderAdmin() {
             <span className="sr-only">Notifications</span>
           </Button>
 
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <Button
               variant="ghost"
               size="sm"
-              className="text-foreground hover:bg-muted"
+              disabled={isChatOpen}
+              className={`text-foreground hover:bg-muted ${isChatOpen ? "opacity-50 cursor-not-allowed" : ""}`}
               onClick={() => setUserMenuOpen(!userMenuOpen)}
             >
               <User className="w-5 h-5" />
