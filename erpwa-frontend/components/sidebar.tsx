@@ -32,11 +32,7 @@ const menuItems = [
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
-interface SidebarProps {
-  userRole?: "sales";
-}
-
-export function Sidebar({ userRole }: SidebarProps = {}) {
+export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
   const { logout } = useAuth();
