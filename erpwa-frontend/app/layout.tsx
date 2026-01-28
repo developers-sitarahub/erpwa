@@ -14,8 +14,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "GPS erp",
-  description:
-    "Professional sales and support management dashboard",
+  description: "Professional sales and support management dashboard",
 };
 
 export default function RootLayout({

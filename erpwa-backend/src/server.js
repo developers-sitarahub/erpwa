@@ -28,6 +28,7 @@ import testUploadRoute from "./routes/testUpload.route.js";
 import WhatsappNumberCheckRoute from "./routes/whatsappNumberCheck.route.js";
 // import webhookLogsRoutes from "./routes/webhookLogs.route.js";
 import activityLogsRoutes from "./routes/activityLogs.route.js";
+import whatsappFlowsRoutes from "./routes/whatsappFlows.route.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -72,6 +73,7 @@ app.use("/api/activity-logs", activityLogsRoutes);
 app.use("/webhook", whatsappWebhookRoutes);
 app.use("/test", testUploadRoute);
 app.use("/api/whatsapp", WhatsappNumberCheckRoute);
+app.use("/api/whatsapp/flows", whatsappFlowsRoutes);
 
 /* ================= SERVER START ================= */
 const PORT = process.env.PORT || 5000;
