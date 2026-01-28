@@ -1,11 +1,11 @@
-"use client";
+"use client"
 
-import type React from "react";
+import type React from "react"
 
-import { Sidebar } from "./sidebar";
+import { Sidebar } from "./sidebar"
 
 interface LayoutWrapperProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export function LayoutWrapper({ children }: LayoutWrapperProps) {
@@ -14,5 +14,5 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
       <Sidebar />
       <main className="flex-1 overflow-auto">{children}</main>
     </div>
-  );
+  )
 }

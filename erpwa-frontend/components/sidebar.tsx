@@ -65,7 +65,7 @@ export function Sidebar() {
               isActive
                 ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-              collapsed && "justify-center px-0",
+              collapsed && "justify-center px-0"
             )}
             title={collapsed ? item.label : undefined}
           >
@@ -106,7 +106,7 @@ export function Sidebar() {
         <aside
           className={cn(
             "fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border transition-transform duration-300",
-            isMobileOpen ? "translate-x-0" : "-translate-x-full",
+            isMobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
           <div className="flex items-center justify-center px-2 h-16 border-b border-sidebar-border">
@@ -126,7 +126,7 @@ export function Sidebar() {
               Logout
             </button>
           </div>
-        </aside>
+        </aside >
       </>
     );
   }
@@ -136,24 +136,12 @@ export function Sidebar() {
     <aside
       className={cn(
         "hidden md:flex fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border flex-col transition-all duration-300",
-        isCollapsed ? "w-20" : "w-64",
+        isCollapsed ? "w-20" : "w-64"
       )}
     >
       <div className="flex items-center justify-between px-2 h-16 border-b border-sidebar-border">
-        <div
-          className={cn(
-            "flex items-center transition-all duration-300",
-            isCollapsed ? "justify-center w-full" : "justify-start pl-4 flex-1",
-          )}
-        >
-          <Logo
-            collapsed={isCollapsed}
-            isSidebar={true}
-            className={cn(
-              "transition-all duration-300",
-              isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-[220px]",
-            )}
-          />
+        <div className={cn("flex items-center transition-all duration-300", isCollapsed ? "justify-center w-full" : "justify-start pl-4 flex-1")}>
+          <Logo collapsed={isCollapsed} isSidebar={true} className={cn("transition-all duration-300", isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-[220px]")} />
         </div>
 
         {!isCollapsed && (
@@ -183,7 +171,7 @@ export function Sidebar() {
           onClick={logout}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-sidebar-accent/50 w-full",
-            isCollapsed && "justify-center px-0",
+            isCollapsed && "justify-center px-0"
           )}
         >
           <LogOut className="w-5 h-5" />

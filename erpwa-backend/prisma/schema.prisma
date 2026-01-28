@@ -27,7 +27,9 @@ model Vendor {
   templates             Template[]
   users                 User[]
   activityLogs          ActivityLog[]
+  workflows             Workflow[]
 }
+
 
 model User {
   id                String             @id @default(uuid())
@@ -462,4 +464,35 @@ model ActivityLog {
   @@index([status])
   @@index([createdAt])
   @@index([type])
+}
+
+model Workflow {
+  id          String   @id @default(uuid())
+  vendorId    String
+  name        String
+  description String?
+  isActive    Boolean  @default(false)
+  triggerKeyword String? // Keyword to start this flow
+  nodes       Json     // Store reactflow nodes
+  edges       Json     // Store reactflow edges
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  sessions    WorkflowSession[]
+  
+  @@unique([vendorId, triggerKeyword])
+}
+
+model WorkflowSession {
+  id            String   @id @default(uuid())
+  workflowId    String
+  conversationId String // Link to the Conversation
+  currentNodeId String   // ID of the node the user is currently at
+  state         Json?    // Store variables collected during flow
+  status        String   @default("active") // active, completed, dropped
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 }
