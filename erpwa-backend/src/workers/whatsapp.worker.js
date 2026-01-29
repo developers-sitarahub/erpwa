@@ -16,7 +16,7 @@ function log(level, message, meta = {}) {
       level,
       message,
       ...meta,
-    })
+    }),
   );
 }
 
@@ -68,14 +68,24 @@ export async function processWhatsappQueue() {
 
       // 4️⃣ Dispatch based on message type
       if (message.messageType === "image") {
-        whatsappMsgId = await processImageMessage(message, accessToken, to, vendor);
+        whatsappMsgId = await processImageMessage(
+          message,
+          accessToken,
+          to,
+          vendor,
+        );
       } else if (message.messageType === "template") {
-        whatsappMsgId = await processTemplateMessage(message, accessToken, to, vendor);
+        whatsappMsgId = await processTemplateMessage(
+          message,
+          accessToken,
+          to,
+          vendor,
+        );
       } else {
         throw new Error(`Unsupported message type: ${message.messageType}`);
       }
 
-      // 5️⃣ FINAL COMMIT (Success)
+      // 5️⃣ FINAL COMMIT (Success) - Step 1: Message Status (Critical)
       await prisma.$transaction(async (tx) => {
         // ✅ Update message
         await tx.message.update({
@@ -95,25 +105,34 @@ export async function processWhatsappQueue() {
             whatsappMsgId,
           },
         });
+      });
 
+      // 6️⃣ POST-PROCESSING (Non-blocking / Best Effort)
+      try {
         // ✅ Update conversation ordering
-        await tx.conversation.update({
+        await prisma.conversation.update({
           where: { id: message.conversationId },
           data: {
             lastMessageAt: new Date(),
           },
         });
 
-        // ✅ Update Campaign Stats (Increment sent count) - Unified for both
+        // ✅ Update Campaign Stats (Increment sent count)
         if (message.campaignId) {
-          await tx.campaign.update({
+          await prisma.campaign.update({
             where: { id: message.campaignId },
             data: {
               sentMessages: { increment: 1 },
             },
           });
         }
-      });
+      } catch (postError) {
+        log("error", "Post-processing success update failed", {
+          messageId: message.id,
+          error: postError.message,
+        });
+        // We do typically not fail the whole job here as the message was sent successfully
+      }
 
       log("success", `WhatsApp ${message.messageType} sent successfully`, {
         messageId: message.id,
@@ -201,7 +220,7 @@ async function processImageMessage(message, accessToken, to, vendor) {
 
 async function processTemplateMessage(message, accessToken, to, vendor) {
   const { outboundPayload } = message;
-  
+
   if (!outboundPayload || !outboundPayload.templateId) {
     throw new Error("Missing template payload");
   }
@@ -244,7 +263,10 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
   }
 
   // B. Body
-  if (outboundPayload.bodyVariables && outboundPayload.bodyVariables.length > 0) {
+  if (
+    outboundPayload.bodyVariables &&
+    outboundPayload.bodyVariables.length > 0
+  ) {
     components.push({
       type: "body",
       parameters: outboundPayload.bodyVariables.map((v) => ({
