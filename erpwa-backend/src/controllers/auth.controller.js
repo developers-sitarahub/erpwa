@@ -13,6 +13,9 @@ const COOKIE_OPTIONS = {
 export async function login(req, res) {
   const data = await Auth.login(req.body.email, req.body.password);
 
+  console.log("✅ LOGIN SUCCESS: Setting cookie for user", data.user.email);
+  console.log("Cookie Options:", COOKIE_OPTIONS);
+
   res.cookie("refreshToken", data.refreshToken, COOKIE_OPTIONS).json({
     accessToken: data.accessToken,
     user: {
@@ -29,6 +32,7 @@ export async function refresh(req, res) {
   const token = req.cookies?.refreshToken;
 
   if (!token) {
+    console.log("❌ REFRESH: No token in cookies", req.cookies);
     res.clearCookie("refreshToken", COOKIE_OPTIONS);
     return res.status(401).json({ message: "No token" });
   }
@@ -37,6 +41,7 @@ export async function refresh(req, res) {
     const data = await Auth.refresh(token);
     return res.json(data);
   } catch (err) {
+    console.error("❌ REFRESH ERROR:", err.message);
     // 🔴 DELETE COOKIE ON FAILURE
     res.clearCookie("refreshToken", COOKIE_OPTIONS);
     return res.status(401).json({ message: "Invalid refresh token" });
