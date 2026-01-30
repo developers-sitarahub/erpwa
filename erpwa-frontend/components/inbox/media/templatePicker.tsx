@@ -131,21 +131,101 @@ export default function TemplatePicker({
                                 Live Preview
                             </p>
 
-                            <div className="rounded-xl border p-4 bg-[#0b141a] text-white">
-                                <p className="text-sm whitespace-pre-wrap">
-                                    {(() => {
-                                        let body = selectedTemplate.languages[0]?.body || "";
+                            <div className="rounded-xl border border-border overflow-hidden bg-[var(--wa-chat-bg)] relative group transition-colors duration-300">
+                                <div className="absolute inset-0 opacity-[0.4] [.dark_&]:opacity-[0.05] bg-[url('https://camo.githubusercontent.com/857a221f7c706d8847f9723ec083b063878b2772591f463378b879a838be8194/68747470733a2f2f757365722d696d616765732e67697468756275736572636f6e74656e742e636f6d2f31353037353735392f32383731393134342d38366463306637302d373362312d346334382d393630332d3935303237396532373635382e706e67')] bg-repeat bg-[length:400px]"></div>
 
-                                        templateVariables.forEach((val, idx) => {
-                                            body = body.replace(
-                                                `{{${idx + 1}}}`,
-                                                val || `{{${idx + 1}}}`
-                                            );
-                                        });
+                                <div className="relative z-10 p-4 min-h-[300px] flex flex-col items-start justify-center">
+                                    <div className="w-full bg-white [.dark_&]:bg-[#202c33] rounded-2xl rounded-tl-none shadow-sm relative overflow-hidden border border-black/5 [.dark_&]:border-white/5 transition-colors duration-300">
+                                        <div className="p-1">
+                                            {/* Header Media */}
+                                            {(() => {
+                                                const mediaItem = selectedTemplate.media?.find(
+                                                    (m) => m.language === selectedTemplate.languages[0].language
+                                                );
+                                                if (mediaItem?.s3Url) {
+                                                    return (
+                                                        <div className="rounded-xl overflow-hidden bg-black/5 [.dark_&]:bg-black/40 min-h-[140px] relative group flex items-center justify-center">
+                                                            {selectedTemplate.languages[0].headerType === "VIDEO" ? (
+                                                                <video
+                                                                    src={mediaItem.s3Url}
+                                                                    className="w-full h-full object-contain"
+                                                                    controls
+                                                                />
+                                                            ) : (
+                                                                <img
+                                                                    src={mediaItem.s3Url}
+                                                                    alt="Header"
+                                                                    className="w-full h-full object-contain"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                if (
+                                                    ["IMAGE", "VIDEO", "DOCUMENT"].includes(
+                                                        selectedTemplate.languages[0].headerType
+                                                    )
+                                                ) {
+                                                    return (
+                                                        <div className="min-h-[140px] bg-slate-100 [.dark_&]:bg-[#2a3942] flex flex-col items-center justify-center rounded-xl text-slate-500 [.dark_&]:text-slate-400 text-[10px] font-bold uppercase tracking-wider border border-black/5 [.dark_&]:border-white/5">
+                                                            <ImageIcon className="w-6 h-6 mb-2 opacity-30 text-slate-500 [.dark_&]:text-white" />
+                                                            {selectedTemplate.languages[0].headerType} MEDIA
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
 
-                                        return body;
-                                    })()}
-                                </p>
+                                            {/* Header Text */}
+                                            {selectedTemplate.languages[0]?.headerType === "TEXT" &&
+                                                selectedTemplate.languages[0]?.headerText && (
+                                                    <p className="font-bold text-[14px] pt-2 px-3 text-[#111b21] [.dark_&]:text-[#e9edef] leading-tight">
+                                                        {selectedTemplate.languages[0].headerText}
+                                                    </p>
+                                                )}
+                                        </div>
+
+                                        <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-[#111b21] [.dark_&]:text-[#e9edef] whitespace-pre-wrap font-sans">
+                                            {(() => {
+                                                let body = selectedTemplate.languages[0]?.body || "";
+                                                templateVariables.forEach((val, idx) => {
+                                                    body = body.replace(
+                                                        `{{${idx + 1}}}`,
+                                                        val || `{{${idx + 1}}}`
+                                                    );
+                                                });
+                                                return body;
+                                            })()}
+
+                                            {selectedTemplate.languages[0]?.footerText && (
+                                                <p className="mt-1.5 text-[11px] text-[#667781] [.dark_&]:text-[#8696a0] font-medium border-t border-black/5 [.dark_&]:border-white/5 pt-1.5">
+                                                    {selectedTemplate.languages[0].footerText}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Buttons */}
+                                        {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
+                                            <div className="border-t border-black/5 [.dark_&]:border-white/10 flex flex-col divide-y divide-black/5 [.dark_&]:divide-white/10 bg-gray-50 [.dark_&]:bg-[#2a3942]/30">
+                                                {selectedTemplate.buttons.map((btn, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        className="p-2.5 text-center text-[13px] font-medium text-[#00a884] flex items-center justify-center gap-2 hover:bg-black/5 [.dark_&]:hover:bg-white/5 transition-colors cursor-pointer"
+                                                    >
+                                                        {btn.type === "URL" ? (
+                                                            <Globe className="w-3.5 h-3.5" />
+                                                        ) : btn.type === "PHONE_NUMBER" ? (
+                                                            <Phone className="w-3.5 h-3.5" />
+                                                        ) : (
+                                                            <MessageSquareIcon className="w-3.5 h-3.5" />
+                                                        )}
+                                                        {btn.text}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

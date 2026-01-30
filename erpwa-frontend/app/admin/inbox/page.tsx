@@ -39,6 +39,7 @@ import type {
   Message,
   Template,
   Conversation,
+  Lead,
 } from "@/lib/types";
 import ChatMessages from "@/components/inbox/chatMessages";
 import ConversationList from "@/components/inbox/conversationList";
@@ -907,12 +908,13 @@ export default function InboxPage() {
   const chatId = searchParams.get("chatId");
 
   const [selectedConversation, setSelectedConversation] = useState<string>(
-    chatId || ""
+    chatId || "",
   );
   const [showChat, setShowChat] = useState(!!chatId);
   const readSentRef = useRef<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [assignedLeads, setAssignedLeads] = useState<Lead[]>([]); // ✅ State for assigned leads
 
   const loadInbox = async () => {
     console.time("⏱️ Load Inbox API Call");
@@ -923,6 +925,11 @@ export default function InboxPage() {
       setConversations(res.data.map(mapApiConversation));
       console.timeEnd("⏱️ Map Conversations");
       console.log(`📊 Loaded ${res.data.length} conversations`);
+
+      // ✅ Fetch ALL assigned leads (handled by backend role filtering)
+      const allLeadsRes = await api.get("/leads-management");
+      // status_counts, total are also returned but we only need leads
+      setAssignedLeads(allLeadsRes.data.data.leads || []);
     } catch (err) {
       console.error("❌ Failed to load inbox", err);
     }
@@ -984,10 +991,14 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                  footer: m.outboundPayload.footer,
-                  buttons: m.outboundPayload.buttons,
-                }
+                    footer: m.outboundPayload.footer,
+                    buttons: m.outboundPayload.buttons,
+                  }
                 : undefined),
+
+            // ✅ Map outboundPayload for interactive messages
+            outboundPayload: m.outboundPayload,
+            messageType: (m as any).messageType,
           };
         },
       );
@@ -1005,11 +1016,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              sessionStarted: res.data.sessionStarted,
-              sessionActive: res.data.sessionActive,
-              sessionExpiresAt: res.data.sessionExpiresAt,
-            }
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
             : c,
         ),
       );
@@ -1075,11 +1086,13 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden bg-background">
       <div
-        className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full flex-shrink-0`}
+        className={`${
+          showChat ? "hidden md:block" : "block"
+        } w-full md:w-auto h-full flex-shrink-0`}
       >
         <ConversationList
           conversations={conversations}
+          assignedLeads={assignedLeads} // ✅ Pass assigned leads
           selected={selectedConversation}
           onSelect={handleSelectConversation}
           onReload={loadInbox}

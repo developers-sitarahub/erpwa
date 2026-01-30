@@ -159,7 +159,7 @@ export default function CreateTemplateCampaignModal({
       const payload = {
         name: campaignName,
         templateId: selectedTemplate.id,
-        language: selectedTemplate.languages[0].language, 
+        language: selectedTemplate.languages[0].language,
         recipients: Array.from(selectedRecipients).map(id => {
           const contact = contacts.find(c => c.id === id);
           return contact?.mobile_number;
@@ -338,11 +338,10 @@ export default function CreateTemplateCampaignModal({
                                       newModes[idx] = 'custom';
                                       setVariableModes(newModes);
                                     }}
-                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
-                                      variableModes[idx] === 'custom'
+                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${variableModes[idx] === 'custom'
                                         ? 'bg-white dark:bg-card text-foreground shadow-sm'
                                         : 'text-muted-foreground hover:text-foreground'
-                                    }`}
+                                      }`}
                                   >
                                     Custom
                                   </button>
@@ -356,11 +355,10 @@ export default function CreateTemplateCampaignModal({
                                       newVars[idx] = '';
                                       setTemplateVariables(newVars);
                                     }}
-                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
-                                      variableModes[idx] === 'company'
+                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${variableModes[idx] === 'company'
                                         ? 'bg-white dark:bg-card text-foreground shadow-sm'
                                         : 'text-muted-foreground hover:text-foreground'
-                                    }`}
+                                      }`}
                                   >
                                     Company
                                   </button>
@@ -376,9 +374,8 @@ export default function CreateTemplateCampaignModal({
                                   newVars[idx] = e.target.value;
                                   setTemplateVariables(newVars);
                                 }}
-                                className={`w-full bg-input border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:opacity-30 ${
-                                  variableModes[idx] === 'company' ? 'opacity-60 cursor-not-allowed' : ''
-                                }`}
+                                className={`w-full bg-input border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:opacity-30 ${variableModes[idx] === 'company' ? 'opacity-60 cursor-not-allowed' : ''
+                                  }`}
                               />
                             </div>
                           ))

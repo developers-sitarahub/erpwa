@@ -70,10 +70,7 @@ router.post(
       });
 
       if (!media?.s3Url) {
-        return res.status(400).json({
-          message:
-            "Template media URL not found. Please re-upload the template.",
-        });
+        console.warn(`⚠️ Header media record or S3 URL missing for template ${template.displayName} (${language.headerType}). Proceeding without header component.`);
       }
     }
 
@@ -128,7 +125,7 @@ router.post(
         const components = [];
 
         /** 🔹 HEADER (MEDIA ONLY) */
-        if (media) {
+        if (media?.s3Url) {
           components.push({
             type: "header",
             parameters: [

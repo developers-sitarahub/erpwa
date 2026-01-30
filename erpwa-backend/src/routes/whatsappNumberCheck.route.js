@@ -63,8 +63,11 @@ router.post(
 
       // 🔒 ROLE-BASED FILTERING
       if (req.user.role === "sales") {
-        whereLead.salesPersonName = req.user.name;
-        whereConversation.lead.salesPersonName = req.user.name;
+        whereLead.salesPersonId = req.user.id;
+        whereConversation.lead = {
+          ...whereConversation.lead,
+          salesPersonId: req.user.id,
+        };
       }
 
       // Check if lead exists with this phone number
@@ -160,10 +163,37 @@ router.post(
     });
 
     // 🔒 ROLE-BASED PROTECTION
-    if (lead && req.user.role === "sales" && lead.salesPersonName && lead.salesPersonName !== req.user.name) {
-      return res.status(403).json({
-        message: "This lead is assigned to another sales person",
-      });
+    if (lead && req.user.role === "sales") {
+      // 1. Check if we have a Name match but ID Mismatch (Data Corruption Fix)
+      // If the visible Name matches the User, we assume the User owns it and the ID is outdated.
+      if (
+        lead.salesPersonName === req.user.name &&
+        lead.salesPersonId !== req.user.id
+      ) {
+        // Fix the ID to match the User
+        lead = await prisma.lead.update({
+          where: { id: lead.id },
+          data: { salesPersonId: req.user.id },
+        });
+      }
+      // 2. Otherwise, enforce ID ownership if ID exists
+      else if (lead.salesPersonId && lead.salesPersonId !== req.user.id) {
+        return res.status(403).json({
+          message:
+            "This number is already assigned to another sales person",
+        });
+      }
+      // 3. Enforce Name ownership if ID is missing (Legacy)
+      else if (
+        !lead.salesPersonId &&
+        lead.salesPersonName &&
+        lead.salesPersonName !== req.user.name
+      ) {
+        return res.status(403).json({
+          message:
+            "This number is already assigned to another sales person",
+        });
+      }
     }
 
     // Create lead if it doesn't exist
@@ -194,11 +224,14 @@ router.post(
           salesPersonName, // Auto-assign name for sales person, null for admins/owners
         },
       });
-    } else if (req.user.role === "sales" && !lead.salesPersonName) {
-      // Auto-assign if unassigned
+    } else if (req.user.role === "sales" && !lead.salesPersonId) {
+      // Auto-assign if unassigned OR backfill ID if missing (but name matched)
       lead = await prisma.lead.update({
         where: { id: lead.id },
-        data: { salesPersonName: req.user.name },
+        data: {
+          salesPersonName: req.user.name,
+          salesPersonId: userId,
+        },
       });
     }
 

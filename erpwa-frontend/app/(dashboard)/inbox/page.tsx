@@ -19,6 +19,7 @@ import type {
   Message,
   Template,
   Conversation,
+  Lead,
 } from "@/lib/types";
 import ChatMessages from "@/components/inbox/chatMessages";
 import ConversationList from "@/components/inbox/conversationList";
@@ -893,6 +894,7 @@ export default function InboxPage() {
   const readSentRef = useRef<Set<string>>(new Set());
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [assignedLeads, setAssignedLeads] = useState<Lead[]>([]); // ✅ State for assigned leads
 
   const loadInbox = async () => {
     console.time("⏱️ Load Inbox API Call");
@@ -903,17 +905,15 @@ export default function InboxPage() {
       setConversations(res.data.map(mapApiConversation));
       console.timeEnd("⏱️ Map Conversations");
       console.log(`📊 Loaded ${res.data.length} conversations`);
+
+      // ✅ Fetch ALL assigned leads (handled by backend role filtering)
+      const allLeadsRes = await api.get("/leads-management");
+      // status_counts, total are also returned but we only need leads
+      setAssignedLeads(allLeadsRes.data.data.leads || []);
     } catch (err) {
       console.error("❌ Failed to load inbox", err);
     }
   };
-
-  useEffect(() => {
-    loadInbox();
-    if (chatId) {
-      handleSelectConversation(chatId);
-    }
-  }, []);
 
   useInboxSocket({
     selectedConversation,
@@ -968,6 +968,10 @@ export default function InboxPage() {
                     buttons: m.outboundPayload.buttons,
                   }
                 : undefined),
+
+            // ✅ Map outboundPayload for interactive messages
+            outboundPayload: m.outboundPayload,
+            messageType: (m as any).messageType,
           };
         },
       );
@@ -1048,6 +1052,13 @@ export default function InboxPage() {
     }
   };
 
+  useEffect(() => {
+    loadInbox();
+    if (chatId) {
+      handleSelectConversation(chatId);
+    }
+  }, []);
+
   const currentConversation = conversations.find(
     (c) => c.id === selectedConversation,
   );
@@ -1061,6 +1072,7 @@ export default function InboxPage() {
       >
         <ConversationList
           conversations={conversations}
+          assignedLeads={assignedLeads} // ✅ Pass assigned leads
           selected={selectedConversation}
           onSelect={handleSelectConversation}
           onReload={loadInbox}

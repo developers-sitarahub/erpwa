@@ -20,6 +20,8 @@ CREATE TABLE "Vendor" (
     "whatsappStatus" TEXT NOT NULL DEFAULT 'not_configured',
     "whatsappVerifiedAt" TIMESTAMP(3),
     "whatsappLastError" TEXT,
+    "whatsappFlowsPublicKey" TEXT,
+    "whatsappFlowsPrivateKey" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Vendor_pkey" PRIMARY KEY ("id")
@@ -164,11 +166,31 @@ CREATE TABLE "Template" (
     "displayName" TEXT NOT NULL,
     "category" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'draft',
+    "templateType" TEXT NOT NULL DEFAULT 'standard',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "createdBy" TEXT,
+    "flowId" TEXT,
 
     CONSTRAINT "Template_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateCarouselCard" (
+    "id" TEXT NOT NULL,
+    "templateId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "subtitle" TEXT,
+    "s3Url" TEXT,
+    "mediaHandle" TEXT,
+    "mimeType" TEXT,
+    "buttonType" TEXT DEFAULT 'URL',
+    "buttonText" TEXT,
+    "buttonValue" TEXT,
+    "position" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TemplateCarouselCard_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -179,6 +201,8 @@ CREATE TABLE "TemplateButton" (
     "text" TEXT NOT NULL,
     "value" TEXT,
     "position" INTEGER NOT NULL,
+    "flowId" TEXT,
+    "flowAction" TEXT,
 
     CONSTRAINT "TemplateButton_pkey" PRIMARY KEY ("id")
 );
@@ -218,6 +242,17 @@ CREATE TABLE "TemplateLanguage" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "TemplateLanguage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateCatalogProduct" (
+    "id" TEXT NOT NULL,
+    "templateId" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TemplateCatalogProduct_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -323,6 +358,89 @@ CREATE TABLE "MessageDelivery" (
     CONSTRAINT "MessageDelivery_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "ActivityLog" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT,
+    "conversationId" TEXT,
+    "messageId" TEXT,
+    "phoneNumber" TEXT,
+    "type" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "event" TEXT,
+    "category" TEXT,
+    "error" TEXT,
+    "payload" JSONB,
+    "direction" TEXT,
+    "responseCode" INTEGER,
+    "processingMs" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ActivityLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Workflow" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "triggerKeyword" TEXT,
+    "nodes" JSONB NOT NULL,
+    "edges" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Workflow_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WorkflowSession" (
+    "id" TEXT NOT NULL,
+    "workflowId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "currentNodeId" TEXT NOT NULL,
+    "state" JSONB,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "WorkflowSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WhatsAppFlow" (
+    "id" TEXT NOT NULL,
+    "metaFlowId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "flowJson" JSONB NOT NULL,
+    "endpointUri" TEXT,
+    "vendorId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "publishedAt" TIMESTAMP(3),
+    "deprecatedAt" TIMESTAMP(3),
+
+    CONSTRAINT "WhatsAppFlow_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "FlowResponse" (
+    "id" TEXT NOT NULL,
+    "flowId" TEXT,
+    "conversationId" TEXT NOT NULL,
+    "responseData" JSONB NOT NULL,
+    "flowToken" TEXT,
+    "status" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3),
+
+    CONSTRAINT "FlowResponse_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -390,7 +508,16 @@ CREATE INDEX "Template_vendorId_idx" ON "Template"("vendorId");
 CREATE INDEX "Template_createdBy_idx" ON "Template"("createdBy");
 
 -- CreateIndex
+CREATE INDEX "Template_flowId_idx" ON "Template"("flowId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Template_vendorId_metaTemplateName_key" ON "Template"("vendorId", "metaTemplateName");
+
+-- CreateIndex
+CREATE INDEX "TemplateCarouselCard_templateId_idx" ON "TemplateCarouselCard"("templateId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TemplateCarouselCard_templateId_position_key" ON "TemplateCarouselCard"("templateId", "position");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "TemplateButton_templateId_position_key" ON "TemplateButton"("templateId", "position");
@@ -400,6 +527,12 @@ CREATE UNIQUE INDEX "TemplateMedia_templateId_language_position_key" ON "Templat
 
 -- CreateIndex
 CREATE UNIQUE INDEX "TemplateLanguage_templateId_language_key" ON "TemplateLanguage"("templateId", "language");
+
+-- CreateIndex
+CREATE INDEX "TemplateCatalogProduct_templateId_idx" ON "TemplateCatalogProduct"("templateId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TemplateCatalogProduct_templateId_position_key" ON "TemplateCatalogProduct"("templateId", "position");
 
 -- CreateIndex
 CREATE INDEX "Campaign_vendorId_idx" ON "Campaign"("vendorId");
@@ -412,6 +545,51 @@ CREATE INDEX "Campaign_createdBy_idx" ON "Campaign"("createdBy");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MessageDelivery_messageMediaId_conversationId_key" ON "MessageDelivery"("messageMediaId", "conversationId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_vendorId_idx" ON "ActivityLog"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_conversationId_idx" ON "ActivityLog"("conversationId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_messageId_idx" ON "ActivityLog"("messageId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_status_idx" ON "ActivityLog"("status");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_createdAt_idx" ON "ActivityLog"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_type_idx" ON "ActivityLog"("type");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Workflow_vendorId_triggerKeyword_key" ON "Workflow"("vendorId", "triggerKeyword");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "WhatsAppFlow_metaFlowId_key" ON "WhatsAppFlow"("metaFlowId");
+
+-- CreateIndex
+CREATE INDEX "WhatsAppFlow_vendorId_idx" ON "WhatsAppFlow"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "WhatsAppFlow_metaFlowId_idx" ON "WhatsAppFlow"("metaFlowId");
+
+-- CreateIndex
+CREATE INDEX "WhatsAppFlow_status_idx" ON "WhatsAppFlow"("status");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_flowId_idx" ON "FlowResponse"("flowId");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_conversationId_idx" ON "FlowResponse"("conversationId");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_flowToken_idx" ON "FlowResponse"("flowToken");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_status_idx" ON "FlowResponse"("status");
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -465,6 +643,12 @@ ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_vendorId_fkey" FOREIGN K
 ALTER TABLE "Template" ADD CONSTRAINT "Template_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Template" ADD CONSTRAINT "Template_flowId_fkey" FOREIGN KEY ("flowId") REFERENCES "WhatsAppFlow"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateCarouselCard" ADD CONSTRAINT "TemplateCarouselCard_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "TemplateButton" ADD CONSTRAINT "TemplateButton_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -472,6 +656,9 @@ ALTER TABLE "TemplateMedia" ADD CONSTRAINT "TemplateMedia_templateId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "TemplateLanguage" ADD CONSTRAINT "TemplateLanguage_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateCatalogProduct" ADD CONSTRAINT "TemplateCatalogProduct_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Campaign" ADD CONSTRAINT "Campaign_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -508,3 +695,21 @@ ALTER TABLE "MessageDelivery" ADD CONSTRAINT "MessageDelivery_messageId_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "MessageDelivery" ADD CONSTRAINT "MessageDelivery_messageMediaId_fkey" FOREIGN KEY ("messageMediaId") REFERENCES "MessageMedia"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Workflow" ADD CONSTRAINT "Workflow_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WorkflowSession" ADD CONSTRAINT "WorkflowSession_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "Workflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WhatsAppFlow" ADD CONSTRAINT "WhatsAppFlow_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FlowResponse" ADD CONSTRAINT "FlowResponse_flowId_fkey" FOREIGN KEY ("flowId") REFERENCES "WhatsAppFlow"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FlowResponse" ADD CONSTRAINT "FlowResponse_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;

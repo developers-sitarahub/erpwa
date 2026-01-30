@@ -480,27 +480,7 @@ router.post("/", async (req, res) => {
           },
         });
 
-        // ============================================
-        // 🚀 WORKFLOW ENGINE INTEGRATION
-        // ============================================
-        try {
-          // 1. Check if user is already in a workflow session
-          const isSessionHandled = await handleWorkflowResponse(
-            vendor.id,
-            conversation.id,
-            inboundMessage,
-          );
-
-          if (!isSessionHandled) {
-            // 2. If not, check if message triggers a NEW workflow
-            // Content variable is already extracted above
-            await checkAndStartWorkflow(vendor.id, conversation.id, content);
-          }
-        } catch (wfError) {
-          console.error("Workflow Error:", wfError);
-        }
-
-        // Handle Media download logic (removed for brevity, but assumed unchanged if not shown)
+        // Handle Media download logic
         if (
           ["image", "video", "audio", "document", "sticker"].includes(msg.type)
         ) {
@@ -561,6 +541,16 @@ router.post("/", async (req, res) => {
             include: { media: true },
           });
 
+          console.log(
+            "📤 Emitting message:new to conversation:",
+            conversation.id,
+          );
+          console.log("📤 Message data:", {
+            id: fullMessage.id,
+            sender: "customer",
+            text: fullMessage.media.length ? undefined : fullMessage.content,
+          });
+
           io.to(`conversation:${conversation.id}`).emit("message:new", {
             id: fullMessage.id,
             whatsappMessageId: fullMessage.whatsappMessageId,
@@ -573,6 +563,26 @@ router.post("/", async (req, res) => {
             caption: fullMessage.media[0]?.caption,
           });
         } catch (socketErr) {}
+
+        // ============================================
+        // 🚀 WORKFLOW ENGINE INTEGRATION
+        // ============================================
+        try {
+          // 1. Check if user is already in a workflow session
+          const isSessionHandled = await handleWorkflowResponse(
+            vendor.id,
+            conversation.id,
+            inboundMessage,
+          );
+
+          if (!isSessionHandled) {
+            // 2. If not, check if message triggers a NEW workflow
+            // Content variable is already extracted above
+            await checkAndStartWorkflow(vendor.id, conversation.id, content);
+          }
+        } catch (wfError) {
+          console.error("Workflow Error:", wfError);
+        }
 
         // Log successful message processing
         await logActivity({
@@ -706,6 +716,47 @@ router.post("/", async (req, res) => {
           );
         } catch {}
       }
+    }
+
+    /* =====================================================
+       3️⃣ HANDLE TEMPLATE APPROVAL EVENTS
+    ===================================================== */
+    if (value.message_template_status_update) {
+      eventType = "template_status";
+      direction = "inbound";
+
+      const templateUpdate = value.message_template_status_update;
+      const templateEvent = templateUpdate.event; // APPROVED | REJECTED | PENDING
+      // const templateId = templateUpdate.message_template_id;
+
+      let opEvent = "Template Update";
+      let opStatus = "received";
+
+      if (templateEvent === "APPROVED") {
+        opEvent = "Template Created";
+        opStatus = "created";
+      } else if (templateEvent === "REJECTED") {
+        opEvent = "Template Rejected";
+        opStatus = "failed";
+      } else if (templateEvent === "PENDING") {
+        opEvent = "Template Pending";
+        opStatus = "pending";
+      } else {
+        // Fallback for "created" or other events
+        opEvent = templateEvent;
+        opStatus = "received";
+      }
+
+      await logActivity({
+        vendorId,
+        type: "Template", // Proper casing
+        status: opStatus,
+        event: opEvent,
+        payload: templateUpdate,
+        responseCode: 200,
+        processingMs: Date.now() - startTime,
+        direction: "inbound",
+      });
     }
 
     /* =====================================================

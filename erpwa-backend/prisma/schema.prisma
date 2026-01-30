@@ -424,9 +424,8 @@ model Message {
 
   media         MessageMedia[]
   deliveries    MessageDelivery[]
-
-  @@index([whatsappMessageId])
 }
+
 
 model MediaAlbum {
   id        String       @id @default(uuid())

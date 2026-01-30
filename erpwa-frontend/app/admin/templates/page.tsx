@@ -100,6 +100,8 @@ export default function TemplatesPage() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
 
   // --- Delete Modal State ---
   const [deleteConf, setDeleteConf] = useState<{
@@ -367,10 +369,10 @@ export default function TemplatesPage() {
           prev.map((t) =>
             t.id === editId
               ? {
-                  ...t,
-                  displayName: formData.displayName,
-                  category: formData.category,
-                }
+                ...t,
+                displayName: formData.displayName,
+                category: formData.category,
+              }
               : t,
           ),
         );
@@ -573,8 +575,7 @@ export default function TemplatesPage() {
           toast.error(`Failed to send: ${firstError}`);
         } else {
           toast.warning(
-            `${results.length - failed.length} sent, ${
-              failed.length
+            `${results.length - failed.length} sent, ${failed.length
             } failed. First error: ${firstError}`,
           );
         }
@@ -633,6 +634,13 @@ export default function TemplatesPage() {
     }
   };
 
+  const filteredTemplates = templates.filter((t) => {
+    const matchesSearch = t.displayName.toLowerCase().includes(search.toLowerCase()) ||
+      t.languages[0]?.body?.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === "ALL" || t.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <div className="flex-1 overflow-auto p-4 md:p-8 space-y-8 bg-gradient-to-br from-background via-background/95 to-muted/20 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -662,6 +670,39 @@ export default function TemplatesPage() {
           </div>
         </div>
 
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-card/10 p-4 rounded-xl border border-border/40">
+          <div className="relative group w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors" />
+            <Input
+              placeholder="Search templates..."
+              className="pl-9 h-10 bg-background/50 border-border/40"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide max-w-full pb-2">
+            {[
+              { value: "ALL", label: "All Categories" },
+              { value: "MARKETING", label: "Marketing" },
+              { value: "UTILITY", label: "Utility" },
+              { value: "AUTHENTICATION", label: "Authentication" }
+            ].map((cat) => (
+              <button
+                key={cat.value}
+                onClick={() => setCategoryFilter(cat.value)}
+                className={cn(
+                  "text-xs font-medium transition-all whitespace-nowrap pb-1 border-b-2",
+                  categoryFilter === cat.value
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-50">
             <div className="relative">
@@ -674,26 +715,42 @@ export default function TemplatesPage() {
               Loading templates...
             </p>
           </div>
-        ) : templates.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 border border-dashed border-border/60 rounded-2xl bg-muted/5 gap-4">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-2">
-              <FileText className="w-8 h-8 text-muted-foreground/50" />
+        ) : filteredTemplates.length === 0 ? (
+          templates.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 border border-dashed border-border/60 rounded-2xl bg-muted/5 gap-4">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-2">
+                <FileText className="w-8 h-8 text-muted-foreground/50" />
+              </div>
+              <h3 className="text-lg font-semibold">No templates yet</h3>
+              <p className="text-muted-foreground text-center max-w-sm text-sm">
+                Get started by creating your first WhatsApp template approval.
+              </p>
+              <Button
+                variant="link"
+                onClick={openCreateModal}
+                className="text-primary mt-2"
+              >
+                Create Template &rarr;
+              </Button>
             </div>
-            <h3 className="text-lg font-semibold">No templates yet</h3>
-            <p className="text-muted-foreground text-center max-w-sm text-sm">
-              Get started by creating your first WhatsApp template approval.
-            </p>
-            <Button
-              variant="link"
-              onClick={openCreateModal}
-              className="text-primary mt-2"
-            >
-              Create Template &rarr;
-            </Button>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <p className="text-muted-foreground">No templates match your search.</p>
+              <Button
+                variant="link"
+                onClick={() => {
+                  setSearch("");
+                  setCategoryFilter("ALL");
+                }}
+                className="text-primary mt-2"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((t) => (
+            {filteredTemplates.map((t) => (
               <motion.div
                 key={t.id}
                 initial={{ opacity: 0, scale: 0.98 }}
@@ -763,6 +820,28 @@ export default function TemplatesPage() {
                         <p className="line-clamp-4 whitespace-pre-wrap">
                           {t.languages[0]?.body || "No content"}
                         </p>
+
+                        {/* Show button types (Quick Reply / URL / Phone) inline below the body */}
+                        {t.buttons && t.buttons.length > 0 && (
+                          <div className="mt-2 flex items-center gap-2">
+                            {t.buttons.map((b, i) => (
+                              <Badge
+                                key={i}
+                                variant="outline"
+                                className="text-[10px] px-2 py-0.5 h-6"
+                              >
+                                {b.type === "QUICK_REPLY"
+                                  ? "Quick Reply"
+                                  : b.type === "URL"
+                                    ? "URL"
+                                    : b.type === "PHONE_NUMBER"
+                                      ? "Phone"
+                                      : b.type}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
                         <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-dashed border-border/40">
                           {t.createdByName && (
                             <span className="text-[9px] text-muted-foreground font-medium">
@@ -879,7 +958,8 @@ export default function TemplatesPage() {
                 <div className="p-6 space-y-6">
                   {/* Preview Section */}
                   <div className="bg-muted/10 rounded-xl p-4 border border-border/50 space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <Eye className="w-3.5 h-3.5" />
                       Preview
                     </label>
                     <div className="bg-white dark:bg-card p-4 rounded-lg shadow-sm border border-border/20 text-sm whitespace-pre-wrap leading-relaxed">
@@ -936,13 +1016,41 @@ export default function TemplatesPage() {
                         )}
 
                       <div className="text-foreground/90">
-                        {selectedTemplate.languages[0]?.body}
+                        {(() => {
+                          let body = selectedTemplate.languages[0]?.body || "";
+                          variables.forEach((val, idx) => {
+                            const placeholder = `{{${idx + 1}}}`;
+                            body = body.replace(placeholder, val || placeholder);
+                          });
+                          return body;
+                        })()}
                       </div>
 
                       {selectedTemplate.languages[0]?.footerText && (
                         <p className="mt-3 text-[11px] text-muted-foreground border-t border-border/40 pt-2 italic">
                           {selectedTemplate.languages[0].footerText}
                         </p>
+                      )}
+
+                      {/* Buttons */}
+                      {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-border/40 space-y-2">
+                          {selectedTemplate.buttons.map((btn, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer text-primary font-medium text-sm"
+                            >
+                              {btn.type === "URL" ? (
+                                <Globe className="w-4 h-4" />
+                              ) : btn.type === "PHONE_NUMBER" ? (
+                                <Phone className="w-4 h-4" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                              {btn.text}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1103,7 +1211,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               ).length > 0 &&
                               leads
                                 .filter(
@@ -1121,7 +1229,7 @@ export default function TemplatesPage() {
                                       l.category_name === selectedCategory) &&
                                     (!selectedSubCategory ||
                                       l.sub_category_name ===
-                                        selectedSubCategory),
+                                      selectedSubCategory),
                                 )
                                 .every((l) =>
                                   recipientList.includes(l.mobile_number),
@@ -1139,7 +1247,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               );
                               const allSelected = filtered.every((l) =>
                                 recipientList.includes(l.mobile_number),
@@ -1181,7 +1289,7 @@ export default function TemplatesPage() {
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
                                     l.sub_category_name ===
-                                      selectedSubCategory),
+                                    selectedSubCategory),
                               ).length
                             }
                             )
@@ -1229,7 +1337,7 @@ export default function TemplatesPage() {
                                 checked={recipientList.includes(
                                   lead.mobile_number,
                                 )}
-                                onChange={() => {}} // handled by parent div click
+                                onChange={() => { }} // handled by parent div click
                                 className="pointer-events-none"
                               />
                               <div className="flex flex-col">
@@ -1710,19 +1818,19 @@ export default function TemplatesPage() {
                               />
                               {(btn.type === "URL" ||
                                 btn.type === "PHONE_NUMBER") && (
-                                <Input
-                                  className="h-8 text-sm"
-                                  placeholder={
-                                    btn.type === "URL"
-                                      ? "https://website.com"
-                                      : "+1234567890"
-                                  }
-                                  value={btn.value}
-                                  onChange={(e) =>
-                                    updateButton(idx, "value", e.target.value)
-                                  }
-                                />
-                              )}
+                                  <Input
+                                    className="h-8 text-sm"
+                                    placeholder={
+                                      btn.type === "URL"
+                                        ? "https://website.com"
+                                        : "+1234567890"
+                                    }
+                                    value={btn.value}
+                                    onChange={(e) =>
+                                      updateButton(idx, "value", e.target.value)
+                                    }
+                                  />
+                                )}
 
                               {btn.type === "FLOW" && (
                                 <div className="flex flex-col gap-2 mt-2">
@@ -1773,7 +1881,7 @@ export default function TemplatesPage() {
                 {/* RIGHT: PHONE PREVIEW */}
                 <div
                   className={cn(
-                    "bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
+                    "bg-muted/50 p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
                     "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-4 lg:pt-4", // Desktop defaults
                     showMobilePreview
                       ? "flex fixed inset-0 z-50 pt-24 pb-8"
@@ -1803,43 +1911,43 @@ export default function TemplatesPage() {
                       </div>
                     </div>
 
-                    <div className="relative bg-[#0b141a] p-3 pt-4 min-h-[500px] max-h-[550px] overflow-y-auto custom-scrollbar flex flex-col">
-                      <div className="absolute inset-0 opacity-[0.05] bg-[url('https://camo.githubusercontent.com/857a221f7c706d8847f9723ec083b063878b2772591f463378b879a838be8194/68747470733a2f2f757365722d696d616765732e67697468756275736572636f6e74656e742e636f6d2f31353037353735392f32383731393134342d38366463306637302d373362312d346334382d393630332d3935303237396532373635382e706e67')] bg-repeat bg-[length:400px]"></div>
+                    <div className="relative bg-muted/30 p-3 pt-4 min-h-[500px] max-h-[550px] overflow-y-auto custom-scrollbar flex flex-col">
+                      <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
                       <div className="relative z-10 w-full flex flex-col gap-1 mt-1 animate-in fade-in zoom-in-95 duration-500">
-                        <div className="bg-[#202c33] rounded-2xl rounded-tl-none shadow-lg relative overflow-hidden group border border-white/5">
+                        <div className="bg-card rounded-2xl rounded-tl-none shadow-lg relative overflow-hidden group border border-border">
                           <div className="p-1">
                             {/* Header Media */}
                             {(formData.headerType === "IMAGE" ||
                               formData.headerType === "VIDEO") && (
-                              <div className="rounded-xl overflow-hidden bg-black/40 min-h-[140px] relative group flex items-center justify-center">
-                                {headerPreview ? (
-                                  formData.headerType === "VIDEO" ? (
-                                    <video
-                                      src={headerPreview}
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    <img
-                                      src={headerPreview}
-                                      alt="Header"
-                                      className="w-full h-full object-contain"
-                                    />
-                                  )
-                                ) : (
-                                  <div className="flex flex-col items-center gap-1 opacity-20">
-                                    {formData.headerType === "IMAGE" ? (
-                                      <ImageIcon className="w-6 h-6" />
+                                <div className="rounded-xl overflow-hidden bg-black/40 min-h-[140px] relative group flex items-center justify-center">
+                                  {headerPreview ? (
+                                    formData.headerType === "VIDEO" ? (
+                                      <video
+                                        src={headerPreview}
+                                        className="w-full h-full object-contain"
+                                      />
                                     ) : (
-                                      <Video className="w-6 h-6" />
-                                    )}
-                                    <span className="text-[8px] font-bold uppercase">
-                                      {formData.headerType}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                      <img
+                                        src={headerPreview}
+                                        alt="Header"
+                                        className="w-full h-full object-contain"
+                                      />
+                                    )
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-1 opacity-20">
+                                      {formData.headerType === "IMAGE" ? (
+                                        <ImageIcon className="w-6 h-6" />
+                                      ) : (
+                                        <Video className="w-6 h-6" />
+                                      )}
+                                      <span className="text-[8px] font-bold uppercase">
+                                        {formData.headerType}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
 
                             {/* Header Text */}
                             {formData.headerType === "TEXT" &&
@@ -1850,11 +1958,11 @@ export default function TemplatesPage() {
                               )}
                           </div>
 
-                          <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-[#e9edef] whitespace-pre-wrap font-sans">
+                          <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-foreground/80 whitespace-pre-wrap font-sans">
                             {formData.body || "Your message body..."}
 
                             {formData.footerText && (
-                              <p className="mt-1.5 text-[11px] text-[#8696a0] font-medium border-t border-white/5 pt-1.5">
+                              <p className="mt-1.5 text-[11px] text-muted-foreground font-medium border-t border-border pt-1.5">
                                 {formData.footerText}
                               </p>
                             )}
@@ -1862,7 +1970,7 @@ export default function TemplatesPage() {
 
                           {/* Buttons */}
                           {buttons.length > 0 && (
-                            <div className="border-t border-white/10 flex flex-col divide-y divide-white/10 bg-[#2a3942]/30">
+                            <div className="border-t border-border flex flex-col divide-y divide-border bg-muted/30">
                               {buttons.map((btn, idx) => (
                                 <div
                                   key={idx}
@@ -1887,7 +1995,7 @@ export default function TemplatesPage() {
                             9:41 AM
                           </span>
                           <div className="flex -space-x-1">
-                            <CheckCircle className="w-2.5 h-2.5 text-white" />
+                            <CheckCircle className="w-2.5 h-2.5 text-muted-foreground" />
                           </div>
                         </div>
                       </div>

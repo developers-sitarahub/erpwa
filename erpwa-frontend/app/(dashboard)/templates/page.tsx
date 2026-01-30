@@ -33,8 +33,12 @@ import {
   Users,
   Eye,
   ShoppingBag,
+  BookTemplate,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import api from "@/lib/api";
+import { OFFICIAL_TEMPLATES } from "@/lib/officialTemplates";
 import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
 import { leadsAPI } from "@/lib/leadsApi";
@@ -87,13 +91,21 @@ type Template = {
   createdByName?: string;
 };
 
+
+
 export default function TemplatesPage() {
   const router = useRouter();
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const [importing, setImporting] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"my" | "library">("my");
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [libraryCategory, setLibraryCategory] = useState("ALL");
+  const [myTemplatesSearch, setMyTemplatesSearch] = useState("");
+  const [myTemplatesCategory, setMyTemplatesCategory] = useState("ALL");
 
   // --- Delete Modal State ---
   const [deleteConf, setDeleteConf] = useState<{
@@ -160,10 +172,37 @@ export default function TemplatesPage() {
   }, [showSendModal]);
 
   // Fetch Templates
-  const fetchTemplates = async () => {
+  const fetchAllTemplates = async () => {
+    setLoading(true);
     try {
-      const res = await api.get("/vendor/templates");
-      setTemplates(res.data);
+      const [localRes, metaRes] = await Promise.all([
+        api.get("/vendor/templates"),
+        api.get("/vendor/templates/meta").catch(() => ({ data: [] }))
+      ]);
+
+      const localTemplates = localRes.data;
+      const metaRaw = metaRes.data || [];
+
+      // Parse Meta templates
+      const parsedMeta = metaRaw
+        .map((m: any) => parseMetaTemplate(m))
+        .filter((t: any) => t !== null);
+
+      // Filter out Meta templates that already exist locally
+      // Match by metaTemplateName (which we store in local DB) vs originalName from Meta
+      // OR by Meta ID if we stored it. Local store `metaTemplateName`.
+      const localNames = new Set(localTemplates.map((l: any) => l.metaTemplateName));
+
+      const uniqueMetaTemplates = parsedMeta.filter(
+        (m: any) => !localNames.has(m.originalName)
+      );
+
+      // Combine: First show Local, then rest of Meta
+      // Actually user probably wants them sorted by name or creation?
+      // Let's just append Meta ones at the end or mix them. 
+      // Merging:
+      const merged = [...localTemplates, ...uniqueMetaTemplates];
+      setTemplates(merged);
     } catch (error) {
       console.error("Failed to fetch templates", error);
     } finally {
@@ -171,8 +210,73 @@ export default function TemplatesPage() {
     }
   };
 
+  const parseMetaTemplate = (metaTpl: any) => {
+    try {
+      const components = metaTpl.components || [];
+      const bodyComp = components.find((c: any) => c.type === "BODY");
+      const headerComp = components.find((c: any) => c.type === "HEADER");
+      const buttonsComp = components.find((c: any) => c.type === "BUTTONS");
+
+      // If no body, skip
+      if (!bodyComp || !bodyComp.text) return null;
+
+      const buttons = buttonsComp?.buttons?.map((b: any) => ({
+        type: b.type,
+        text: b.text,
+        url: b.url,
+        phone_number: b.phone_number,
+        value: b.url || b.phone_number || ""
+      })) || [];
+
+      const headerType = headerComp?.format || "TEXT";
+
+      // Extract header media URL from Meta's example field for preview
+      // Meta returns header media in example.header_url (array of URLs)
+      let headerMediaUrl: string | null = null;
+      if (headerComp && headerType !== "TEXT" && headerComp.example) {
+        console.log(`[Meta Template Debug] ${metaTpl.name} header:`, JSON.stringify(headerComp, null, 2));
+        const urlArray = headerComp.example.header_url || headerComp.example.header_handle;
+        if (Array.isArray(urlArray) && urlArray.length > 0) {
+          headerMediaUrl = urlArray[0];
+          console.log(`[Meta Template Debug] Found header media URL:`, headerMediaUrl);
+        }
+      }
+
+      // Build media array for preview modal compatibility
+      const media = headerMediaUrl ? [{
+        id: `meta-media-${metaTpl.id}`,
+        mediaType: headerType.toLowerCase(),
+        s3Url: headerMediaUrl,
+        language: metaTpl.language
+      }] : [];
+
+      return {
+        isMetaOnly: true, // Flag to identify
+        id: metaTpl.id, // Meta ID
+        displayName: metaTpl.name.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+        metaTemplateName: metaTpl.name,
+        category: metaTpl.category,
+        status: metaTpl.status.toLowerCase(),
+        languages: [{
+          language: metaTpl.language,
+          body: bodyComp.text,
+          headerType: headerType,
+          headerText: headerType === "TEXT" ? headerComp?.text : null,
+          footerText: components.find((c: any) => c.type === "FOOTER")?.text || null
+        }],
+        buttons: buttons,
+        media: media, // Include media for preview modal
+        createdAt: new Date().toISOString(), // Mock for sorting
+        originalName: metaTpl.name
+      };
+    } catch (e) {
+      console.error("Error parsing meta template:", e);
+      return null;
+    }
+  };
+
   useEffect(() => {
-    fetchTemplates();
+    fetchAllTemplates();
   }, []);
 
   // --- Create/Edit Handlers ---
@@ -330,13 +434,13 @@ export default function TemplatesPage() {
               : t
           )
         );
-        fetchTemplates();
+        fetchAllTemplates();
       } else {
         await api.post("/vendor/templates", data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         toast.success("Template created successfully!");
-        fetchTemplates();
+        fetchAllTemplates();
       }
 
       setShowCreateModal(false);
@@ -353,7 +457,7 @@ export default function TemplatesPage() {
       setIsCreating(true);
       await api.post("/vendor/templates", templateData);
       toast.success("Catalog template created successfully!");
-      fetchTemplates();
+      fetchAllTemplates();
       setShowCatalogModal(false);
     } catch (error: any) {
       toast.error(formatError(error, "Failed to create catalog template"));
@@ -375,7 +479,7 @@ export default function TemplatesPage() {
     try {
       await api.post(`/vendor/templates/${template.id}/submit`);
       toast.success("Template submitted to Meta successfully!");
-      fetchTemplates();
+      fetchAllTemplates();
     } catch (error: any) {
       toast.error(formatError(error, "Failed to submit template"));
     } finally {
@@ -389,7 +493,7 @@ export default function TemplatesPage() {
     try {
       const res = await api.post(`/vendor/templates/${id}/sync-status`);
       toast.success(res.data.message || "Status synced successfully");
-      fetchTemplates();
+      fetchAllTemplates();
     } catch (error: any) {
       toast.error(formatError(error, "Failed to sync status"));
     } finally {
@@ -423,12 +527,118 @@ export default function TemplatesPage() {
     }
   };
 
+  const handleMetaDelete = async (metaName: string) => {
+    if (!metaName) return;
+    if (!confirm("Are you sure you want to delete this template from Meta? This cannot be undone.")) return;
+
+    setDeleting(metaName);
+    try {
+      await api.delete(`/vendor/templates/meta?name=${encodeURIComponent(metaName)}`);
+      toast.success("Template deleted from Meta");
+      fetchAllTemplates(); // Refresh list to remove it
+    } catch (error: any) {
+      toast.error(formatError(error, "Failed to delete from Meta"));
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleMetaSend = async (metaTpl: any) => {
+    setImporting(metaTpl.id || metaTpl.metaTemplateName);
+    try {
+      // Import first (it returns the full template object)
+      // Include headerMediaUrl so the backend can store it for sending
+      const headerMediaUrl = metaTpl.media?.[0]?.s3Url || null;
+      const res = await api.post("/vendor/templates/import", {
+        metaTemplateName: metaTpl.metaTemplateName,
+        displayName: metaTpl.displayName,
+        category: metaTpl.category,
+        language: metaTpl.languages[0].language,
+        body: metaTpl.languages[0].body,
+        headerType: metaTpl.languages[0].headerType,
+        headerText: metaTpl.languages[0].headerText,
+        footerText: metaTpl.languages[0].footerText,
+        buttons: metaTpl.buttons,
+        metaId: metaTpl.id,
+        status: metaTpl.status,
+        headerMediaUrl: headerMediaUrl // Pass the Meta header image URL
+      });
+
+      const newTemplate = res.data;
+
+      // Merge media from the parsed Meta template (backend import doesn't store Meta media URL)
+      const templateWithMedia = {
+        ...newTemplate,
+        media: newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media
+      };
+
+      // Update local list with the new template (so it shows as local/approved now)
+      setTemplates((prev) => {
+        // Replace the meta-only entry with the real one, or just re-fetch
+        return prev.map(p => (p.metaTemplateName === newTemplate.metaTemplateName) ? templateWithMedia : p);
+      });
+
+      // Open send modal directly with media included
+      openSendModal(templateWithMedia);
+
+    } catch (error: any) {
+      toast.error(formatError(error, "Failed to prepare template for sending"));
+    } finally {
+      setImporting(null);
+    }
+  };
+
   const handleCardClick = (template: Template) => {
     if (template.status === "approved") {
       openSendModal(template);
     } else if (template.status === "draft" || template.status === "rejected") {
       openEditModal(template);
     }
+  };
+
+
+
+  const filteredMyTemplates = templates.filter((t) => {
+    const matchesSearch = t.displayName.toLowerCase().includes(myTemplatesSearch.toLowerCase()) ||
+      t.languages[0]?.body?.toLowerCase().includes(myTemplatesSearch.toLowerCase());
+    const matchesCategory = myTemplatesCategory === "ALL" || t.category === myTemplatesCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const filteredLibrary = OFFICIAL_TEMPLATES.filter((t) => {
+    const matchesSearch = t.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
+      t.body.toLowerCase().includes(librarySearch.toLowerCase());
+    const matchesCategory = libraryCategory === "ALL" || t.category === libraryCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleUseTemplate = (template: any) => {
+    resetForm();
+    setFormData({
+      displayName: template.title || template.displayName,
+      category: template.category,
+      language: "en_US",
+      headerType: template.headerType || "TEXT",
+      body: template.body,
+      footerText: template.footerText || "",
+      headerText: template.headerText || "",
+    });
+
+    if (template.buttons) {
+      setButtons(
+        template.buttons.map((b: any) => ({
+          type: b.type,
+          text: b.text,
+          value: b.value || "",
+        }))
+      );
+    } else {
+      setButtons([]);
+    }
+
+    setShowCreateModal(true);
+    // Switch to My Templates tab if we're in library, so they see we're creating
+    // Actually, staying in library is fine as the modal covers it.
   };
 
   // --- Send Modal Handlers ---
@@ -605,6 +815,49 @@ export default function TemplatesPage() {
           </div>
         </div>
 
+
+
+        {/* Tabs with Icons */}
+        <div className="flex border-b border-border/40 space-x-8">
+          <button
+            onClick={() => setActiveTab("my")}
+            className={cn(
+              "pb-4 text-sm font-medium transition-all relative flex items-center gap-2",
+              activeTab === "my"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            My Templates
+            {activeTab === "my" && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("library")}
+            className={cn(
+              "pb-4 text-sm font-medium transition-all relative flex items-center gap-2",
+              activeTab === "library"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <BookTemplate className="w-4 h-4" />
+            Template Library
+            {activeTab === "library" && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+              />
+            )}
+          </button>
+        </div>
+
+
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-50">
             <div className="relative">
@@ -617,164 +870,381 @@ export default function TemplatesPage() {
               Loading templates...
             </p>
           </div>
-        ) : templates.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 border border-dashed border-border/60 rounded-2xl bg-muted/5 gap-4">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-2">
-              <FileText className="w-8 h-8 text-muted-foreground/50" />
-            </div>
-            <h3 className="text-lg font-semibold">No templates yet</h3>
-            <p className="text-muted-foreground text-center max-w-sm text-sm">
-              Get started by creating your first WhatsApp template approval.
-            </p>
-            <Button
-              variant="link"
-              onClick={openCreateModal}
-              className="text-primary mt-2"
-            >
-              Create Template &rarr;
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {templates.map((t) => (
-              <motion.div
-                key={t.id}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group h-full"
-              >
-                <Card
-                  onClick={() => handleCardClick(t)}
-                  className={cn(
-                    "h-full flex flex-col cursor-pointer border-border/50 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden group-hover:border-primary/20",
-                    t.status === "approved" && "hover:border-green-500/30"
-                  )}
-                >
-                  {/* Card Header area */}
-                  <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="min-w-0 flex-1">
-                        <h3
-                          className="font-semibold text-base text-foreground truncate"
-                          title={t.displayName}
-                        >
-                          {t.displayName}
-                        </h3>
-                      </div>
-                      <div className="shrink-0">{getStatusBadge(t.status)}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground shrink-0"
-                      >
-                        {t.category}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground/60">
-                        •
-                      </span>
-                      <span className="text-[10px] text-muted-foreground/60">
-                        {t.languages[0]?.language}
-                      </span>
-                    </div>
+        ) : activeTab === "my" ? (
+          <div className="space-y-6">
+            {templates.length > 0 && (
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-card/10 p-4 rounded-xl border border-border/40">
+                <div className="relative group w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors" />
+                  <Input
+                    placeholder="Search templates..."
+                    className="pl-9 h-10 bg-background/50 border-border/40"
+                    value={myTemplatesSearch}
+                    onChange={(e) => setMyTemplatesSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide max-w-full pb-2">
+                  {[
+                    { value: "ALL", label: "All Categories" },
+                    { value: "MARKETING", label: "Marketing" },
+                    { value: "UTILITY", label: "Utility" },
+                    { value: "AUTHENTICATION", label: "Authentication" }
+                  ].map((cat) => (
+                    <button
+                      key={cat.value}
+                      onClick={() => setMyTemplatesCategory(cat.value)}
+                      className={cn(
+                        "text-xs font-medium transition-all whitespace-nowrap pb-1 border-b-2",
+                        myTemplatesCategory === cat.value
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {filteredMyTemplates.length === 0 ? (
+              templates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 border border-dashed border-border/60 rounded-2xl bg-muted/5 gap-4">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-2">
+                    <FileText className="w-8 h-8 text-muted-foreground/50" />
                   </div>
-
-                  {/* Card Body - Message Preview style */}
-                  <CardContent className="p-0 flex-1 flex flex-col relative bg-muted/5">
-                    <div className="p-5 flex-1 relative overflow-hidden">
-                      {/* Subtle background pattern for whatsapp feel */}
-                      <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
-
-                      <div className="bg-white dark:bg-muted rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-none p-3 shadow-sm border border-border/20 text-xs text-foreground/80 leading-relaxed font-sans relative z-10 max-w-[90%] before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-white dark:before:bg-muted before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
-                        {t.languages[0]?.headerType !== "TEXT" && (
-                          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                            {t.languages[0]?.headerType === "IMAGE" ? (
-                              <ImageIcon className="w-3 h-3" />
-                            ) : (
-                              <Paperclip className="w-3 h-3" />
-                            )}
-                            {t.languages[0]?.headerType}
+                  <h3 className="text-lg font-semibold">No templates yet</h3>
+                  <p className="text-muted-foreground text-center max-w-sm text-sm">
+                    Get started by creating your first WhatsApp template approval.
+                  </p>
+                  <Button
+                    variant="link"
+                    onClick={openCreateModal}
+                    className="text-primary mt-2"
+                  >
+                    Create Template &rarr;
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <p className="text-muted-foreground">No templates match your search.</p>
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setMyTemplatesSearch("");
+                      setMyTemplatesCategory("ALL");
+                    }}
+                    className="text-primary mt-2"
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+              )
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredMyTemplates.map((t) => (
+                  <motion.div
+                    key={t.id}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    className="group h-full"
+                  >
+                    <Card
+                      onClick={() => !t.isMetaOnly && handleCardClick(t)}
+                      className={cn(
+                        "h-full flex flex-col cursor-pointer border-border/50 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden group-hover:border-primary/20",
+                        !t.isMetaOnly && "cursor-pointer",
+                        t.status === "approved" && "hover:border-green-500/30"
+                      )}
+                    >
+                      <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h3
+                              className="font-semibold text-base text-foreground truncate"
+                              title={t.displayName}
+                            >
+                              {t.displayName}
+                            </h3>
                           </div>
-                        )}
-                        <p className="line-clamp-4 whitespace-pre-wrap">
-                          {t.languages[0]?.body || "No content"}
-                        </p>
-                        <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-dashed border-border/40">
-                          {t.createdByName && (
-                            <span className="text-[9px] text-muted-foreground font-medium">
-                              By {t.createdByName}
-                            </span>
-                          )}
-                          <span className="text-[9px] text-muted-foreground font-medium">
-                            {formatTime(t.createdAt)}
+                          <div className="shrink-0">{t.isMetaOnly ? (
+                            <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px]">
+                              Meta
+                            </Badge>
+                          ) : getStatusBadge(t.status)}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground shrink-0"
+                          >
+                            {t.category}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground/60">
+                            •
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/60">
+                            {t.languages[0]?.language}
                           </span>
                         </div>
                       </div>
+
+                      <CardContent className="p-0 flex-1 flex flex-col relative bg-muted/5">
+                        <div className="p-5 flex-1 relative overflow-hidden">
+                          <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
+
+                          <div className="bg-white dark:bg-muted rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-none p-3 shadow-sm border border-border/20 text-xs text-foreground/80 leading-relaxed font-sans relative z-10 max-w-[90%] before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-white dark:before:bg-muted before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
+                            {t.languages[0]?.headerType !== "TEXT" && (
+                              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                {t.languages[0]?.headerType === "IMAGE" ? (
+                                  <ImageIcon className="w-3 h-3" />
+                                ) : t.languages[0]?.headerType === "VIDEO" ? (
+                                  <Video className="w-3 h-3" />
+                                ) : (
+                                  <FileText className="w-3.5 h-3.5" />
+                                )}
+                                {t.languages[0]?.headerType}
+                              </div>
+                            )}
+                            <p className="line-clamp-4 whitespace-pre-wrap">
+                              {t.languages[0]?.body || "No content"}
+                            </p>
+
+                            {t.buttons && t.buttons.length > 0 && (
+                              <div className="mt-2 flex items-center gap-2">
+                                {t.buttons.map((b: any, i: number) => (
+                                  <Badge
+                                    key={i}
+                                    variant="outline"
+                                    className="text-[10px] px-2 py-0.5 h-6"
+                                  >
+                                    {b.type === "URL" ? (
+                                      <Globe className="w-2.5 h-2.5 mr-1" />
+                                    ) : b.type === "PHONE_NUMBER" ? (
+                                      <Phone className="w-2.5 h-2.5 mr-1" />
+                                    ) : (
+                                      <CheckCircle className="w-2.5 h-2.5 mr-1" />
+                                    )}
+                                    {b.text}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-dashed border-border/40">
+                              {t.createdByName && (
+                                <span className="text-[9px] text-muted-foreground font-medium">
+                                  By {t.createdByName}
+                                </span>
+                              )}
+                              <span className="text-[9px] text-muted-foreground font-medium">
+                                {t.isMetaOnly ? "Available on Meta" : formatTime(t.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-card border-t border-border/40 flex items-center gap-2">
+                          {t.isMetaOnly ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="flex-1 h-8 text-xs font-bold text-green-600 bg-green-500/5 hover:bg-green-500/10 hover:text-green-700"
+                                onClick={() => handleMetaSend(t)}
+                                disabled={importing === (t.id || t.metaTemplateName)}
+                              >
+                                {importing === (t.id || t.metaTemplateName) ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                                ) : (
+                                  <Send className="w-3 h-3 mr-1.5" />
+                                )}
+                                Send
+                              </Button>
+                              <div className="w-px h-4 bg-border/60"></div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="flex-1 h-8 text-xs font-bold text-red-500/80 bg-red-500/5 hover:text-red-600 hover:bg-red-500/10 transition-all"
+                                onClick={() => handleMetaDelete(t.metaTemplateName)}
+                                disabled={deleting === t.metaTemplateName}
+                              >
+                                {deleting === t.metaTemplateName ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3 mr-1.5" />
+                                )}
+                                Delete
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "flex-1 h-8 text-xs font-bold transition-all",
+                                  t.status === "draft"
+                                    ? "text-blue-600 bg-blue-500/5 hover:bg-blue-500/10"
+                                    : t.status === "approved"
+                                      ? "text-green-600 bg-green-500/5 hover:bg-green-500/10"
+                                      : "text-muted-foreground bg-muted/30 hover:bg-muted/50"
+                                )}
+                                onClick={(e) => {
+                                  if (t.status === "approved") {
+                                    e.stopPropagation();
+                                    openSendModal(t);
+                                  } else if (t.status === "draft" || t.status === "rejected") {
+                                    handleSubmitToMeta(t, e);
+                                  } else {
+                                    handleSyncStatus(t.id, e);
+                                  }
+                                }}
+                                disabled={submitting === t.id || syncing === t.id}
+                              >
+                                {submitting === t.id || syncing === t.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                                ) : t.status === "draft" || t.status === "rejected" ? (
+                                  <Upload className="w-3 h-3 mr-1.5" />
+                                ) : t.status === "approved" ? (
+                                  <Send className="w-3 h-3 mr-1.5" />
+                                ) : (
+                                  <RefreshCw className="w-3 h-3 mr-1.5" />
+                                )}
+                                {t.status === "draft" || t.status === "rejected"
+                                  ? "Submit"
+                                  : t.status === "approved"
+                                    ? "Send"
+                                    : "Sync"}
+                              </Button>
+                              <div className="w-px h-4 bg-border/60"></div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="flex-1 h-8 text-xs font-bold text-red-500/80 bg-red-500/5 hover:text-red-600 hover:bg-red-500/10 transition-all font-bold"
+                                onClick={(e) => handleDelete(t, e)}
+                                disabled={deleting === t.id}
+                              >
+                                {deleting === t.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3 mr-1.5" />
+                                )}
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* LIBRARY VIEW (Reverted Style) */
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-card/10 p-4 rounded-xl border border-border/40">
+              <div className="relative group w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors" />
+                <Input
+                  placeholder="Search library..."
+                  className="pl-9 h-10 bg-background/50 border-border/40"
+                  value={librarySearch}
+                  onChange={(e) => setLibrarySearch(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide max-w-full pb-2">
+                {[
+                  { value: "ALL", label: "All Categories" },
+                  { value: "MARKETING", label: "Marketing" },
+                  { value: "UTILITY", label: "Utility" },
+                  { value: "AUTHENTICATION", label: "Authentication" }
+                ].map((cat) => (
+                  <button
+                    key={cat.value}
+                    onClick={() => setLibraryCategory(cat.value)}
+                    className={cn(
+                      "text-xs font-medium transition-all whitespace-nowrap pb-1 border-b-2",
+                      libraryCategory === cat.value
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredLibrary.map((t) => (
+                <motion.div
+                  key={t.id}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                  className="group h-full"
+                >
+                  <Card className="h-full flex flex-col border-border/50 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden">
+                    <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-base text-foreground truncate" title={t.title}>
+                            {t.title}
+                          </h3>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] h-5 border-primary/20 bg-primary/5 text-primary">
+                          LIB
+                        </Badge>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground w-fit">
+                        {t.category}
+                      </Badge>
                     </div>
 
-                    {/* Actions Footer */}
-                    <div className="p-3 bg-card border-t border-border/40 flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "flex-1 h-8 text-xs font-bold transition-all",
-                          t.status === "draft"
-                            ? "text-blue-600 bg-blue-500/5 hover:bg-blue-500/10"
-                            : t.status === "approved"
-                              ? "text-green-600 bg-green-500/5 hover:bg-green-500/10"
-                              : "text-muted-foreground bg-muted/30 hover:bg-muted/50"
-                        )}
-                        onClick={(e) => {
-                          if (t.status === "approved") {
-                            e.stopPropagation();
-                            openSendModal(t);
-                          } else if (t.status === "draft") {
-                            handleSubmitToMeta(t, e);
-                          } else {
-                            handleSyncStatus(t.id, e);
-                          }
-                        }}
-                        disabled={!!syncing || !!submitting}
-                      >
-                        {syncing === t.id || submitting === t.id ? (
-                          <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
-                        ) : t.status === "draft" ? (
-                          <Upload className="w-3 h-3 mr-1.5" />
-                        ) : t.status === "approved" ? (
-                          <Send className="w-3 h-3 mr-1.5" />
-                        ) : (
-                          <RefreshCw className="w-3 h-3 mr-1.5" />
-                        )}
-                        {t.status === "draft"
-                          ? "Submit"
-                          : t.status === "approved"
-                            ? "Send"
-                            : "Sync"}
-                      </Button>
-                      <div className="w-px h-4 bg-border/60"></div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex-1 h-8 text-xs font-bold text-red-500/80 bg-red-500/5 hover:text-red-600 hover:bg-red-500/10 transition-all font-bold"
-                        onClick={(e) => handleDelete(t, e)}
-                        disabled={!!deleting}
-                      >
-                        {deleting === t.id ? (
-                          <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
-                        ) : (
-                          <Trash2 className="w-3 h-3 mr-1.5" />
-                        )}
-                        Delete
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                    <CardContent className="p-0 flex-1 flex flex-col relative bg-muted/5">
+                      <div className="p-5 flex-1 relative overflow-hidden">
+                        <div className="bg-white dark:bg-muted rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-none p-3 shadow-sm border border-border/20 text-xs text-foreground/80 leading-relaxed font-sans relative z-10 max-w-[90%] before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-white dark:before:bg-muted before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
+                          {t.headerType !== "TEXT" && (
+                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                              <FileText className="w-3 h-3" />
+                              {t.headerType}
+                            </div>
+                          )}
+                          <p className="line-clamp-4 whitespace-pre-wrap">
+                            {t.body}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="p-4 pt-0">
+                        <Button
+                          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2 h-9 text-xs font-bold"
+                          onClick={() => handleUseTemplate(t)}
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Use Template
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+
+              {filteredLibrary.length === 0 && (
+                <div className="col-span-full py-24 text-center">
+                  <p className="text-muted-foreground">No templates found in library.</p>
+                </div>
+              )}
+            </div>
           </div>
-        )}
+        )
+        }
+
+
+
       </div>
 
       {/* SEND MODAL */}
@@ -816,7 +1286,8 @@ export default function TemplatesPage() {
                 <div className="p-6 space-y-6">
                   {/* Preview Section */}
                   <div className="bg-muted/10 rounded-xl p-4 border border-border/50 space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                      <Eye className="w-3.5 h-3.5" />
                       Preview
                     </label>
                     <div className="bg-white dark:bg-card p-4 rounded-lg shadow-sm border border-border/20 text-sm whitespace-pre-wrap leading-relaxed">
@@ -854,13 +1325,41 @@ export default function TemplatesPage() {
                       )}
 
                       <div className="text-foreground/90">
-                        {selectedTemplate.languages[0]?.body}
+                        {(() => {
+                          let body = selectedTemplate.languages[0]?.body || "";
+                          variables.forEach((val, idx) => {
+                            const placeholder = `{{${idx + 1}}}`;
+                            body = body.replace(placeholder, val || placeholder);
+                          });
+                          return body;
+                        })()}
                       </div>
 
                       {selectedTemplate.languages[0]?.footerText && (
                         <p className="mt-3 text-[11px] text-muted-foreground border-t border-border/40 pt-2 italic">
                           {selectedTemplate.languages[0].footerText}
                         </p>
+                      )}
+
+                      {/* Buttons */}
+                      {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-border/40 space-y-2">
+                          {selectedTemplate.buttons.map((btn, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer text-primary font-medium text-sm"
+                            >
+                              {btn.type === "URL" ? (
+                                <Globe className="w-4 h-4" />
+                              ) : btn.type === "PHONE_NUMBER" ? (
+                                <Phone className="w-4 h-4" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                              {btn.text}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1644,7 +2143,7 @@ export default function TemplatesPage() {
                 {/* RIGHT: PHONE PREVIEW */}
                 <div
                   className={cn(
-                    "bg-[#F0F2F5] dark:bg-[#0c1317] p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
+                    "bg-muted/50 p-8 flex-col items-center justify-center relative border-l border-border/50 overflow-hidden transition-all",
                     "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-4 lg:pt-4", // Desktop defaults
                     showMobilePreview
                       ? "flex fixed inset-0 z-50 pt-24 pb-8"
@@ -1663,22 +2162,22 @@ export default function TemplatesPage() {
                   )}
                   <div className="absolute inset-0 pattern-dots opacity-10 pointer-events-none"></div>
 
-                  {/* Mobile Frame Container - Elegantly elongated and responsive */}
-                  <div className="relative mx-auto w-full max-w-[280px] border-[10px] border-[#1F2937] rounded-[48px] shadow-2xl bg-[#0b141a] transition-all duration-500 overflow-hidden transform lg:scale-[1.02] 2xl:scale-105">
-                    <div className="h-6 bg-[#0b141a] flex justify-between items-center px-6 pt-3 z-20 relative">
-                      <span className="text-[10px] text-white font-semibold">9:41</span>
-                      <div className="flex gap-1.5 opacity-50 italic font-bold text-[10px] text-white">WhatsApp</div>
+                  {/* Mobile Frame Container */}
+                  <div className="relative mx-auto w-full max-w-[280px] border-[10px] border-border rounded-[48px] shadow-2xl bg-card transition-all duration-500 overflow-hidden transform lg:scale-[1.02] 2xl:scale-105">
+                    <div className="h-6 bg-card flex justify-between items-center px-6 pt-3 z-20 relative">
+                      <span className="text-[10px] text-muted-foreground font-semibold">9:41</span>
+                      <div className="flex gap-1.5 opacity-50 italic font-bold text-[10px] text-muted-foreground">WhatsApp</div>
                     </div>
 
-                    <div className="relative bg-[#0b141a] p-3 pt-4 min-h-[500px] max-h-[550px] overflow-y-auto custom-scrollbar flex flex-col">
-                      <div className="absolute inset-0 opacity-[0.05] bg-[url('https://camo.githubusercontent.com/857a221f7c706d8847f9723ec083b063878b2772591f463378b879a838be8194/68747470733a2f2f757365722d696d616765732e67697468756275736572636f6e74656e742e636f6d2f31353037353735392f32383731393134342d38366463306637302d373362312d346334382d393630332d3935303237396532373635382e706e67')] bg-repeat bg-[length:400px]"></div>
+                    <div className="relative bg-muted/30 p-3 pt-4 min-h-[500px] max-h-[550px] overflow-y-auto custom-scrollbar flex flex-col">
+                      <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
                       <div className="relative z-10 w-full flex flex-col gap-1 mt-1 animate-in fade-in zoom-in-95 duration-500">
-                        <div className="bg-[#202c33] rounded-2xl rounded-tl-none shadow-lg relative overflow-hidden group border border-white/5">
+                        <div className="bg-card rounded-2xl rounded-tl-none shadow-lg relative overflow-hidden group border border-border">
                           <div className="p-1">
                             {/* Header Media */}
                             {(formData.headerType === "IMAGE" || formData.headerType === "VIDEO") && (
-                              <div className="rounded-xl overflow-hidden bg-black/40 min-h-[140px] relative group flex items-center justify-center">
+                              <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
                                 {headerPreview ? (
                                   formData.headerType === "VIDEO" ? (
                                     <video src={headerPreview} className="w-full h-full object-contain" />
@@ -1686,7 +2185,7 @@ export default function TemplatesPage() {
                                     <img src={headerPreview} alt="Header" className="w-full h-full object-contain" />
                                   )
                                 ) : (
-                                  <div className="flex flex-col items-center gap-1 opacity-20">
+                                  <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
                                     {formData.headerType === "IMAGE" ? <ImageIcon className="w-6 h-6" /> : <Video className="w-6 h-6" />}
                                     <span className="text-[8px] font-bold uppercase">{formData.headerType}</span>
                                   </div>
@@ -1696,17 +2195,17 @@ export default function TemplatesPage() {
 
                             {/* Header Text */}
                             {formData.headerType === "TEXT" && formData.headerText && (
-                              <p className="font-bold text-[14px] pt-2 px-3 text-[#e9edef] leading-tight">
+                              <p className="font-bold text-[14px] pt-2 px-3 text-foreground leading-tight">
                                 {formData.headerText}
                               </p>
                             )}
                           </div>
 
-                          <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-[#e9edef] whitespace-pre-wrap font-sans">
+                          <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-foreground/80 whitespace-pre-wrap font-sans">
                             {formData.body || "Your message body..."}
 
                             {formData.footerText && (
-                              <p className="mt-1.5 text-[11px] text-[#8696a0] font-medium border-t border-white/5 pt-1.5">
+                              <p className="mt-1.5 text-[11px] text-muted-foreground font-medium border-t border-border pt-1.5">
                                 {formData.footerText}
                               </p>
                             )}
@@ -1714,9 +2213,9 @@ export default function TemplatesPage() {
 
                           {/* Buttons */}
                           {buttons.length > 0 && (
-                            <div className="border-t border-white/10 flex flex-col divide-y divide-white/10 bg-[#2a3942]/30">
+                            <div className="border-t border-border flex flex-col divide-y divide-border bg-muted/30">
                               {buttons.map((btn, idx) => (
-                                <div key={idx} className="p-2.5 text-center text-[13px] font-medium text-[#00a884] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors cursor-pointer">
+                                <div key={idx} className="p-2.5 text-center text-[13px] font-medium text-primary flex items-center justify-center gap-2 hover:bg-muted/50 transition-colors cursor-pointer">
                                   {btn.type === "URL" ? (
                                     <Globe className="w-3.5 h-3.5" />
                                   ) : btn.type === "PHONE_NUMBER" ? (
@@ -1732,9 +2231,9 @@ export default function TemplatesPage() {
                         </div>
 
                         <div className="self-end mr-1 mt-0.5 flex items-center gap-1 opacity-40">
-                          <span className="text-[10px] text-white font-bold uppercase tracking-tighter">9:41 AM</span>
+                          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">9:41 AM</span>
                           <div className="flex -space-x-1">
-                            <CheckCircle className="w-2.5 h-2.5 text-white" />
+                            <CheckCircle className="w-2.5 h-2.5 text-muted-foreground" />
                           </div>
                         </div>
                       </div>

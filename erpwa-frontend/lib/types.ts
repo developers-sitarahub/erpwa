@@ -136,6 +136,8 @@ export interface Message {
   };
   optimistic?: boolean;
   clientTempId?: string;
+  outboundPayload?: any;
+  messageType?: string;
 }
 
 export interface Template {

@@ -72,6 +72,240 @@ router.get(
 
 /**
  * ===============================
+ * GET TEMPLATES FROM META (LIBRARY)
+ * ===============================
+ */
+router.get(
+  "/meta",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin", "sales"]),
+  asyncHandler(async (req, res) => {
+    console.log(`🔍 Fetching Meta templates for Vendor ID: ${req.user.vendorId}`);
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+    });
+
+    if (!vendor || !vendor.whatsappAccessToken || !vendor.whatsappBusinessId) {
+      return res.status(400).json({ message: "Vendor WhatsApp credentials missing" });
+    }
+
+    const accessToken = decrypt(vendor.whatsappAccessToken);
+
+    try {
+      // Fetch templates from Meta API
+      const metaResp = await fetch(
+        `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?limit=100`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
+      if (!metaResp.ok) {
+        const error = await metaResp.json();
+        console.error("Meta API Error:", error);
+        return res.status(mapMetaStatus(metaResp.status)).json({
+          message: "Failed to fetch from Meta",
+          details: error
+        });
+      }
+
+      const metaData = await metaResp.json();
+      const templates = metaData.data || [];
+
+      console.log(`✅ Fetched ${templates.length} templates from Meta.`);
+      res.json(templates);
+    } catch (error) {
+      console.error("Fetch Meta Templates Error:", error);
+      res.status(500).json({ message: "Internal Server Error fetching from Meta" });
+    }
+  })
+);
+
+/**
+ * ===============================
+ * IMPORT TEMPLATE FROM META
+ * ===============================
+ */
+router.post(
+  "/import",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin", "sales"]),
+  asyncHandler(async (req, res) => {
+    const {
+      metaTemplateName,
+      displayName,
+      category,
+      language,
+      body,
+      headerType = "TEXT",
+      headerText,
+      footerText,
+      buttons = [],
+      metaId,
+      status = "approved",
+      headerMediaUrl = null // Header image URL from Meta
+    } = req.body;
+
+    // Check if exists
+    const existing = await prisma.template.findFirst({
+      where: {
+        vendorId: req.user.vendorId,
+        metaTemplateName: metaTemplateName
+      },
+      include: { languages: true, buttons: true, media: true }
+    });
+
+    if (existing) {
+      // If the template exists but is missing media (and we have a URL), create it now
+      // This fixes issues where templates were imported before the media fix
+      if (headerMediaUrl && headerType !== "TEXT" && (!existing.media || existing.media.length === 0)) {
+        console.log(`📸 Backfilling media for existing template ${metaTemplateName}`);
+        await prisma.templateMedia.create({
+          data: {
+            templateId: existing.id,
+            language: language,
+            mediaType: headerType.toLowerCase(), // IMAGE, VIDEO, DOCUMENT
+            s3Url: headerMediaUrl,
+            uploadStatus: "uploaded",
+            mimeType: headerType === "IMAGE" ? "image/jpeg" : headerType === "VIDEO" ? "video/mp4" : "application/pdf"
+          }
+        });
+
+        // Return the updated template with media
+        const updated = await prisma.template.findUnique({
+          where: { id: existing.id },
+          include: { languages: true, buttons: true, media: true }
+        });
+        return res.json(updated);
+      }
+
+      return res.json(existing);
+    }
+
+    // Create template
+    const template = await prisma.template.create({
+      data: {
+        vendorId: req.user.vendorId,
+        metaTemplateName,
+        displayName,
+        category,
+        status: status, // Trusted from Meta
+        createdBy: req.user.id,
+      },
+    });
+
+    await prisma.templateLanguage.create({
+      data: {
+        templateId: template.id,
+        language,
+        body,
+        headerType,
+        headerText,
+        footerText,
+        metaStatus: status,
+        metaId: metaId // important specifically for sending usage
+      },
+    });
+
+    // Create TemplateMedia record if there's a header media URL (from Meta)
+    if (headerMediaUrl && headerType !== "TEXT") {
+      await prisma.templateMedia.create({
+        data: {
+          templateId: template.id,
+          language: language,
+          mediaType: headerType.toLowerCase(), // IMAGE, VIDEO, DOCUMENT
+          s3Url: headerMediaUrl, // This is actually Meta's URL, but we use it for sending
+          uploadStatus: "uploaded",
+          mimeType: headerType === "IMAGE" ? "image/jpeg" : headerType === "VIDEO" ? "video/mp4" : "application/pdf"
+        }
+      });
+      console.log(`📸 Stored Meta header media URL for template ${metaTemplateName}: ${headerMediaUrl}`);
+    }
+
+    // Create buttons
+    if (buttons.length > 0) {
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = buttons[i];
+        await prisma.templateButton.create({
+          data: {
+            templateId: template.id,
+            type: btn.type,
+            text: btn.text,
+            position: i,
+            value: (btn.type === "URL" || btn.type === "PHONE_NUMBER") ? btn.value : null,
+          }
+        });
+      }
+    }
+
+    const fullTemplate = await prisma.template.findUnique({
+      where: { id: template.id },
+      include: { languages: true, buttons: true, media: true }
+    });
+
+    res.json(fullTemplate);
+  })
+);
+
+/**
+ * ===============================
+ * DELETE TEMPLATE FROM META (Direct)
+ * ===============================
+ */
+router.delete(
+  "/meta",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin", "sales"]),
+  asyncHandler(async (req, res) => {
+    const { name } = req.query;
+
+    if (!name) {
+      return res.status(400).json({ message: "Template name is required" });
+    }
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+    });
+
+    if (!vendor || !vendor.whatsappAccessToken || !vendor.whatsappBusinessId) {
+      return res.status(400).json({ message: "Vendor WhatsApp credentials missing" });
+    }
+
+    const accessToken = decrypt(vendor.whatsappAccessToken);
+
+    try {
+      const url = `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?name=${name}`;
+      console.log(`🗑️ Deleting Meta-only template: ${name}`);
+
+      const metaResp = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!metaResp.ok) {
+        const error = await metaResp.json();
+        console.error("Meta Delete Error:", error);
+        return res.status(400).json({ message: "Failed to delete from Meta", details: error });
+      }
+
+      res.json({ success: true, message: "Deleted from Meta" });
+    } catch (error) {
+      console.error("Delete Meta Template Error:", error);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  })
+);
+
+function mapMetaStatus(status) {
+  if (status === 401 || status === 403) return 400; // Bad request (auth invalid)
+  return status;
+}
+
+/**
+ * ===============================
  * CREATE TEMPLATE (DRAFT)
  * ===============================
  */
