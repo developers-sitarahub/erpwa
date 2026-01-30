@@ -167,7 +167,8 @@ router.get(
         include: {
           languages: true,
           buttons: true,
-          media: true, // ✅ Include media for headers
+          media: true,
+          carouselCards: { orderBy: { position: 'asc' } }, // ✅ Include carousel cards
         },
       });
       templates.forEach((t) => templatesMap.set(t.id, t));
@@ -232,7 +233,10 @@ router.get(
           type: b.type,
           text: b.text,
           value: b.value,
+          value: b.value,
         })),
+        templateType: tmpl.templateType || 'standard', // ✅ Add Template Type
+        carouselCards: tmpl.carouselCards, // ✅ Add Carousel Cards
       };
 
       return {

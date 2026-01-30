@@ -179,16 +179,16 @@ export default function GalleryModal({
 
   // Local search Filter (applied on top of fetched images)
   const filteredImages = images.filter((img) =>
-    img.url?.toLowerCase().includes(searchQuery.toLowerCase()),
+    (img.url || img.s3_url || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return ReactDOM.createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <ImageIcon className="text-primary" />
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+            <ImageIcon className="text-blue-600" />
             Media Gallery
           </h2>
           <button
@@ -262,7 +262,7 @@ export default function GalleryModal({
             ) : (
               <Upload size={18} />
             )}
-            Upload
+            Upload Image
           </button>
           <input
             type="file"
@@ -282,11 +282,10 @@ export default function GalleryModal({
                 <div
                   key={idx}
                   onClick={() => toggleSelection(img.url)}
-                  className={`group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${
-                    isSelected
+                  className={`group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${isSelected
                       ? "border-primary ring-2 ring-primary/20 scale-[0.98]"
                       : "border-gray-100 hover:border-gray-300 hover:shadow-md"
-                  }`}
+                    }`}
                 >
                   <Image
                     src={img.url}
@@ -342,7 +341,7 @@ export default function GalleryModal({
 
         {/* Footer */}
         {multiSelect && (
-          <div className="px-6 py-4 border-t border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900">
             <span className="text-sm text-gray-500 font-medium">
               {selectedUrls.length} selected
             </span>

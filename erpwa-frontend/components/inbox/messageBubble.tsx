@@ -63,7 +63,7 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
       {/* Play/Pause Button */}
       <button
         onClick={togglePlay}
-        className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+        className="shrink-0 w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
       >
         {isPlaying ? (
           <svg
@@ -134,7 +134,7 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
       </div>
 
       {/* Remaining Time */}
-      <span className="text-xs text-muted-foreground flex-shrink-0">
+      <span className="text-xs text-muted-foreground shrink-0">
         {formatTime(remainingTime)}
       </span>
     </div>
@@ -392,7 +392,7 @@ export default function MessageBubble({
 
             {isDocument && effectiveMediaUrl && (
               <div className="relative flex items-center gap-3 px-3 py-3 bg-muted/30 dark:bg-muted/10 rounded-lg pb-5">
-                <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <div className="shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                   <svg
                     width="24"
                     height="24"
@@ -419,7 +419,7 @@ export default function MessageBubble({
                   href={effectiveMediaUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+                  className="shrink-0 w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
                 >
                   <svg
                     width="20"
@@ -459,7 +459,7 @@ export default function MessageBubble({
                   </div>
                 </div>
                 {repliedMessage.mediaUrl && (
-                  <div className="flex-shrink-0 w-12 h-12 rounded bg-muted/20 overflow-hidden">
+                  <div className="shrink-0 w-12 h-12 rounded bg-muted/20 overflow-hidden">
                     {repliedMessage.mimeType?.startsWith("image/") ? (
                       <img
                         src={repliedMessage.mediaUrl}
@@ -553,6 +553,71 @@ export default function MessageBubble({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* CAROUSEL CARDS */}
+        {(msg.template?.templateType === "carousel" ||
+          (msg.carouselCards && msg.carouselCards.length > 0) ||
+          (msg.template?.carouselCards &&
+            msg.template.carouselCards.length > 0)) && (
+          <div className="flex overflow-x-auto gap-2 px-2 pb-2 mt-2 snap-x scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+            {(msg.carouselCards || msg.template?.carouselCards || []).map(
+              (card, idx) => (
+                <div
+                  key={idx}
+                  className="shrink-0 w-[220px] bg-wa-inbound rounded-2xl shadow-sm border border-border/50 overflow-hidden snap-center flex flex-col"
+                >
+                  <div className="p-3">
+                    {/* Card Media */}
+                    {(card.mediaUrl || card.s3Url) && (
+                      <div className="relative h-28 w-full bg-muted mb-3 rounded-lg overflow-hidden">
+                        {card.mimeType?.startsWith("video") ? (
+                          <video
+                            src={card.mediaUrl || card.s3Url}
+                            className="w-full h-full object-cover"
+                            controls={false}
+                          />
+                        ) : (
+                          <img
+                            src={card.mediaUrl || card.s3Url}
+                            alt={card.title}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                    )}
+                    {/* Card Content */}
+                    <div className="flex-1">
+                      {card.title && (
+                        <p className="font-bold text-sm text-foreground line-clamp-1 mb-1">
+                          {idx + 1}. {card.title}
+                        </p>
+                      )}
+                      {card.subtitle && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {card.subtitle}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Button */}
+                  {card.buttonText && (
+                    <button
+                      className="w-full py-2.5 text-sm text-[#0084ff] dark:text-[#53bdeb] font-semibold border-t border-border/30 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      onClick={() => {
+                        if (card.buttonType === "URL" && card.buttonValue) {
+                          window.open(card.buttonValue, "_blank");
+                        }
+                      }}
+                    >
+                      {card.buttonText}
+                    </button>
+                  )}
+                </div>
+              ),
+            )}
           </div>
         )}
 
