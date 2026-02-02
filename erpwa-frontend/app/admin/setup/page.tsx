@@ -171,8 +171,13 @@ export default function WhatsAppSetupPage() {
     phoneNumberId?: string;
   }>({});
 
+  /* ================= EMBEDDED SIGNUP (FB SDK) ================= */
+
+  // Listener for Session Info (WABA & Phone ID)
+  // We store these temporarily to send with the code
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Security check: facebook events come from facebook.com
       if (
         event.origin !== "https://www.facebook.com" &&
         event.origin !== "https://web.facebook.com"
@@ -182,18 +187,23 @@ export default function WhatsAppSetupPage() {
 
       try {
         const data = JSON.parse(event.data);
-
-        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
-          const { phone_number_id, waba_id } = data.data;
-
-          console.log("📦 Session received", { waba_id, phone_number_id });
-
-          setSessionData({
-            wabaId: waba_id,
-            phoneNumberId: phone_number_id,
-          });
+        if (data.type === "WA_EMBEDDED_SIGNUP") {
+          if (data.event === "FINISH") {
+            const { phone_number_id, waba_id } = data.data;
+            console.log("📦 Session received", { waba_id, phone_number_id });
+            setSessionData({
+              wabaId: waba_id,
+              phoneNumberId: phone_number_id,
+            });
+          } else if (data.event === "CANCEL") {
+            // Handle cancellation if needed
+          } else if (data.event === "ERROR") {
+            // Handle error if needed
+            const { error_message } = data.data;
+            toast.error("Error from Meta: " + error_message);
+          }
         }
-      } catch {
+      } catch (e) {
         // Ignore non-JSON messages
         console.debug("Non-JSON message received", event.data);
       }
@@ -229,7 +239,8 @@ export default function WhatsAppSetupPage() {
         toast.success("WhatsApp connected successfully 🎉");
       } catch (err: any) {
         setStatus("error");
-        setError(err.response?.data?.message || "Embedded setup failed");
+        const error = err as { response?: { data?: { message?: string } } };
+        setError(error.response?.data?.message || "Embedded setup failed");
       } finally {
         setSaving(false);
         setAuthCode(null);
@@ -240,30 +251,34 @@ export default function WhatsAppSetupPage() {
     sendToBackend();
   }, [authCode, sessionData]);
 
-  const handleEmbeddedSignup = () => {
-    // Launch Facebook login
-    if (!(window as any).FB) {
-      toast.error("Facebook SDK not loaded properly. Please refresh.");
-      return;
-    }
+  const handleEmbeddedSignup = async () => {
+    try {
+      setSaving(true);
+      // Get the embedded signup URL from backend
+      const res = await api.get("/vendor/whatsapp/embedded-signup-url");
+      const { signupUrl } = res.data;
 
-    // Trigger FB Login
-    (window as any).FB.login(
-      (response: any) => {
-        if (response.authResponse?.code) {
-          console.log("🔑 Code received", response.authResponse.code);
-          setAuthCode(response.authResponse.code);
-        } else {
-          toast.error("Authorization cancelled");
-        }
-      },
-      {
-        config_id: "25811306978465246", // Provided Config ID
-        response_type: "code",
-        override_default_response_type: true,
-        extras: { version: "v3" },
-      },
-    );
+      // Open Meta's embedded signup in a popup
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+
+      window.open(
+        signupUrl,
+        "MetaEmbeddedSignup",
+        `width=${width},height=${height},left=${left},top=${top}`,
+      );
+
+      // We don't await the result here; the "message" listener handles the rest.
+    } catch (err: any) {
+      toast.error(
+        "Failed to start setup: " +
+          (err.response?.data?.message || err.message),
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   /* ================= GUARDS ================= */

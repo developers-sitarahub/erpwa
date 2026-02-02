@@ -74,6 +74,35 @@ router.post(
 
 /**
  * ===============================
+ * GET EMBEDDED SIGNUP URL
+ * ===============================
+ * Access: vendor_owner only
+ */
+router.get(
+  "/whatsapp/embedded-signup-url",
+  authenticate,
+  requireRoles(["vendor_owner"]),
+  asyncHandler(async (req, res) => {
+    const appId = process.env.META_APP_ID;
+    const redirectUri = process.env.META_OAUTH_REDIRECT_URI;
+
+    if (!appId || !redirectUri) {
+      return res.status(500).json({
+        message: "Meta OAuth configuration is missing",
+      });
+    }
+
+    // Build Meta's embedded signup URL
+    const signupUrl = `https://www.facebook.com/v24.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
+      redirectUri,
+    )}&state=${req.user.vendorId}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code`;
+
+    res.json({ signupUrl });
+  }),
+);
+
+/**
+ * ===============================
  * EMBEDDED SIGNUP CALLBACK
  * ===============================
  * Access: vendor_owner only
