@@ -8,13 +8,7 @@ import { toast } from "react-toastify";
 type WhatsAppStatus = "not_configured" | "connected" | "error";
 type SetupMethod = "embedded" | "manual";
 
-declare global {
-  interface Window {
-    fbAsyncInit: () => void;
-    FB: any;
-  }
-  var FB: any;
-}
+/* ================= CONFIRM TOAST ================= */
 
 export default function WhatsAppSetupPage() {
   const { user, loading: authLoading } = useAuth();
@@ -147,8 +141,9 @@ export default function WhatsAppSetupPage() {
 
   useEffect(() => {
     // Load Facebook SDK
-    window.fbAsyncInit = function () {
-      FB.init({
+    // Load Facebook SDK
+    (window as any).fbAsyncInit = function () {
+      (window as any).FB.init({
         appId: "1336009088545442",
         autoLogAppEvents: true,
         xfbml: true,
@@ -217,13 +212,13 @@ export default function WhatsAppSetupPage() {
 
   const handleEmbeddedSignup = () => {
     // Launch Facebook login
-    if (!window.FB) {
+    if (!(window as any).FB) {
       toast.error("Facebook SDK not loaded properly. Please refresh.");
       return;
     }
 
     // Trigger FB Login
-    FB.login(
+    (window as any).FB.login(
       async (response: any) => {
         if (response.authResponse) {
           const code = response.authResponse.code;
