@@ -20,6 +20,7 @@ export default function WhatsAppSetupPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [setupMethod, setSetupMethod] = useState<SetupMethod>("embedded");
+  const [authCode, setAuthCode] = useState<string | null>(null);
 
   const [config, setConfig] = useState<{
     whatsappBusinessId?: string;
@@ -182,23 +183,15 @@ export default function WhatsAppSetupPage() {
       try {
         const data = JSON.parse(event.data);
 
-        if (data.type === "WA_EMBEDDED_SIGNUP") {
-          if (data.event === "FINISH") {
-            const { phone_number_id, waba_id } = data.data;
-            setSessionData({ wabaId: waba_id, phoneNumberId: phone_number_id });
-            console.log("Captured Session Info:", {
-              waba_id,
-              phone_number_id,
-            });
-          } else if (data.event === "CANCEL") {
-            console.warn(
-              "Embedded Signup Cancelled at step:",
-              data.data.current_step,
-            );
-          } else if (data.event === "ERROR") {
-            console.error("Embedded Signup Error:", data.data.error_message);
-            toast.error("Error during setup: " + data.data.error_message);
-          }
+        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
+          const { phone_number_id, waba_id } = data.data;
+
+          console.log("📦 Session received", { waba_id, phone_number_id });
+
+          setSessionData({
+            wabaId: waba_id,
+            phoneNumberId: phone_number_id,
+          });
         }
       } catch {
         // Ignore non-JSON messages
@@ -210,6 +203,43 @@ export default function WhatsAppSetupPage() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  useEffect(() => {
+    if (!authCode || !sessionData.wabaId || !sessionData.phoneNumberId) return;
+
+    const sendToBackend = async () => {
+      setSaving(true);
+      setError(null);
+
+      try {
+        console.log("🚀 Sending to backend", {
+          code: authCode,
+          wabaId: sessionData.wabaId,
+          phoneNumberId: sessionData.phoneNumberId,
+        });
+
+        await api.post("/vendor/whatsapp/embedded-setup", {
+          code: authCode,
+          wabaId: sessionData.wabaId,
+          phoneNumberId: sessionData.phoneNumberId,
+        });
+
+        const res = await api.get("/vendor/whatsapp");
+        setConfig(res.data);
+        setStatus("connected");
+        toast.success("WhatsApp connected successfully 🎉");
+      } catch (err: any) {
+        setStatus("error");
+        setError(err.response?.data?.message || "Embedded setup failed");
+      } finally {
+        setSaving(false);
+        setAuthCode(null);
+        setSessionData({});
+      }
+    };
+
+    sendToBackend();
+  }, [authCode, sessionData]);
+
   const handleEmbeddedSignup = () => {
     // Launch Facebook login
     if (!(window as any).FB) {
@@ -220,12 +250,11 @@ export default function WhatsAppSetupPage() {
     // Trigger FB Login
     (window as any).FB.login(
       (response: any) => {
-        if (response.authResponse) {
-          const code = response.authResponse.code;
-          // Send code + captured session data to backend
-          completeEmbeddedSetup(code);
+        if (response.authResponse?.code) {
+          console.log("🔑 Code received", response.authResponse.code);
+          setAuthCode(response.authResponse.code);
         } else {
-          console.log("User cancelled login or did not fully authorize.");
+          toast.error("Authorization cancelled");
         }
       },
       {
@@ -236,36 +265,6 @@ export default function WhatsAppSetupPage() {
       },
     );
   };
-
-  async function completeEmbeddedSetup(code: string) {
-    setSaving(true);
-    try {
-      // We use the sessionData state which should be populated by the 'FINISH' event
-      // However, sometimes the callback might fire before we process the message event?
-      // Usually the 'FINISH' event happens inside the flow before the window closes/callback fires.
-      // We'll pass what we have.
-      const payload = {
-        code,
-        wabaId: sessionData.wabaId,
-        phoneNumberId: sessionData.phoneNumberId,
-      };
-
-      await api.post("/vendor/whatsapp/embedded-setup", payload);
-      const res = await api.get("/vendor/whatsapp");
-
-      setConfig(res.data);
-      setStatus("connected");
-      toast.success("WhatsApp connected successfully via embedded signup!");
-    } catch (err: any) {
-      setStatus("error");
-      const error = err as {
-        response?: { data?: { message?: string } };
-      };
-      setError(error.response?.data?.message || "Embedded setup failed");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   /* ================= GUARDS ================= */
 
