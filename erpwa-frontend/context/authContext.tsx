@@ -77,7 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAccessToken(null);
       setUser(null);
 
-      const publicPaths = ["/login", "/forgot-password", "/create-password"];
+      const publicPaths = [
+        "/login",
+        "/forgot-password",
+        "/create-password",
+        "/privacy-policy",
+      ];
       if (!publicPaths.includes(pathname)) {
         router.replace("/login");
       }
@@ -88,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener("auth:logout", handleLogout);
     };
-  }, [router]);
+  }, [router, pathname]);
 
   /* ================= LOGIN ================= */
 

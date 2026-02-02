@@ -673,7 +673,7 @@ export default function MessageBubble({
                 }`}
               >
                 {msg.outboundPayload.interactive.action?.buttons?.map(
-                  (btn: any, idx: number) => (
+                  (btn: { reply: { title: string } }, idx: number) => (
                     <button
                       key={idx}
                       className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 ${
