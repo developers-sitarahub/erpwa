@@ -196,9 +196,8 @@ export default function WhatsAppSetupPage() {
               phoneNumberId: phone_number_id,
             });
           } else if (data.event === "CANCEL") {
-            // Handle cancellation if needed
+            // Handle cancellation
           } else if (data.event === "ERROR") {
-            // Handle error if needed
             const { error_message } = data.data;
             toast.error("Error from Meta: " + error_message);
           }
@@ -251,34 +250,38 @@ export default function WhatsAppSetupPage() {
     sendToBackend();
   }, [authCode, sessionData]);
 
-  const handleEmbeddedSignup = async () => {
-    try {
-      setSaving(true);
-      // Get the embedded signup URL from backend
-      const res = await api.get("/vendor/whatsapp/embedded-signup-url");
-      const { signupUrl } = res.data;
+  const handleEmbeddedSignup = () => {
+    setSaving(true);
 
-      // Open Meta's embedded signup in a popup
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-
-      window.open(
-        signupUrl,
-        "MetaEmbeddedSignup",
-        `width=${width},height=${height},left=${left},top=${top}`,
-      );
-
-      // We don't await the result here; the "message" listener handles the rest.
-    } catch (err: any) {
-      toast.error(
-        "Failed to start setup: " +
-          (err.response?.data?.message || err.message),
-      );
-    } finally {
+    // Check if FB SDK is loaded
+    if (!(window as any).FB) {
+      toast.error("Facebook SDK not currently loaded. Please refresh.");
       setSaving(false);
+      return;
     }
+
+    // Launch Facebook login with config_id
+    (window as any).FB.login(
+      (response: any) => {
+        if (response.authResponse?.code) {
+          const code = response.authResponse.code;
+          console.log("🔑 Code received", code);
+          setAuthCode(code);
+          // logic to send to backend is handled by the useEffect dependent on [authCode, sessionData]
+        } else {
+          console.log("User cancelled login or did not fully authorize.");
+          setSaving(false);
+        }
+      },
+      {
+        config_id: "906827855187816", // From user prompt
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          version: "v3",
+        },
+      },
+    );
   };
 
   /* ================= GUARDS ================= */
