@@ -113,7 +113,7 @@ router.post(
   authenticate,
   requireRoles(["vendor_owner"]),
   asyncHandler(async (req, res) => {
-    const { code } = req.body;
+    const { code, wabaId, phoneNumberId } = req.body;
 
     if (!code) {
       return res.status(400).json({
@@ -132,12 +132,23 @@ router.post(
     }
 
     // 1️⃣ Exchange code for access token
-    const tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&redirect_uri=${encodeURIComponent(
+    // Note: If using FB.login(), redirect_uri might need to be the page URL or empty, NOT the configured OAuth redirect URI.
+    // However, we'll try with the configured one first as it matches the previous manual flow.
+    // If this fails, we might need to update this logic to accept redirect_uri from client.
+    let tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&redirect_uri=${encodeURIComponent(
       redirectUri,
     )}&code=${code}`;
 
-    const tokenResp = await fetch(tokenUrl);
-    const tokenData = await tokenResp.json();
+    let tokenResp = await fetch(tokenUrl);
+    let tokenData = await tokenResp.json();
+
+    // Retry without redirect_uri if strict validation fails (common with FB.login codes)
+    if (!tokenResp.ok && tokenData?.error?.message?.includes("redirect_uri")) {
+      console.log("Retrying token exchange without redirect_uri...");
+      tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}`;
+      tokenResp = await fetch(tokenUrl);
+      tokenData = await tokenResp.json();
+    }
 
     if (!tokenResp.ok || !tokenData.access_token) {
       return res.status(400).json({
@@ -176,7 +187,7 @@ router.post(
       });
     }
 
-    // Get the first business account
+    // Get the first business account (usually the one managing the line)
     const businessId = accountsData.data[0].id;
 
     // 4️⃣ Get WhatsApp Business Account ID (WABA)
@@ -195,7 +206,13 @@ router.post(
       });
     }
 
-    const whatsappBusinessId = wabaListData.data[0].id;
+    // Select WABA: Use provided wabaId if found, else default to first
+    let selectedWaba = wabaListData.data[0];
+    if (wabaId) {
+      const found = wabaListData.data.find((w) => w.id === wabaId);
+      if (found) selectedWaba = found;
+    }
+    const whatsappBusinessId = selectedWaba.id;
 
     // 5️⃣ Get Phone Number ID
     const phoneUrl = `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers?access_token=${accessToken}`;
@@ -209,7 +226,13 @@ router.post(
       });
     }
 
-    const whatsappPhoneNumberId = phoneData.data[0].id;
+    // Select Phone Number: Use provided phoneNumberId if found, else default to first
+    let selectedPhone = phoneData.data[0];
+    if (phoneNumberId) {
+      const found = phoneData.data.find((p) => p.id === phoneNumberId);
+      if (found) selectedPhone = found;
+    }
+    const whatsappPhoneNumberId = selectedPhone.id;
 
     // 6️⃣ Encrypt access token
     const encryptedToken = encrypt(accessToken);
@@ -229,6 +252,8 @@ router.post(
 
     res.json({
       message: "WhatsApp successfully connected via embedded signup",
+      whatsappBusinessId,
+      whatsappPhoneNumberId,
     });
   }),
 );

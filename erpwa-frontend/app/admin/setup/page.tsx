@@ -8,6 +8,14 @@ import { toast } from "react-toastify";
 type WhatsAppStatus = "not_configured" | "connected" | "error";
 type SetupMethod = "embedded" | "manual";
 
+declare global {
+  interface Window {
+    fbAsyncInit: () => void;
+    FB: any;
+  }
+  var FB: any;
+}
+
 export default function WhatsAppSetupPage() {
   const { user, loading: authLoading } = useAuth();
 
@@ -135,76 +143,132 @@ export default function WhatsAppSetupPage() {
 
   /* ================= EMBEDDED SIGNUP ================= */
 
-  async function handleEmbeddedSignup() {
-    try {
-      // Get the embedded signup URL from backend
-      const res = await api.get("/vendor/whatsapp/embedded-signup-url");
-      const { signupUrl } = res.data;
+  /* ================= EMBEDDED SIGNUP (FB SDK) ================= */
 
-      // Open Meta's embedded signup in a popup
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
+  useEffect(() => {
+    // Load Facebook SDK
+    window.fbAsyncInit = function () {
+      FB.init({
+        appId: "1336009088545442",
+        autoLogAppEvents: true,
+        xfbml: true,
+        version: "v24.0",
+      });
+    };
 
-      const popup = window.open(
-        signupUrl,
-        "MetaEmbeddedSignup",
-        `width=${width},height=${height},left=${left},top=${top}`,
-      );
+    const script = document.createElement("script");
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    document.body.appendChild(script);
 
-      // Listen for the OAuth callback
-      const handleMessage = async (event: MessageEvent) => {
-        // Verify origin for security
-        if (event.origin !== window.location.origin) return;
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
-        if (event.data.type === "whatsapp-embedded-signup") {
-          const { code } = event.data;
+  // Listener for Session Info (WABA & Phone ID)
+  // We store these temporarily to send with the code
+  const [sessionData, setSessionData] = useState<{
+    wabaId?: string;
+    phoneNumberId?: string;
+  }>({});
 
-          if (code) {
-            setSaving(true);
-            try {
-              // Exchange code for access token and complete setup
-              await api.post("/vendor/whatsapp/embedded-setup", { code });
-              const res = await api.get("/vendor/whatsapp");
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.facebook.com" &&
+        event.origin !== "https://web.facebook.com"
+      ) {
+        return;
+      }
 
-              setConfig(res.data);
-              setStatus("connected");
-              toast.success(
-                "WhatsApp connected successfully via embedded signup!",
-              );
-            } catch (err: any) {
-              setStatus("error");
-              const error = err as {
-                response?: { data?: { message?: string } };
-              };
-              setError(
-                error.response?.data?.message || "Embedded setup failed",
-              );
-            } finally {
-              setSaving(false);
-            }
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "WA_EMBEDDED_SIGNUP") {
+          if (data.event === "FINISH") {
+            const { phone_number_id, waba_id } = data.data;
+            setSessionData({ wabaId: waba_id, phoneNumberId: phone_number_id });
+            console.log("Captured Session Info:", {
+              waba_id,
+              phone_number_id,
+            });
+          } else if (data.event === "CANCEL") {
+            console.warn(
+              "Embedded Signup Cancelled at step:",
+              data.data.current_step,
+            );
+          } else if (data.event === "ERROR") {
+            console.error("Embedded Signup Error:", data.data.error_message);
+            toast.error("Error during setup: " + data.data.error_message);
           }
-
-          popup?.close();
-          window.removeEventListener("message", handleMessage);
         }
+      } catch {
+        // Ignore non-JSON messages
+        console.debug("Non-JSON message received", event.data);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handleEmbeddedSignup = () => {
+    // Launch Facebook login
+    if (!window.FB) {
+      toast.error("Facebook SDK not loaded properly. Please refresh.");
+      return;
+    }
+
+    // Trigger FB Login
+    FB.login(
+      async (response: any) => {
+        if (response.authResponse) {
+          const code = response.authResponse.code;
+          // Send code + captured session data to backend
+          await completeEmbeddedSetup(code);
+        } else {
+          console.log("User cancelled login or did not fully authorize.");
+        }
+      },
+      {
+        config_id: "25811306978465246", // Provided Config ID
+        response_type: "code",
+        override_default_response_type: true,
+        extras: { version: "v3" },
+      },
+    );
+  };
+
+  async function completeEmbeddedSetup(code: string) {
+    setSaving(true);
+    try {
+      // We use the sessionData state which should be populated by the 'FINISH' event
+      // However, sometimes the callback might fire before we process the message event?
+      // Usually the 'FINISH' event happens inside the flow before the window closes/callback fires.
+      // We'll pass what we have.
+      const payload = {
+        code,
+        wabaId: sessionData.wabaId,
+        phoneNumberId: sessionData.phoneNumberId,
       };
 
-      window.addEventListener("message", handleMessage);
+      await api.post("/vendor/whatsapp/embedded-setup", payload);
+      const res = await api.get("/vendor/whatsapp");
 
-      // Clean up if popup is closed manually
-      const checkPopup = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkPopup);
-          window.removeEventListener("message", handleMessage);
-        }
-      }, 500);
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(
-        error.response?.data?.message || "Failed to initiate embedded signup",
-      );
+      setConfig(res.data);
+      setStatus("connected");
+      toast.success("WhatsApp connected successfully via embedded signup!");
+    } catch (err: any) {
+      setStatus("error");
+      const error = err as {
+        response?: { data?: { message?: string } };
+      };
+      setError(error.response?.data?.message || "Embedded setup failed");
+    } finally {
+      setSaving(false);
     }
   }
 
