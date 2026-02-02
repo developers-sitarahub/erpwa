@@ -47,10 +47,11 @@ export default function PrivacyPolicyPage() {
             <div className="space-y-8 text-foreground leading-relaxed">
               <section>
                 <p className="mb-4">
-                  GPS-ERP ("we", "our", "us") provides business messaging and
-                  customer communication tools using the WhatsApp Business
-                  Platform. We are committed to protecting your privacy and
-                  ensuring the security of your data.
+                  GPS-ERP (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;)
+                  provides business messaging and customer communication tools
+                  using the WhatsApp Business Platform. We are committed to
+                  protecting your privacy and ensuring the security of your
+                  data.
                 </p>
               </section>
 
