@@ -219,11 +219,11 @@ export default function WhatsAppSetupPage() {
 
     // Trigger FB Login
     (window as any).FB.login(
-      async (response: any) => {
+      (response: any) => {
         if (response.authResponse) {
           const code = response.authResponse.code;
           // Send code + captured session data to backend
-          await completeEmbeddedSetup(code);
+          completeEmbeddedSetup(code);
         } else {
           console.log("User cancelled login or did not fully authorize.");
         }
