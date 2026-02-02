@@ -147,8 +147,6 @@ export default function MessageBubble({
   allMessages,
   onOpenMenu,
   onReply,
-  setInputValue,
-  inputRef,
 }: Props) {
   const repliedMessage =
     msg.replyTo ??

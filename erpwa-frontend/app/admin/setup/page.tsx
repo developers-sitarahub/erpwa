@@ -104,6 +104,30 @@ export default function WhatsAppSetupPage() {
 
   /* ================= SUBMIT ================= */
 
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.facebook.com" &&
+        event.origin !== "https://web.facebook.com"
+      )
+        return;
+
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
+          const { phone_number_id, waba_id } = data.data;
+
+          sessionStorage.setItem("wa_phone_id", phone_number_id);
+          sessionStorage.setItem("wa_waba_id", waba_id);
+        }
+      } catch {}
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -136,76 +160,57 @@ export default function WhatsAppSetupPage() {
   /* ================= EMBEDDED SIGNUP ================= */
 
   async function handleEmbeddedSignup() {
-    try {
-      // Get the embedded signup URL from backend
-      const res = await api.get("/vendor/whatsapp/embedded-signup-url");
-      const { signupUrl } = res.data;
+    const FB = (window as any).FB;
 
-      // Open Meta's embedded signup in a popup
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-
-      const popup = window.open(
-        signupUrl,
-        "MetaEmbeddedSignup",
-        `width=${width},height=${height},left=${left},top=${top}`,
-      );
-
-      // Listen for the OAuth callback
-      const handleMessage = async (event: MessageEvent) => {
-        // Verify origin for security
-        if (event.origin !== window.location.origin) return;
-
-        if (event.data.type === "whatsapp-embedded-signup") {
-          const { code } = event.data;
-
-          if (code) {
-            setSaving(true);
-            try {
-              // Exchange code for access token and complete setup
-              await api.post("/vendor/whatsapp/embedded-setup", { code });
-              const res = await api.get("/vendor/whatsapp");
-
-              setConfig(res.data);
-              setStatus("connected");
-              toast.success(
-                "WhatsApp connected successfully via embedded signup!",
-              );
-            } catch (err: any) {
-              setStatus("error");
-              const error = err as {
-                response?: { data?: { message?: string } };
-              };
-              setError(
-                error.response?.data?.message || "Embedded setup failed",
-              );
-            } finally {
-              setSaving(false);
-            }
-          }
-
-          popup?.close();
-          window.removeEventListener("message", handleMessage);
-        }
-      };
-
-      window.addEventListener("message", handleMessage);
-
-      // Clean up if popup is closed manually
-      const checkPopup = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkPopup);
-          window.removeEventListener("message", handleMessage);
-        }
-      }, 500);
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(
-        error.response?.data?.message || "Failed to initiate embedded signup",
-      );
+    if (!FB) {
+      toast.error("Facebook SDK not loaded yet");
+      return;
     }
+
+    FB.login(
+      async (response: any) => {
+        if (!response.authResponse) {
+          setError("Signup cancelled");
+          return;
+        }
+
+        const code = response.authResponse.code;
+        const phoneNumberId = sessionStorage.getItem("wa_phone_id");
+        const wabaId = sessionStorage.getItem("wa_waba_id");
+
+        if (!phoneNumberId || !wabaId) {
+          setError("Failed to retrieve WhatsApp account details from Meta");
+          return;
+        }
+
+        try {
+          setSaving(true);
+
+          await api.post("/vendor/whatsapp/embedded-setup", {
+            code,
+            phoneNumberId,
+            wabaId,
+          });
+
+          const res = await api.get("/vendor/whatsapp");
+          setConfig(res.data);
+          setStatus("connected");
+
+          toast.success("WhatsApp connected successfully!");
+        } catch (err: any) {
+          setStatus("error");
+          setError(err.response?.data?.message || "Embedded setup failed");
+        } finally {
+          setSaving(false);
+        }
+      },
+      {
+        config_id: "25811306978465246",
+        response_type: "code",
+        override_default_response_type: true,
+        extras: { version: "v3" },
+      },
+    );
   }
 
   /* ================= GUARDS ================= */

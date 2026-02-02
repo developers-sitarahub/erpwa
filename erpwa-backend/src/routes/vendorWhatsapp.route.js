@@ -78,28 +78,28 @@ router.post(
  * ===============================
  * Access: vendor_owner only
  */
-router.get(
-  "/whatsapp/embedded-signup-url",
-  authenticate,
-  requireRoles(["vendor_owner"]),
-  asyncHandler(async (req, res) => {
-    const appId = process.env.META_APP_ID;
-    const redirectUri = process.env.META_OAUTH_REDIRECT_URI;
+// router.get(
+//   "/whatsapp/embedded-signup-url",
+//   authenticate,
+//   requireRoles(["vendor_owner"]),
+//   asyncHandler(async (req, res) => {
+//     const appId = process.env.META_APP_ID;
+//     const redirectUri = process.env.META_OAUTH_REDIRECT_URI;
 
-    if (!appId || !redirectUri) {
-      return res.status(500).json({
-        message: "Meta OAuth configuration is missing",
-      });
-    }
+//     if (!appId || !redirectUri) {
+//       return res.status(500).json({
+//         message: "Meta OAuth configuration is missing",
+//       });
+//     }
 
-    // Build Meta's embedded signup URL
-    const signupUrl = `https://www.facebook.com/v24.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
-      redirectUri,
-    )}&state=${req.user.vendorId}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code`;
+//     // Build Meta's embedded signup URL
+//     const signupUrl = `https://www.facebook.com/v24.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
+//       redirectUri,
+//     )}&state=${req.user.vendorId}&scope=whatsapp_business_management,whatsapp_business_messaging&response_type=code`;
 
-    res.json({ signupUrl });
-  }),
-);
+//     res.json({ signupUrl });
+//   }),
+// );
 
 /**
  * ===============================
@@ -113,7 +113,11 @@ router.post(
   authenticate,
   requireRoles(["vendor_owner"]),
   asyncHandler(async (req, res) => {
-    const { code } = req.body;
+    const { code, phoneNumberId, wabaId } = req.body;
+
+    if (!code || !phoneNumberId || !wabaId) {
+      return res.status(400).json({ message: "Missing required data" });
+    }
 
     if (!code) {
       return res.status(400).json({
@@ -132,16 +136,26 @@ router.post(
     }
 
     // 1️⃣ Exchange code for access token
-    const tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&redirect_uri=${encodeURIComponent(
-      redirectUri,
-    )}&code=${code}`;
+    const tokenResp = await fetch(
+      "https://graph.facebook.com/v24.0/oauth/access_token",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: appId,
+          client_secret: appSecret,
+          grant_type: "authorization_code",
+          redirect_uri: redirectUri,
+          code,
+        }),
+      },
+    );
 
-    const tokenResp = await fetch(tokenUrl);
     const tokenData = await tokenResp.json();
 
     if (!tokenResp.ok || !tokenData.access_token) {
       return res.status(400).json({
-        message: "Failed to exchange code for access token",
+        message: "Failed to exchange code",
         metaError: tokenData?.error?.message,
       });
     }
