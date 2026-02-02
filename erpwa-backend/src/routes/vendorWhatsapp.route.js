@@ -113,37 +113,30 @@ router.post(
   authenticate,
   requireRoles(["vendor_owner"]),
   asyncHandler(async (req, res) => {
-    const { code, wabaId, phoneNumberId } = req.body;
+    const { code } = req.body;
 
-    if (!code || !wabaId || !phoneNumberId) {
+    if (!code) {
       return res.status(400).json({
-        message: "Code, WABA ID and Phone Number ID are required",
+        message: "Authorization code is required",
       });
     }
 
     const appId = process.env.META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
+    const redirectUri = process.env.META_OAUTH_REDIRECT_URI;
 
-    if (!appId || !appSecret) {
+    if (!appId || !appSecret || !redirectUri) {
       return res.status(500).json({
         message: "Meta OAuth configuration is missing",
       });
     }
 
-    // 1️⃣ Exchange code for access token (Embedded Signup flow)
-    const tokenResp = await fetch(
-      "https://graph.facebook.com/v24.0/oauth/access_token",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: appId,
-          client_secret: appSecret,
-          code,
-        }),
-      },
-    );
+    // 1️⃣ Exchange code for access token
+    const tokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&redirect_uri=${encodeURIComponent(
+      redirectUri,
+    )}&code=${code}`;
 
+    const tokenResp = await fetch(tokenUrl);
     const tokenData = await tokenResp.json();
 
     if (!tokenResp.ok || !tokenData.access_token) {
@@ -155,31 +148,78 @@ router.post(
 
     const accessToken = tokenData.access_token;
 
-    // 2️⃣ (Optional but recommended) verify phone number exists
-    const phoneCheck = await fetch(
-      `https://graph.facebook.com/v24.0/${phoneNumberId}?fields=display_phone_number`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
-    );
+    // 2️⃣ Get WhatsApp Business Account details
+    const wabaUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${accessToken}&access_token=${appId}|${appSecret}`;
+    const wabaResp = await fetch(wabaUrl);
+    const wabaData = await wabaResp.json();
 
-    if (!phoneCheck.ok) {
-      const err = await phoneCheck.json();
+    if (!wabaResp.ok) {
       return res.status(400).json({
-        message: "Phone number verification failed",
-        metaError: err?.error?.message,
+        message: "Failed to verify access token",
+        metaError: wabaData?.error?.message,
       });
     }
 
-    // 3️⃣ Encrypt token
+    // 3️⃣ Get WhatsApp Business Accounts associated with this token
+    const accountsUrl = `https://graph.facebook.com/v24.0/me/businesses?access_token=${accessToken}`;
+    const accountsResp = await fetch(accountsUrl);
+    const accountsData = await accountsResp.json();
+
+    if (
+      !accountsResp.ok ||
+      !accountsData.data ||
+      accountsData.data.length === 0
+    ) {
+      return res.status(400).json({
+        message: "No WhatsApp Business Account found",
+        metaError: accountsData?.error?.message,
+      });
+    }
+
+    // Get the first business account
+    const businessId = accountsData.data[0].id;
+
+    // 4️⃣ Get WhatsApp Business Account ID (WABA)
+    const wabaListUrl = `https://graph.facebook.com/v24.0/${businessId}/owned_whatsapp_business_accounts?access_token=${accessToken}`;
+    const wabaListResp = await fetch(wabaListUrl);
+    const wabaListData = await wabaListResp.json();
+
+    if (
+      !wabaListResp.ok ||
+      !wabaListData.data ||
+      wabaListData.data.length === 0
+    ) {
+      return res.status(400).json({
+        message: "No WhatsApp Business Account found for this business",
+        metaError: wabaListData?.error?.message,
+      });
+    }
+
+    const whatsappBusinessId = wabaListData.data[0].id;
+
+    // 5️⃣ Get Phone Number ID
+    const phoneUrl = `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers?access_token=${accessToken}`;
+    const phoneResp = await fetch(phoneUrl);
+    const phoneData = await phoneResp.json();
+
+    if (!phoneResp.ok || !phoneData.data || phoneData.data.length === 0) {
+      return res.status(400).json({
+        message: "No phone number found for this WhatsApp Business Account",
+        metaError: phoneData?.error?.message,
+      });
+    }
+
+    const whatsappPhoneNumberId = phoneData.data[0].id;
+
+    // 6️⃣ Encrypt access token
     const encryptedToken = encrypt(accessToken);
 
-    // 4️⃣ Save directly (trust Meta session IDs)
+    // 7️⃣ Save credentials to Vendor
     await prisma.vendor.update({
       where: { id: req.user.vendorId },
       data: {
-        whatsappBusinessId: wabaId,
-        whatsappPhoneNumberId: phoneNumberId,
+        whatsappBusinessId,
+        whatsappPhoneNumberId,
         whatsappAccessToken: encryptedToken,
         whatsappStatus: "connected",
         whatsappVerifiedAt: new Date(),
@@ -188,9 +228,7 @@ router.post(
     });
 
     res.json({
-      message: "WhatsApp connected successfully via Embedded Signup 🎉",
-      whatsappBusinessId: wabaId,
-      whatsappPhoneNumberId: phoneNumberId,
+      message: "WhatsApp successfully connected via embedded signup",
     });
   }),
 );
