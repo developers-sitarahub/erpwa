@@ -17,7 +17,7 @@ import {
   Globe,
   Phone,
   ShoppingBag,
-  Layers
+  Layers,
 } from "lucide-react";
 import type { Category, Contact } from "@/lib/types";
 
@@ -60,17 +60,27 @@ export default function CreateTemplateCampaignModal({
 }) {
   const [campaignName, setCampaignName] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
+    null,
+  );
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
-  const [variableModes, setVariableModes] = useState<('custom' | 'company')[]>([]);
+  const [variableModes, setVariableModes] = useState<("custom" | "company")[]>(
+    [],
+  );
   const [templateSearch, setTemplateSearch] = useState("");
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set());
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(
+    new Set(),
+  );
 
-  const [recipientCategoryId, setRecipientCategoryId] = useState<number | null>(null);
-  const [recipientSubcategoryId, setRecipientSubcategoryId] = useState<number | null>(null);
+  const [recipientCategoryId, setRecipientCategoryId] = useState<number | null>(
+    null,
+  );
+  const [recipientSubcategoryId, setRecipientSubcategoryId] = useState<
+    number | null
+  >(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
@@ -81,14 +91,18 @@ export default function CreateTemplateCampaignModal({
 
     setLoadingTemplates(true);
     // Fetch Categories
-    api.get<{ data: Category[] }>("/categories")
+    api
+      .get<{ data: Category[] }>("/categories")
       .then((res) => setCategories(res.data.data))
       .catch(console.error);
 
     // Fetch Templates
-    api.get("/vendor/templates")
+    api
+      .get("/vendor/templates")
       .then((res) => {
-        const approved = res.data.filter((t: Template) => t.status === "approved");
+        const approved = res.data.filter(
+          (t: Template) => t.status === "approved",
+        );
         setTemplates(approved);
       })
       .catch((err) => console.error("Failed to load templates", err))
@@ -96,15 +110,21 @@ export default function CreateTemplateCampaignModal({
   }, [isOpen]);
 
   // Fetch Recipients
-  const fetchRecipients = async (catId?: number | null, subId?: number | null) => {
+  const fetchRecipients = async (
+    catId?: number | null,
+    subId?: number | null,
+  ) => {
     setLoadingContacts(true);
     try {
-      const res = await api.get<{ data: { contacts: Contact[] } }>("/categories/contacts", {
-        params: {
-          category_id: catId ?? undefined,
-          subcategory_id: subId ?? undefined,
+      const res = await api.get<{ data: { contacts: Contact[] } }>(
+        "/categories/contacts",
+        {
+          params: {
+            category_id: catId ?? undefined,
+            subcategory_id: subId ?? undefined,
+          },
         },
-      });
+      );
       setContacts(res.data.data.contacts);
     } catch (err) {
       console.error(err);
@@ -141,12 +161,14 @@ export default function CreateTemplateCampaignModal({
 
   const handleSelectAllRecipients = () => {
     if (contacts.length === 0) return;
-    const allVisibleSelected = contacts.every(c => selectedRecipients.has(c.id));
+    const allVisibleSelected = contacts.every((c) =>
+      selectedRecipients.has(c.id),
+    );
     const newSelected = new Set(selectedRecipients);
     if (allVisibleSelected) {
-      contacts.forEach(c => newSelected.delete(c.id));
+      contacts.forEach((c) => newSelected.delete(c.id));
     } else {
-      contacts.forEach(c => newSelected.add(c.id));
+      contacts.forEach((c) => newSelected.add(c.id));
     }
     setSelectedRecipients(newSelected);
   };
@@ -163,11 +185,12 @@ export default function CreateTemplateCampaignModal({
         name: campaignName,
         templateId: selectedTemplate.id,
         language: selectedTemplate.languages[0].language,
-        language: selectedTemplate.languages[0].language,
-        recipients: Array.from(selectedRecipients).map(id => {
-          const contact = contacts.find(c => c.id === id);
-          return contact?.mobile_number;
-        }).filter(Boolean),
+        recipients: Array.from(selectedRecipients)
+          .map((id) => {
+            const contact = contacts.find((c) => c.id === id);
+            return contact?.mobile_number;
+          })
+          .filter(Boolean),
         bodyVariables: templateVariables,
         variableModes: variableModes,
       };
@@ -183,7 +206,11 @@ export default function CreateTemplateCampaignModal({
     }
   };
 
-  const canLaunch = campaignName.trim() && selectedTemplate && selectedRecipients.size > 0 && !isLaunching;
+  const canLaunch =
+    campaignName.trim() &&
+    selectedTemplate &&
+    selectedRecipients.size > 0 &&
+    !isLaunching;
 
   if (!isOpen) return null;
 
@@ -246,11 +273,17 @@ export default function CreateTemplateCampaignModal({
                     ) : templates.length === 0 ? (
                       <div className="text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed border-border">
                         <MessageSquareIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-20" />
-                        <p className="text-sm text-muted-foreground font-medium">No approved templates found</p>
+                        <p className="text-sm text-muted-foreground font-medium">
+                          No approved templates found
+                        </p>
                       </div>
                     ) : (
                       templates
-                        .filter(t => t.displayName.toLowerCase().includes(templateSearch.toLowerCase()))
+                        .filter((t) =>
+                          t.displayName
+                            .toLowerCase()
+                            .includes(templateSearch.toLowerCase()),
+                        )
                         .map((t) => (
                           <button
                             key={t.id}
@@ -260,7 +293,7 @@ export default function CreateTemplateCampaignModal({
                               const match = body.match(/\{\{\d+\}\}/g);
                               const count = match ? new Set(match).size : 0;
                               setTemplateVariables(new Array(count).fill(""));
-                              setVariableModes(new Array(count).fill('custom'));
+                              setVariableModes(new Array(count).fill("custom"));
                             }}
                             className="w-full text-left p-4 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group relative overflow-hidden bg-card shadow-sm hover:shadow-md"
                           >
@@ -269,23 +302,32 @@ export default function CreateTemplateCampaignModal({
                                 {t.displayName}
                               </p>
                               <div className="flex gap-1 items-center">
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${t.category === 'MARKETING' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' :
-                                  t.category === 'UTILITY' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
-                                    'bg-muted text-muted-foreground'
-                                  }`}>
+                                <span
+                                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                    t.category === "MARKETING"
+                                      ? "bg-orange-100 text-orange-600 dark:bg-orange-900/30"
+                                      : t.category === "UTILITY"
+                                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30"
+                                        : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
                                   {t.category}
                                 </span>
-                                {(t.templateType || "").toLowerCase() === "catalog" && (
+                                {(t.templateType || "").toLowerCase() ===
+                                  "catalog" && (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-purple-100 text-purple-600 dark:bg-purple-900/30 flex items-center gap-1">
                                     <ShoppingBag className="w-3 h-3" /> Catalog
                                   </span>
                                 )}
-                                {(t.templateType || "").toLowerCase() === "carousel" && (
+                                {(t.templateType || "").toLowerCase() ===
+                                  "carousel" && (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-pink-100 text-pink-600 dark:bg-pink-900/30 flex items-center gap-1">
                                     <Layers className="w-3 h-3" /> Carousel
                                   </span>
                                 )}
-                                {(!t.templateType || (t.templateType || "").toLowerCase() === "standard") && (
+                                {(!t.templateType ||
+                                  (t.templateType || "").toLowerCase() ===
+                                    "standard") && (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 flex items-center gap-1">
                                     Standard
                                   </span>
@@ -296,7 +338,8 @@ export default function CreateTemplateCampaignModal({
                               &ldquo;{t.languages[0]?.body}&rdquo;
                             </p>
                             <div className="mt-3 flex items-center justify-end text-[10px] font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                              SELECT TEMPLATE <ChevronRight className="w-3 h-3 ml-1" />
+                              SELECT TEMPLATE{" "}
+                              <ChevronRight className="w-3 h-3 ml-1" />
                             </div>
                           </button>
                         ))
@@ -313,20 +356,29 @@ export default function CreateTemplateCampaignModal({
                       <ArrowLeft className="w-5 h-5 text-primary" />
                     </button>
                     <div>
-                      <p className="font-bold text-lg text-foreground">{selectedTemplate.displayName}</p>
+                      <p className="font-bold text-lg text-foreground">
+                        {selectedTemplate.displayName}
+                      </p>
                       <div className="flex gap-2">
-                        <p className="text-[10px] text-primary font-bold uppercase tracking-widest">{selectedTemplate.category}</p>
-                        {(selectedTemplate.templateType || "").toLowerCase() === "catalog" && (
+                        <p className="text-[10px] text-primary font-bold uppercase tracking-widest">
+                          {selectedTemplate.category}
+                        </p>
+                        {(selectedTemplate.templateType || "").toLowerCase() ===
+                          "catalog" && (
                           <span className="text-[10px] text-purple-600 font-bold uppercase tracking-widest flex items-center gap-1">
                             <ShoppingBag className="w-3 h-3" /> Catalog
                           </span>
                         )}
-                        {(selectedTemplate.templateType || "").toLowerCase() === "carousel" && (
+                        {(selectedTemplate.templateType || "").toLowerCase() ===
+                          "carousel" && (
                           <span className="text-[10px] text-pink-600 font-bold uppercase tracking-widest flex items-center gap-1">
                             <Layers className="w-3 h-3" /> Carousel
                           </span>
                         )}
-                        {(!selectedTemplate.templateType || (selectedTemplate.templateType || "").toLowerCase() === "standard") && (
+                        {(!selectedTemplate.templateType ||
+                          (
+                            selectedTemplate.templateType || ""
+                          ).toLowerCase() === "standard") && (
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
                             Standard
                           </span>
@@ -354,32 +406,38 @@ export default function CreateTemplateCampaignModal({
                     {/* Variables */}
                     <div>
                       <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-primary" /> Variables Configuration
+                        <Zap className="w-4 h-4 text-primary" /> Variables
+                        Configuration
                       </h3>
                       <div className="space-y-4">
                         {templateVariables.length === 0 ? (
                           <div className="p-6 bg-muted/30 rounded-xl text-center border border-dashed border-border">
-                            <p className="text-sm text-muted-foreground">This template has no dynamic variables.</p>
+                            <p className="text-sm text-muted-foreground">
+                              This template has no dynamic variables.
+                            </p>
                           </div>
                         ) : (
                           templateVariables.map((val, idx) => (
                             <div key={idx} className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                                  Variable {"\u007B\u007B"}{idx + 1}{"\u007D\u007D"}
+                                  Variable {"\u007B\u007B"}
+                                  {idx + 1}
+                                  {"\u007D\u007D"}
                                 </label>
                                 <div className="flex gap-1 bg-muted rounded-lg p-0.5">
                                   <button
                                     type="button"
                                     onClick={() => {
                                       const newModes = [...variableModes];
-                                      newModes[idx] = 'custom';
+                                      newModes[idx] = "custom";
                                       setVariableModes(newModes);
                                     }}
-                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${variableModes[idx] === 'custom'
-                                      ? 'bg-white dark:bg-card text-foreground shadow-sm'
-                                      : 'text-muted-foreground hover:text-foreground'
-                                      }`}
+                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                                      variableModes[idx] === "custom"
+                                        ? "bg-white dark:bg-card text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                    }`}
                                   >
                                     Custom
                                   </button>
@@ -387,16 +445,17 @@ export default function CreateTemplateCampaignModal({
                                     type="button"
                                     onClick={() => {
                                       const newModes = [...variableModes];
-                                      newModes[idx] = 'company';
+                                      newModes[idx] = "company";
                                       setVariableModes(newModes);
                                       const newVars = [...templateVariables];
-                                      newVars[idx] = '';
+                                      newVars[idx] = "";
                                       setTemplateVariables(newVars);
                                     }}
-                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${variableModes[idx] === 'company'
-                                      ? 'bg-white dark:bg-card text-foreground shadow-sm'
-                                      : 'text-muted-foreground hover:text-foreground'
-                                      }`}
+                                    className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                                      variableModes[idx] === "company"
+                                        ? "bg-white dark:bg-card text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                    }`}
                                   >
                                     Company
                                   </button>
@@ -404,16 +463,27 @@ export default function CreateTemplateCampaignModal({
                               </div>
                               <input
                                 type="text"
-                                disabled={variableModes[idx] === 'company'}
-                                placeholder={variableModes[idx] === 'company' ? 'Will use company name for each recipient' : `Value for {{${idx + 1}}}`}
-                                value={variableModes[idx] === 'company' ? 'Company Name' : val}
+                                disabled={variableModes[idx] === "company"}
+                                placeholder={
+                                  variableModes[idx] === "company"
+                                    ? "Will use company name for each recipient"
+                                    : `Value for {{${idx + 1}}}`
+                                }
+                                value={
+                                  variableModes[idx] === "company"
+                                    ? "Company Name"
+                                    : val
+                                }
                                 onChange={(e) => {
                                   const newVars = [...templateVariables];
                                   newVars[idx] = e.target.value;
                                   setTemplateVariables(newVars);
                                 }}
-                                className={`w-full bg-input border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:opacity-30 ${variableModes[idx] === 'company' ? 'opacity-60 cursor-not-allowed' : ''
-                                  }`}
+                                className={`w-full bg-input border border-border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:opacity-30 ${
+                                  variableModes[idx] === "company"
+                                    ? "opacity-60 cursor-not-allowed"
+                                    : ""
+                                }`}
                               />
                             </div>
                           ))
@@ -425,14 +495,18 @@ export default function CreateTemplateCampaignModal({
                     <div className="space-y-4 pt-4 border-t border-border">
                       <div className="flex items-center justify-between mb-2">
                         <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                          Select Recipients <span className="text-red-500">*</span>
+                          Select Recipients{" "}
+                          <span className="text-red-500">*</span>
                         </label>
                         <div className="flex items-center gap-4">
                           <button
                             onClick={handleSelectAllRecipients}
                             className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider"
                           >
-                            {contacts.length > 0 && contacts.every(c => selectedRecipients.has(c.id)) ? 'Deselect All' : 'Select All'}
+                            {contacts.length > 0 &&
+                            contacts.every((c) => selectedRecipients.has(c.id))
+                              ? "Deselect All"
+                              : "Select All"}
                           </button>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">
                             {selectedRecipients.size} Selected
@@ -444,28 +518,38 @@ export default function CreateTemplateCampaignModal({
                         <select
                           value={recipientCategoryId ?? ""}
                           onChange={(e) => {
-                            setRecipientCategoryId(e.target.value ? Number(e.target.value) : null);
+                            setRecipientCategoryId(
+                              e.target.value ? Number(e.target.value) : null,
+                            );
                             setRecipientSubcategoryId(null);
                           }}
                           className="w-full px-3 py-2.5 bg-input border border-border rounded-xl text-xs font-semibold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                         >
                           <option value="">All Categories</option>
                           {categories.map((cat) => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
                           ))}
                         </select>
 
                         <select
                           value={recipientSubcategoryId ?? ""}
                           disabled={!recipientCategoryId}
-                          onChange={(e) => setRecipientSubcategoryId(e.target.value ? Number(e.target.value) : null)}
+                          onChange={(e) =>
+                            setRecipientSubcategoryId(
+                              e.target.value ? Number(e.target.value) : null,
+                            )
+                          }
                           className="w-full px-3 py-2.5 bg-input border border-border rounded-xl text-xs font-semibold focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-50"
                         >
                           <option value="">All Subcategories</option>
                           {categories
                             .find((c) => c.id === recipientCategoryId)
                             ?.subcategories?.map((sub) => (
-                              <option key={sub.id} value={sub.id}>{sub.name}</option>
+                              <option key={sub.id} value={sub.id}>
+                                {sub.name}
+                              </option>
                             ))}
                         </select>
                       </div>
@@ -476,25 +560,41 @@ export default function CreateTemplateCampaignModal({
                           {loadingContacts ? (
                             <div className="p-10 text-center opacity-30">
                               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                              <p className="text-[10px] font-bold uppercase tracking-widest">Searching contacts...</p>
+                              <p className="text-[10px] font-bold uppercase tracking-widest">
+                                Searching contacts...
+                              </p>
                             </div>
                           ) : contacts.length === 0 ? (
                             <div className="p-10 text-center opacity-30">
-                              <p className="text-[10px] font-bold uppercase tracking-widest">No matching contacts</p>
+                              <p className="text-[10px] font-bold uppercase tracking-widest">
+                                No matching contacts
+                              </p>
                             </div>
                           ) : (
                             contacts.map((contact) => (
                               <div
                                 key={contact.id}
-                                onClick={() => handleToggleRecipient(contact.id)}
+                                onClick={() =>
+                                  handleToggleRecipient(contact.id)
+                                }
                                 className="group flex items-center gap-4 p-4 hover:bg-primary/5 cursor-pointer transition-all"
                               >
-                                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedRecipients.has(contact.id) ? 'bg-primary border-primary shadow-lg shadow-primary/30' : 'border-border group-hover:border-primary/50 bg-background'
-                                  }`}>
-                                  {selectedRecipients.has(contact.id) && <Check className="w-3 h-3 text-white" />}
+                                <div
+                                  className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                    selectedRecipients.has(contact.id)
+                                      ? "bg-primary border-primary shadow-lg shadow-primary/30"
+                                      : "border-border group-hover:border-primary/50 bg-background"
+                                  }`}
+                                >
+                                  {selectedRecipients.has(contact.id) && (
+                                    <Check className="w-3 h-3 text-white" />
+                                  )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-bold text-foreground truncate">{contact.company_name || contact.mobile_number}</p>
+                                  <p className="text-sm font-bold text-foreground truncate">
+                                    {contact.company_name ||
+                                      contact.mobile_number}
+                                  </p>
                                   <div className="flex items-center gap-2 mt-0.5">
                                     <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-50 px-1.5 py-0.5 bg-muted rounded">
                                       {contact.category_name}
@@ -531,8 +631,12 @@ export default function CreateTemplateCampaignModal({
                     {/* Mobile Frame Container - Elegantly elongated and responsive */}
                     <div className="relative mx-auto w-full max-w-[280px] border-[10px] border-[#1F2937] rounded-[48px] shadow-2xl bg-[#0b141a] transition-all duration-500 overflow-hidden transform lg:scale-105">
                       <div className="h-6 bg-[#0b141a] flex justify-between items-center px-6 pt-3 z-20 relative">
-                        <span className="text-[10px] text-white font-semibold">9:41</span>
-                        <div className="flex gap-1.5 opacity-50 italic font-bold text-[10px] text-white">WhatsApp</div>
+                        <span className="text-[10px] text-white font-semibold">
+                          9:41
+                        </span>
+                        <div className="flex gap-1.5 opacity-50 italic font-bold text-[10px] text-white">
+                          WhatsApp
+                        </div>
                       </div>
 
                       <div className="relative bg-[#0b141a] p-3 pt-4 min-h-[540px] max-h-[550px] overflow-y-auto custom-scrollbar flex flex-col">
@@ -543,14 +647,26 @@ export default function CreateTemplateCampaignModal({
                             <div className="p-1">
                               {/* Header Media */}
                               {(() => {
-                                const mediaItem = selectedTemplate.media?.find(m => m.language === selectedTemplate.languages[0].language);
+                                const mediaItem = selectedTemplate.media?.find(
+                                  (m) =>
+                                    m.language ===
+                                    selectedTemplate.languages[0].language,
+                                );
                                 if (mediaItem?.s3Url) {
                                   return (
                                     <div className="rounded-xl overflow-hidden bg-black/40 min-h-[140px] relative group flex items-center justify-center">
-                                      {selectedTemplate.languages[0].headerType === "VIDEO" ? (
-                                        <video src={mediaItem.s3Url} className="w-full h-full object-contain" />
+                                      {selectedTemplate.languages[0]
+                                        .headerType === "VIDEO" ? (
+                                        <video
+                                          src={mediaItem.s3Url}
+                                          className="w-full h-full object-contain"
+                                        />
                                       ) : (
-                                        <img src={mediaItem.s3Url} alt="Header" className="w-full h-full object-contain" />
+                                        <img
+                                          src={mediaItem.s3Url}
+                                          alt="Header"
+                                          className="w-full h-full object-contain"
+                                        />
                                       )}
                                       <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-all" />
                                     </div>
@@ -559,25 +675,32 @@ export default function CreateTemplateCampaignModal({
                                 return (
                                   <div className="min-h-[140px] bg-[#2a3942] flex flex-col items-center justify-center rounded-xl text-slate-500 text-[10px] font-bold uppercase tracking-wider border border-white/5">
                                     <ImageIcon className="w-6 h-6 mb-2 opacity-30 text-white" />
-                                    {selectedTemplate.languages[0].headerType} MEDIA
+                                    {selectedTemplate.languages[0].headerType}{" "}
+                                    MEDIA
                                   </div>
                                 );
                               })()}
 
                               {/* Header Text */}
-                              {selectedTemplate.languages[0]?.headerType === "TEXT" && selectedTemplate.languages[0]?.headerText && (
-                                <p className="font-bold text-[14px] pt-2 px-3 text-[#e9edef] leading-tight">
-                                  {selectedTemplate.languages[0].headerText}
-                                </p>
-                              )}
+                              {selectedTemplate.languages[0]?.headerType ===
+                                "TEXT" &&
+                                selectedTemplate.languages[0]?.headerText && (
+                                  <p className="font-bold text-[14px] pt-2 px-3 text-[#e9edef] leading-tight">
+                                    {selectedTemplate.languages[0].headerText}
+                                  </p>
+                                )}
                             </div>
 
                             <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-[#e9edef] whitespace-pre-wrap font-sans">
                               {(() => {
-                                let body = selectedTemplate.languages[0]?.body || "";
+                                let body =
+                                  selectedTemplate.languages[0]?.body || "";
                                 templateVariables.forEach((val, idx) => {
                                   const placeholder = `{{${idx + 1}}}`;
-                                  body = body.replace(placeholder, val || placeholder);
+                                  body = body.replace(
+                                    placeholder,
+                                    val || placeholder,
+                                  );
                                 });
                                 return body;
                               })()}
@@ -590,26 +713,32 @@ export default function CreateTemplateCampaignModal({
                             </div>
 
                             {/* Buttons */}
-                            {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
-                              <div className="border-t border-white/10 flex flex-col divide-y divide-white/10 bg-[#2a3942]/30">
-                                {selectedTemplate.buttons.map((btn, idx) => (
-                                  <div key={idx} className="p-2.5 text-center text-[13px] font-medium text-[#00a884] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors cursor-pointer">
-                                    {btn.type === "URL" ? (
-                                      <Globe className="w-3.5 h-3.5" />
-                                    ) : btn.type === "PHONE_NUMBER" ? (
-                                      <Phone className="w-3.5 h-3.5" />
-                                    ) : (
-                                      <MessageSquareIcon className="w-3.5 h-3.5" />
-                                    )}
-                                    {btn.text}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            {selectedTemplate.buttons &&
+                              selectedTemplate.buttons.length > 0 && (
+                                <div className="border-t border-white/10 flex flex-col divide-y divide-white/10 bg-[#2a3942]/30">
+                                  {selectedTemplate.buttons.map((btn, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="p-2.5 text-center text-[13px] font-medium text-[#00a884] flex items-center justify-center gap-2 hover:bg-white/5 transition-colors cursor-pointer"
+                                    >
+                                      {btn.type === "URL" ? (
+                                        <Globe className="w-3.5 h-3.5" />
+                                      ) : btn.type === "PHONE_NUMBER" ? (
+                                        <Phone className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <MessageSquareIcon className="w-3.5 h-3.5" />
+                                      )}
+                                      {btn.text}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                           </div>
 
                           <div className="self-end mr-1 mt-0.5 flex items-center gap-1 opacity-40">
-                            <span className="text-[10px] text-white font-bold uppercase tracking-tighter">9:41 AM</span>
+                            <span className="text-[10px] text-white font-bold uppercase tracking-tighter">
+                              9:41 AM
+                            </span>
                             <div className="flex -space-x-1">
                               <Check className="w-2.5 h-2.5 text-white" />
                               <Check className="w-2.5 h-2.5 text-white" />
@@ -622,7 +751,9 @@ export default function CreateTemplateCampaignModal({
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center p-12 opacity-30">
                     <ImageIcon className="w-16 h-16 mb-4 text-muted-foreground" />
-                    <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Select a template to view preview</p>
+                    <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                      Select a template to view preview
+                    </p>
                   </div>
                 )}
               </div>
@@ -642,10 +773,11 @@ export default function CreateTemplateCampaignModal({
               whileTap={{ scale: canLaunch ? 0.98 : 1 }}
               onClick={handleLaunch}
               disabled={!canLaunch}
-              className={`px-10 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${canLaunch
-                ? "bg-primary text-white shadow-xl shadow-primary/30 hover:bg-primary/90"
-                : "bg-muted text-muted-foreground cursor-not-allowed border border-border opacity-50"
-                }`}
+              className={`px-10 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
+                canLaunch
+                  ? "bg-primary text-white shadow-xl shadow-primary/30 hover:bg-primary/90"
+                  : "bg-muted text-muted-foreground cursor-not-allowed border border-border opacity-50"
+              }`}
             >
               <Zap className="w-4 h-4" />
               {isLaunching ? "Launching..." : "Launch Campaign"}

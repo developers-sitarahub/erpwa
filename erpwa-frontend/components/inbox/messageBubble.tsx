@@ -154,6 +154,11 @@ export default function MessageBubble({
     msg.replyTo ??
     allMessages.find((m) => m.whatsappMessageId === msg.replyToMessageId);
 
+  // Type guard to check if repliedMessage is a full Message (not just replyTo)
+  const isFullMessage = (msg: typeof repliedMessage): msg is Message => {
+    return msg !== undefined && "id" in msg && "timestamp" in msg;
+  };
+
   const cleanText =
     (msg.text || "")
       .replace(/^\[(image|video|audio|document)(?:\s+message)?\]\s*/i, "")
@@ -444,7 +449,12 @@ export default function MessageBubble({
             {msg.replyToMessageId && repliedMessage && (
               <div
                 className="mx-1 px-3 py-2 bg-black/5 dark:bg-white/10 border-l-4 border-primary rounded flex gap-2 cursor-pointer"
-                onClick={() => onReply?.(repliedMessage)}
+                onClick={() => {
+                  // Only call onReply if repliedMessage is a full Message object (has id and timestamp)
+                  if (isFullMessage(repliedMessage)) {
+                    onReply?.(repliedMessage);
+                  }
+                }}
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-primary mb-1">
