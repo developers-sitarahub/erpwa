@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/authContext";
 import { toast } from "react-toastify";
+import Script from "next/script";
 
 type WhatsAppStatus = "not_configured" | "connected" | "error";
 type SetupMethod = "embedded" | "manual";
@@ -135,77 +136,90 @@ export default function WhatsAppSetupPage() {
 
   /* ================= EMBEDDED SIGNUP ================= */
 
+  /* ================= EMBEDDED SIGNUP ================= */
+
   async function handleEmbeddedSignup() {
-    try {
-      // Get the embedded signup URL from backend
-      const res = await api.get("/vendor/whatsapp/embedded-signup-url");
-      const { signupUrl } = res.data;
-
-      // Open Meta's embedded signup in a popup
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-
-      const popup = window.open(
-        signupUrl,
-        "MetaEmbeddedSignup",
-        `width=${width},height=${height},left=${left},top=${top}`,
+    if (!(window as any).FB) {
+      toast.error(
+        "Facebook SDK not loaded. Please disable ad-blockers or refresh.",
       );
-
-      // Listen for the OAuth callback
-      const handleMessage = async (event: MessageEvent) => {
-        // Verify origin for security
-        if (event.origin !== window.location.origin) return;
-
-        if (event.data.type === "whatsapp-embedded-signup") {
-          const { code } = event.data;
-
-          if (code) {
-            setSaving(true);
-            try {
-              // Exchange code for access token and complete setup
-              await api.post("/vendor/whatsapp/embedded-setup", { code });
-              const res = await api.get("/vendor/whatsapp");
-
-              setConfig(res.data);
-              setStatus("connected");
-              toast.success(
-                "WhatsApp connected successfully via embedded signup!",
-              );
-            } catch (err: any) {
-              setStatus("error");
-              const error = err as {
-                response?: { data?: { message?: string } };
-              };
-              setError(
-                error.response?.data?.message || "Embedded setup failed",
-              );
-            } finally {
-              setSaving(false);
-            }
-          }
-
-          popup?.close();
-          window.removeEventListener("message", handleMessage);
-        }
-      };
-
-      window.addEventListener("message", handleMessage);
-
-      // Clean up if popup is closed manually
-      const checkPopup = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkPopup);
-          window.removeEventListener("message", handleMessage);
-        }
-      }, 500);
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(
-        error.response?.data?.message || "Failed to initiate embedded signup",
-      );
+      return;
     }
+
+    setSaving(true);
+    setError(null);
+
+    // Store session info (WABA ID, Phone ID) from the message event
+    let sessionInfo: { wabaId?: string; phoneNumberId?: string } = {};
+
+    const messageHandler = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.facebook.com" &&
+        event.origin !== "https://web.facebook.com"
+      )
+        return;
+
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "WA_EMBEDDED_SIGNUP") {
+          if (data.event === "FINISH") {
+            const { phone_number_id, waba_id } = data.data;
+            sessionInfo = { wabaId: waba_id, phoneNumberId: phone_number_id };
+          } else if (data.event === "CANCEL") {
+            // Handle cancel if needed
+          } else if (data.event === "ERROR") {
+            console.error("Embedded Signup Error", data.data.error_message);
+          }
+        }
+      } catch {
+        // Ignore non-JSON
+      }
+    };
+
+    window.addEventListener("message", messageHandler);
+
+    (window as any).FB.login(
+      async (response: any) => {
+        if (response.authResponse) {
+          const code = response.authResponse.code;
+          try {
+            await api.post("/vendor/whatsapp/embedded-setup", {
+              code,
+              ...sessionInfo,
+            });
+            const res = await api.get("/vendor/whatsapp");
+
+            setConfig(res.data);
+            setStatus("connected");
+            toast.success(
+              "WhatsApp connected successfully via embedded signup!",
+            );
+          } catch (err: any) {
+            setStatus("error");
+            const error = err as {
+              response?: { data?: { message?: string } };
+            };
+            setError(error.response?.data?.message || "Embedded setup failed");
+          } finally {
+            setSaving(false);
+            window.removeEventListener("message", messageHandler);
+          }
+        } else {
+          // User cancelled
+          setSaving(false);
+          window.removeEventListener("message", messageHandler);
+        }
+      },
+      {
+        config_id: "906827855187816",
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          sessionInfoVersion: "3",
+          version: "v3",
+        },
+      },
+    );
   }
 
   /* ================= GUARDS ================= */
@@ -488,6 +502,29 @@ export default function WhatsAppSetupPage() {
           )}
         </div>
       )}
+      <Script
+        id="fb-init"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.fbAsyncInit = function() {
+              FB.init({
+                appId            : '1336009088545442',
+                autoLogAppEvents : true,
+                xfbml            : true,
+                version          : 'v24.0'
+              });
+            };
+          `,
+        }}
+      />
+      <Script
+        id="fb-sdk"
+        strategy="afterInteractive"
+        src="https://connect.facebook.net/en_US/sdk.js"
+        crossOrigin="anonymous"
+        defer
+      />
     </div>
   );
 }
