@@ -179,36 +179,40 @@ export default function WhatsAppSetupPage() {
     window.addEventListener("message", messageHandler);
 
     (window as any).FB.login(
-      async (response: any) => {
-        if (response.authResponse) {
-          const code = response.authResponse.code;
-          try {
-            await api.post("/vendor/whatsapp/embedded-setup", {
-              code,
-              ...sessionInfo,
-            });
-            const res = await api.get("/vendor/whatsapp");
+      (response: any) => {
+        (async () => {
+          if (response.authResponse) {
+            const code = response.authResponse.code;
+            try {
+              await api.post("/vendor/whatsapp/embedded-setup", {
+                code,
+                ...sessionInfo,
+              });
+              const res = await api.get("/vendor/whatsapp");
 
-            setConfig(res.data);
-            setStatus("connected");
-            toast.success(
-              "WhatsApp connected successfully via embedded signup!",
-            );
-          } catch (err: any) {
-            setStatus("error");
-            const error = err as {
-              response?: { data?: { message?: string } };
-            };
-            setError(error.response?.data?.message || "Embedded setup failed");
-          } finally {
+              setConfig(res.data);
+              setStatus("connected");
+              toast.success(
+                "WhatsApp connected successfully via embedded signup!",
+              );
+            } catch (err: any) {
+              setStatus("error");
+              const error = err as {
+                response?: { data?: { message?: string } };
+              };
+              setError(
+                error.response?.data?.message || "Embedded setup failed",
+              );
+            } finally {
+              setSaving(false);
+              window.removeEventListener("message", messageHandler);
+            }
+          } else {
+            // User cancelled
             setSaving(false);
             window.removeEventListener("message", messageHandler);
           }
-        } else {
-          // User cancelled
-          setSaving(false);
-          window.removeEventListener("message", messageHandler);
-        }
+        })();
       },
       {
         config_id: "906827855187816",
