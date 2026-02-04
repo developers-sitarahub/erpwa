@@ -16,7 +16,6 @@ const router = express.Router();
 =============================== */
 import { logActivity } from "../services/activityLog.service.js";
 
-
 /* ===============================
    WEBHOOK VERIFICATION (META)
 =============================== */
@@ -241,6 +240,13 @@ router.post("/", async (req, res) => {
           } else if (interactive.type === "button_reply") {
             content = interactive.button_reply.title;
             // Also store ID if needed, but 'content' helps with workflow matching
+          } else if (interactive.type === "nfm_reply") {
+            // Handle WhatsApp Flows response
+            content = interactive.nfm_reply.body || "Flow Response";
+            console.log(
+              "🌊 FLOW RESPONSE:",
+              interactive.nfm_reply.response_json,
+            );
           } else {
             content = "[interactive]";
           }
@@ -317,7 +323,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch { }
+        } catch {}
 
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
@@ -348,7 +354,7 @@ router.post("/", async (req, res) => {
             mimeType: fullMessage.media[0]?.mimeType,
             caption: fullMessage.media[0]?.caption,
           });
-        } catch (socketErr) { }
+        } catch (socketErr) {}
 
         // ============================================
         // 🚀 WORKFLOW ENGINE INTEGRATION
@@ -419,7 +425,8 @@ router.post("/", async (req, res) => {
             processingMs: Date.now() - startTime,
             responseCode: 200,
             whatsappBusinessId: wabaId,
-            whatsappPhoneNumberId: phoneNumberId || vendor.whatsappPhoneNumberId,
+            whatsappPhoneNumberId:
+              phoneNumberId || vendor.whatsappPhoneNumberId,
           });
           continue;
         }
@@ -452,7 +459,8 @@ router.post("/", async (req, res) => {
                 ? waStatus.errors[0].message
                 : null,
             whatsappBusinessId: wabaId,
-            whatsappPhoneNumberId: phoneNumberId || vendor.whatsappPhoneNumberId,
+            whatsappPhoneNumberId:
+              phoneNumberId || vendor.whatsappPhoneNumberId,
           });
           continue;
         }
@@ -508,7 +516,7 @@ router.post("/", async (req, res) => {
               status: waState,
             },
           );
-        } catch { }
+        } catch {}
       }
     }
 
