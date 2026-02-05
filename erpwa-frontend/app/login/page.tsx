@@ -1,36 +1,46 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Mail, Lock, Shield } from "lucide-react"
-import { useAuth } from "@/context/authContext"
-import { Logo } from "@/components/logo"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Mail, Lock, Shield } from "lucide-react";
+import { AxiosError } from "axios";
+import { toast } from "react-toastify";
+import { useAuth } from "@/context/authContext";
+import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const { login } = useAuth()
+  const router = useRouter();
+  const { login } = useAuth();
 
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (loading) return
-    setLoading(true)
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true);
 
     try {
-      await login(email, password)
+      await login(email, password);
+    } catch (err) {
+      console.error(err);
+      if (err instanceof AxiosError && err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else if (err instanceof Error) {
+        toast.error(err.message);
+      } else {
+        toast.error("Something went wrong");
+      }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-xl bg-card text-foreground shadow-xl p-8 border border-border">
-
         {/* Header */}
         <div className="mb-8 w-full">
           <div className="flex flex-col items-center w-full">
@@ -45,7 +55,6 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-5">
-
           {/* Email */}
           <div>
             <label className="block text-sm font-medium mb-1">Email</label>
@@ -85,7 +94,7 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(v => !v)}
+                onClick={() => setShowPassword((v) => !v)}
                 disabled={loading}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               >
@@ -123,17 +132,23 @@ export default function LoginPage() {
           © {new Date().getFullYear()} GPS erp
         </p>
         <div className="flex justify-center gap-4 mt-2 text-xs text-muted-foreground/80">
-          <a href="/privacy-policy" className="flex items-center gap-1.5 hover:text-primary transition-colors">
+          <a
+            href="/privacy-policy"
+            className="flex items-center gap-1.5 hover:text-primary transition-colors"
+          >
             <Lock className="w-3 h-3" />
             Privacy Policy
           </a>
           <div className="h-3 w-px bg-border/60" />
-          <a href="/terms-n-condition" className="flex items-center gap-1.5 hover:text-primary transition-colors">
+          <a
+            href="/terms-n-condition"
+            className="flex items-center gap-1.5 hover:text-primary transition-colors"
+          >
             <Shield className="w-3 h-3" />
             Terms & Conditions
           </a>
         </div>
       </div>
     </div>
-  )
+  );
 }

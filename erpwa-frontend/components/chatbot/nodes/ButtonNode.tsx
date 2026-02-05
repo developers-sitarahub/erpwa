@@ -338,11 +338,13 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
           className="w-3 h-3 bg-gray-400 border-2 border-white dark:border-slate-900 shadow-sm z-20"
         />
 
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="w-3 h-3 bg-orange-500 border-2 border-white dark:border-slate-900 shadow-sm z-20"
-        />
+        {(!data.buttons || data.buttons.length === 0) && (
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            className="w-3 h-3 bg-orange-500 border-2 border-white dark:border-slate-900 shadow-sm z-20"
+          />
+        )}
       </div>
 
       {showDeleteModal &&

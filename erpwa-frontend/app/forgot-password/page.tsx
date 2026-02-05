@@ -13,8 +13,9 @@ import {
 } from "@/components/card";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
-import { CheckCircle, Lock, Mail, KeyRound } from "lucide-react";
+import { CheckCircle, Lock, Mail, KeyRound, Eye, EyeOff } from "lucide-react";
 import api from "@/lib/api";
+import { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export default function ForgotPasswordPage() {
@@ -26,6 +27,8 @@ export default function ForgotPasswordPage() {
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -39,8 +42,12 @@ export default function ForgotPasswordPage() {
       await api.post("/auth/forgot-password", { email });
       toast.success("OTP sent to your email");
       setStep(2);
-    } catch {
-      toast.error("Failed to send OTP");
+    } catch (err) {
+      if (err instanceof AxiosError && err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else {
+        toast.error("Failed to send OTP");
+      }
     } finally {
       setLoading(false);
     }
@@ -61,8 +68,12 @@ export default function ForgotPasswordPage() {
       setResetToken(data.resetToken);
       toast.success("OTP verified");
       setStep(3);
-    } catch {
-      toast.error("Invalid or expired OTP");
+    } catch (err) {
+      if (err instanceof AxiosError && err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else {
+        toast.error("Invalid or expired OTP");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,13 +104,17 @@ export default function ForgotPasswordPage() {
           headers: {
             Authorization: `Bearer ${resetToken}`,
           },
-        }
+        },
       );
 
       toast.success("Password reset successful");
       setStep(4);
-    } catch {
-      toast.error("Password reset failed");
+    } catch (err) {
+      if (err instanceof AxiosError && err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      } else {
+        toast.error("Password reset failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -208,11 +223,18 @@ export default function ForgotPasswordPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
                 {errors.newPassword && (
                   <p className="text-sm text-destructive">
@@ -226,11 +248,22 @@ export default function ForgotPasswordPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={16} />
+                    ) : (
+                      <Eye size={16} />
+                    )}
+                  </button>
                 </div>
                 {errors.confirmPassword && (
                   <p className="text-sm text-destructive">

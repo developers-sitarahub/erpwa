@@ -11,19 +11,25 @@ const COOKIE_OPTIONS = {
 /* ================= LOGIN ================= */
 
 export async function login(req, res) {
-  const data = await Auth.login(req.body.email, req.body.password);
+  try {
+    const data = await Auth.login(req.body.email, req.body.password);
 
-  console.log("✅ LOGIN SUCCESS: Setting cookie for user", data.user.email);
-  console.log("Cookie Options:", COOKIE_OPTIONS);
+    console.log("✅ LOGIN SUCCESS: Setting cookie for user", data.user.email);
+    console.log("Cookie Options:", COOKIE_OPTIONS);
 
-  res.cookie("refreshToken", data.refreshToken, COOKIE_OPTIONS).json({
-    accessToken: data.accessToken,
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-      role: data.user.role,
-    },
-  });
+    res.cookie("refreshToken", data.refreshToken, COOKIE_OPTIONS).json({
+      accessToken: data.accessToken,
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        role: data.user.role,
+      },
+    });
+  } catch (err) {
+    console.error("❌ LOGIN ERROR:", err.message);
+    const status = err.message === "Invalid credentials" ? 401 : 500;
+    res.status(status).json({ message: err.message });
+  }
 }
 
 /* ================= REFRESH ================= */

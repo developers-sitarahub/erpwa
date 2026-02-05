@@ -245,11 +245,13 @@ const ListNode = ({ id, data, selected }: NodeProps) => {
           position={Position.Top}
           className="w-3 h-3 bg-gray-400 border-2 border-white dark:border-slate-900 shadow-sm z-20"
         />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="w-3 h-3 bg-blue-500 border-2 border-white dark:border-slate-900 shadow-sm z-20"
-        />
+        {(!data.items || data.items.length === 0) && (
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            className="w-3 h-3 bg-blue-500 border-2 border-white dark:border-slate-900 shadow-sm z-20"
+          />
+        )}
       </div>
 
       {showDeleteModal &&
