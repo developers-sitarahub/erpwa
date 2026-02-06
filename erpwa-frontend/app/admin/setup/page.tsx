@@ -31,6 +31,11 @@ export default function WhatsAppSetupPage() {
     whatsappAccessToken: "",
   });
 
+  const [embeddedSession, setEmbeddedSession] = useState<{
+    whatsappBusinessId: string;
+    whatsappPhoneNumberId: string;
+  } | null>(null);
+
   /* ================= CONFIRM TOAST ================= */
 
   function showConfirmToast(options: {
@@ -68,6 +73,68 @@ export default function WhatsAppSetupPage() {
       { autoClose: false, closeOnClick: false },
     );
   }
+
+  useEffect(() => {
+    if (window.FB) return;
+
+    window.fbAsyncInit = function () {
+      window.FB.init({
+        appId: process.env.NEXT_PUBLIC_META_APP_ID!,
+        xfbml: false,
+        version: "v24.0",
+      });
+    };
+
+    const script = document.createElement("script");
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.facebook.com" &&
+        event.origin !== "https://web.facebook.com"
+      ) {
+        return;
+      }
+
+      const payload =
+        typeof event.data === "string"
+          ? (() => {
+              try {
+                return JSON.parse(event.data);
+              } catch {
+                return null;
+              }
+            })()
+          : event.data;
+
+      if (!payload) return;
+
+      if (payload.type === "WA_EMBEDDED_SIGNUP") {
+        console.log("📩 WA_EMBEDDED_SIGNUP:", payload);
+
+        if (payload.event === "FINISH") {
+          setEmbeddedSession({
+            whatsappBusinessId: payload.data.waba_id,
+            whatsappPhoneNumberId: payload.data.phone_number_id,
+          });
+        }
+
+        if (payload.event === "ERROR") {
+          console.error("❌ Embedded signup error:", payload.data);
+        }
+
+        if (payload.event === "CANCEL") {
+          console.warn("⚠️ Embedded signup cancelled:", payload.data);
+        }
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   /* ================= LOAD STATUS ================= */
 
@@ -135,77 +202,69 @@ export default function WhatsAppSetupPage() {
 
   /* ================= EMBEDDED SIGNUP ================= */
 
-  async function handleEmbeddedSignup() {
-    try {
-      // Get the embedded signup URL from backend
-      const res = await api.get("/vendor/whatsapp/embedded-signup-url");
-      const { signupUrl } = res.data;
+  function handleEmbeddedSignup() {
+    if (!window.FB) {
+      toast.error("Facebook SDK not loaded");
+      return;
+    }
 
-      // Open Meta's embedded signup in a popup
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
+    setSaving(true);
+    setError(null);
 
-      const popup = window.open(
-        signupUrl,
-        "MetaEmbeddedSignup",
-        `width=${width},height=${height},left=${left},top=${top}`,
-      );
+    window.FB.login(
+      (response: any) => {
+        if (!response.authResponse) {
+          setSaving(false);
+          toast.error("Signup cancelled");
+          return;
+        }
 
-      // Listen for the OAuth callback
-      const handleMessage = async (event: MessageEvent) => {
-        // Verify origin for security
-        if (event.origin !== window.location.origin) return;
+        const code = response.authResponse.code;
 
-        if (event.data.type === "whatsapp-embedded-signup") {
-          const { code } = event.data;
+        // ⏳ wait for WA_EMBEDDED_SIGNUP
+        const waitForSession = async () => {
+          for (let i = 0; i < 10; i++) {
+            if (embeddedSession) return embeddedSession;
+            await new Promise((r) => setTimeout(r, 300));
+          }
+          return null;
+        };
 
-          if (code) {
-            setSaving(true);
-            try {
-              // Exchange code for access token and complete setup
-              await api.post("/vendor/whatsapp/embedded-setup", { code });
-              const res = await api.get("/vendor/whatsapp");
+        (async () => {
+          const session = await waitForSession();
 
-              setConfig(res.data);
-              setStatus("connected");
-              toast.success(
-                "WhatsApp connected successfully via embedded signup!",
-              );
-            } catch (err: any) {
-              setStatus("error");
-              const error = err as {
-                response?: { data?: { message?: string } };
-              };
-              setError(
-                error.response?.data?.message || "Embedded setup failed",
-              );
-            } finally {
-              setSaving(false);
-            }
+          if (!session) {
+            setSaving(false);
+            setError("Failed to receive WhatsApp account details from Meta");
+            return;
           }
 
-          popup?.close();
-          window.removeEventListener("message", handleMessage);
-        }
-      };
+          try {
+            await api.post("/vendor/whatsapp/embedded-setup", {
+              code,
+              whatsappBusinessId: session.whatsappBusinessId,
+              whatsappPhoneNumberId: session.whatsappPhoneNumberId,
+            });
 
-      window.addEventListener("message", handleMessage);
-
-      // Clean up if popup is closed manually
-      const checkPopup = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkPopup);
-          window.removeEventListener("message", handleMessage);
-        }
-      }, 500);
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(
-        error.response?.data?.message || "Failed to initiate embedded signup",
-      );
-    }
+            const res = await api.get("/vendor/whatsapp");
+            setConfig(res.data);
+            setStatus("connected");
+            toast.success("WhatsApp connected successfully");
+          } catch (err: any) {
+            setStatus("error");
+            setError(err.response?.data?.message || "Embedded signup failed");
+          } finally {
+            setSaving(false);
+          }
+        })();
+      },
+      {
+        config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID!,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: { version: "v3" },
+      },
+    );
   }
 
   /* ================= GUARDS ================= */
