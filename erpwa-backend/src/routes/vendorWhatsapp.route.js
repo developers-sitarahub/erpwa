@@ -92,22 +92,35 @@ router.post(
       });
     }
 
-    const params = new URLSearchParams({
-      client_id: process.env.META_APP_ID,
-      client_secret: process.env.META_APP_SECRET,
-      redirect_uri: process.env.META_OAUTH_REDIRECT_URI,
-      code,
-    });
+    // 🔍 Debugging Logs
+    console.log("🔹 Exchanging code for token...");
+    console.log("🔹 App ID:", process.env.META_APP_ID);
+    console.log(
+      "🔹 App Secret (First 5 chars):",
+      process.env.META_APP_SECRET?.substring(0, 5) + "...",
+    );
 
     const tokenResp = await fetch(
-      `https://graph.facebook.com/v24.0/oauth/access_token?${params.toString()}`,
-      { method: "GET" },
+      "https://graph.facebook.com/v24.0/oauth/access_token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: process.env.META_APP_ID,
+          client_secret: process.env.META_APP_SECRET,
+          // redirect_uri: process.env.META_OAUTH_REDIRECT_URI, // ❌ Often causes mismatch for JS SDK flows
+          code,
+          grant_type: "authorization_code",
+        }),
+      },
     );
 
     const tokenData = await tokenResp.json();
 
     if (!tokenResp.ok || !tokenData.access_token) {
-      console.error("META TOKEN ERROR:", tokenData);
+      console.error("❌ META TOKEN ERROR:", JSON.stringify(tokenData, null, 2));
       return res.status(400).json({
         message: "Token exchange failed",
         metaError: tokenData,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/authContext";
 import { toast } from "react-toastify";
@@ -18,6 +18,15 @@ export default function WhatsAppSetupPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [setupMethod, setSetupMethod] = useState<SetupMethod>("embedded");
+  const [sdkReady, setSdkReady] = useState(false);
+
+  // We use a ref to track the session because the cleanup/finish event
+  // might fire *after* the FB.login callback closes over the state,
+  // so state updates wouldn't be visible inside the polling loop.
+  const sessionRef = useRef<{
+    whatsappBusinessId: string;
+    whatsappPhoneNumberId: string;
+  } | null>(null);
 
   const [config, setConfig] = useState<{
     whatsappBusinessId?: string;
@@ -116,10 +125,12 @@ export default function WhatsAppSetupPage() {
         console.log("📩 WA_EMBEDDED_SIGNUP:", payload);
 
         if (payload.event === "FINISH") {
-          setEmbeddedSession({
+          const newSession = {
             whatsappBusinessId: payload.data.waba_id,
             whatsappPhoneNumberId: payload.data.phone_number_id,
-          });
+          };
+          setEmbeddedSession(newSession);
+          sessionRef.current = newSession; // Update Ref for synchronous access
         }
 
         if (payload.event === "ERROR") {
@@ -210,6 +221,8 @@ export default function WhatsAppSetupPage() {
 
     setSaving(true);
     setError(null);
+    setEmbeddedSession(null);
+    sessionRef.current = null; // Clear ref before starting
 
     window.FB.login(
       (response: any) => {
@@ -223,9 +236,10 @@ export default function WhatsAppSetupPage() {
 
         // ⏳ wait for WA_EMBEDDED_SIGNUP
         const waitForSession = async () => {
-          for (let i = 0; i < 10; i++) {
-            if (embeddedSession) return embeddedSession;
-            await new Promise((r) => setTimeout(r, 300));
+          for (let i = 0; i < 20; i++) {
+            // Check ref instead of state to avoid closure staleness
+            if (sessionRef.current) return sessionRef.current;
+            await new Promise((r) => setTimeout(r, 500));
           }
           return null;
         };
