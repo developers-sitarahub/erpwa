@@ -9,6 +9,97 @@ import { encrypt } from "../utils/encryption.js";
 const router = express.Router();
 
 console.log("✅ vendorWhatsapp routes loaded");
+/**
+ * Helper → Generate PIN
+ */
+const generatePin = () =>
+  Math.floor(100000 + Math.random() * 900000).toString();
+
+/**
+ * Helper → Register Phone Number
+ */
+const registerPhoneNumber = async (phoneNumberId, token) => {
+  const pin = generatePin();
+
+  // ✅ Check current status BEFORE registering
+  const statusResp = await fetch(
+    `https://graph.facebook.com/v24.0/${phoneNumberId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  const statusData = await statusResp.json();
+
+  if (statusData?.code_verification_status === "VERIFIED") {
+    console.log("✅ Number already verified/registered");
+    return { success: true };
+  }
+
+  // 🔥 Only register if truly needed
+  const resp = await fetch(
+    `https://graph.facebook.com/v24.0/${phoneNumberId}/register`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        pin,
+        tier: "prod",
+      }),
+    },
+  );
+
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    // ✅ Already registered → treat as success
+    if (data?.error?.code === 131045) {
+      console.log("✅ Number already registered");
+      return { success: true };
+    }
+
+    return { success: false, error: data };
+  }
+
+  console.log("✅ Number registered");
+  return { success: true };
+};
+
+/**
+ * Helper → Subscribe App
+ */
+const subscribeApp = async (whatsappBusinessId, token) => {
+  const resp = await fetch(
+    `https://graph.facebook.com/v24.0/${whatsappBusinessId}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    if (data?.error?.message?.includes("already subscribed")) {
+      console.log("✅ App already subscribed");
+      return { success: true };
+    }
+
+    return { success: false, error: data };
+  }
+
+  console.log("✅ App subscribed");
+  return { success: true };
+};
 
 /**
  * ===============================
@@ -133,12 +224,73 @@ router.post(
       });
     }
 
+    const accessToken = tokenData.access_token;
+
+    /**
+     * ✅ STEP 1 → Register Phone Number
+     */
+    const registration = await registerPhoneNumber(
+      whatsappPhoneNumberId,
+      accessToken,
+    );
+
+    if (!registration.success) {
+      await prisma.vendor.update({
+        where: { id: req.user.vendorId },
+        data: {
+          whatsappStatus: "error",
+          whatsappLastError: JSON.stringify(registration.error),
+        },
+      });
+
+      return res.status(400).json({
+        message: "Phone number registration failed",
+        metaError: registration.error,
+      });
+    }
+
+    /**
+     * ✅ OPTIONAL → Phone Health Check (Add Here)
+     */
+    const phoneResp = await fetch(
+      `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    const phoneData = await phoneResp.json();
+
+    console.log("📱 Phone Health:", JSON.stringify(phoneData, null, 2));
+
+    /**
+     * ✅ STEP 2 → Subscribe App
+     */
+    const subscription = await subscribeApp(whatsappBusinessId, accessToken);
+
+    if (!subscription.success) {
+      await prisma.vendor.update({
+        where: { id: req.user.vendorId },
+        data: {
+          whatsappStatus: "error",
+          whatsappLastError: JSON.stringify(subscription.error),
+        },
+      });
+
+      return res.status(400).json({
+        message: "Webhook subscription failed",
+        metaError: subscription.error,
+      });
+    }
+
     await prisma.vendor.update({
       where: { id: req.user.vendorId },
       data: {
         whatsappBusinessId,
         whatsappPhoneNumberId,
-        whatsappAccessToken: encrypt(tokenData.access_token),
+        whatsappAccessToken: encrypt(accessToken),
         whatsappStatus: "connected",
         whatsappVerifiedAt: new Date(),
         whatsappLastError: null,
