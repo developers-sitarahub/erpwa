@@ -394,7 +394,7 @@ router.post(
         results.push({
           to,
           success: false,
-          error: err?.error?.message || err,
+          error: err?.error || err,
         });
         console.error(`Failed to send template to ${to}:`, err);
       }

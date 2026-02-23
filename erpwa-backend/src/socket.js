@@ -53,10 +53,12 @@ export function initSocket(httpServer) {
         },
       });
 
-      if (!user || !user.vendorId) {
-        console.error("❌ SOCKET: User not found or no vendor");
+      if (!user) {
+        console.error("❌ SOCKET: User not found");
         return next(new Error("Invalid user"));
       }
+
+      // If no vendorId (user is in onboarding step 1 -> step 2), that's fine for now, they just won't join a vendor room yet.
 
       // 🔐 Attach user to socket
       socket.user = user;
@@ -78,8 +80,10 @@ export function initSocket(httpServer) {
 
     console.log("🔌 SOCKET CONNECTED:", userId);
 
-    // 🔒 Auto-join vendor room
-    socket.join(`vendor:${vendorId}`);
+    // 🔒 Auto-join vendor room if vendorId exists
+    if (vendorId) {
+      socket.join(`vendor:${vendorId}`);
+    }
 
     /**
      * Join conversation room
@@ -147,11 +151,13 @@ export function initSocket(httpServer) {
       })
       .catch((e) => console.error("Error setting online status:", e));
 
-    // 📢 Broadcast to vendor room AND self
-    io.to(`vendor:${vendorId}`).emit("user:presence", {
-      userId,
-      isOnline: true,
-    });
+    // 📢 Broadcast to vendor room AND self (only if vendorId exists)
+    if (vendorId) {
+      io.to(`vendor:${vendorId}`).emit("user:presence", {
+        userId,
+        isOnline: true,
+      });
+    }
     // Ensure the connecting user gets their own status update immediately
     socket.emit("user:presence", {
       userId,
@@ -170,10 +176,12 @@ export function initSocket(httpServer) {
         .catch((e) => console.error("Error setting offline status:", e));
 
       // 📢 Broadcast to vendor room
-      io.to(`vendor:${vendorId}`).emit("user:presence", {
-        userId,
-        isOnline: false,
-      });
+      if (vendorId) {
+        io.to(`vendor:${vendorId}`).emit("user:presence", {
+          userId,
+          isOnline: false,
+        });
+      }
     });
   });
 

@@ -1,4 +1,5 @@
 import prisma from "../prisma.js";
+import { logActivity } from "./activityLog.service.js";
 
 /**
  * Lead Management Service
@@ -398,6 +399,24 @@ class LeadManagementService {
         },
       },
     });
+
+    // 🔥 Log Activity if status changed
+    if (data.status && data.status !== lead.status) {
+      await logActivity({
+        vendorId,
+        type: "Lead",
+        event: "Status Updated",
+        status: data.status,
+        phoneNumber: lead.phoneNumber,
+        payload: {
+          leadId: id,
+          oldStatus: lead.status,
+          newStatus: data.status,
+          updatedBy: user.name,
+          companyName: lead.companyName
+        }
+      });
+    }
 
     // Sync updated lead to contact
     if (updated.phoneNumber) {

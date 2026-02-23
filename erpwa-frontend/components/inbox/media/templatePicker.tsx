@@ -65,7 +65,7 @@ export default function TemplatePicker({
         await handleSendTemplate();
     };
     return (
-        <div className="flex flex-col h-[500px]">
+        <div className="flex flex-col h-125">
             {!selectedTemplate ? (
                 <>
                     {/* Search */}
@@ -189,11 +189,11 @@ export default function TemplatePicker({
                                 Live Preview
                             </p>
 
-                            <div className="rounded-xl border border-border overflow-hidden bg-[var(--wa-chat-bg)] relative group transition-colors duration-300">
-                                <div className="absolute inset-0 opacity-[0.4] [.dark_&]:opacity-[0.05] bg-[url('https://camo.githubusercontent.com/857a221f7c706d8847f9723ec083b063878b2772591f463378b879a838be8194/68747470733a2f2f757365722d696d616765732e67697468756275736572636f6e74656e742e636f6d2f31353037353735392f32383731393134342d38366463306637302d373362312d346334382d393630332d3935303237396532373635382e706e67')] bg-repeat bg-[length:400px]"></div>
+                            <div className="rounded-xl border border-border overflow-hidden bg-wa-chat-bg relative group transition-colors duration-300">
+                                <div className="absolute inset-0 opacity-[0.4] in-[.dark]:opacity-[0.05] bg-[url('https://camo.githubusercontent.com/857a221f7c706d8847f9723ec083b063878b2772591f463378b879a838be8194/68747470733a2f2f757365722d696d616765732e67697468756275736572636f6e74656e742e636f6d2f31353037353735392f32383731393134342d38366463306637302d373362312d346334382d393630332d3935303237396532373635382e706e67')] bg-repeat bg-size-[400px]"></div>
 
-                                <div className="relative z-10 p-4 min-h-[300px] flex flex-col items-start justify-center">
-                                    <div className="w-full bg-white [.dark_&]:bg-[#202c33] rounded-2xl rounded-tl-none shadow-sm relative overflow-hidden border border-black/5 [.dark_&]:border-white/5 transition-colors duration-300">
+                                <div className="relative z-10 p-4 min-h-75 flex flex-col items-start justify-center">
+                                    <div className="w-full bg-white in-[.dark]:bg-[#202c33] rounded-2xl rounded-tl-none shadow-sm relative overflow-hidden border border-black/5 in-[.dark]:border-white/5 transition-colors duration-300">
                                         <div className="p-1">
                                             {/* Header Media */}
                                             {(() => {
@@ -202,7 +202,7 @@ export default function TemplatePicker({
                                                 );
                                                 if (mediaItem?.s3Url) {
                                                     return (
-                                                        <div className="rounded-xl overflow-hidden bg-black/5 [.dark_&]:bg-black/40 min-h-[140px] relative group flex items-center justify-center">
+                                                        <div className="rounded-xl overflow-hidden bg-black/5 in-[.dark]:bg-black/40 min-h-35 relative group flex items-center justify-center">
                                                             {selectedTemplate.languages[0].headerType === "VIDEO" ? (
                                                                 <video
                                                                     src={mediaItem.s3Url}
@@ -225,8 +225,8 @@ export default function TemplatePicker({
                                                     )
                                                 ) {
                                                     return (
-                                                        <div className="min-h-[140px] bg-slate-100 [.dark_&]:bg-[#2a3942] flex flex-col items-center justify-center rounded-xl text-slate-500 [.dark_&]:text-slate-400 text-[10px] font-bold uppercase tracking-wider border border-black/5 [.dark_&]:border-white/5">
-                                                            <ImageIcon className="w-6 h-6 mb-2 opacity-30 text-slate-500 [.dark_&]:text-white" />
+                                                        <div className="min-h-35 bg-slate-100 in-[.dark]:bg-[#2a3942] flex flex-col items-center justify-center rounded-xl text-slate-500 in-[.dark]:text-slate-400 text-[10px] font-bold uppercase tracking-wider border border-black/5 in-[.dark]:border-white/5">
+                                                            <ImageIcon className="w-6 h-6 mb-2 opacity-30 text-slate-500 in-[.dark]:text-white" />
                                                             {selectedTemplate.languages[0].headerType} MEDIA
                                                         </div>
                                                     );
@@ -237,13 +237,13 @@ export default function TemplatePicker({
                                             {/* Header Text */}
                                             {selectedTemplate.languages[0]?.headerType === "TEXT" &&
                                                 selectedTemplate.languages[0]?.headerText && (
-                                                    <p className="font-bold text-[14px] pt-2 px-3 text-[#111b21] [.dark_&]:text-[#e9edef] leading-tight">
+                                                    <p className="font-bold text-[14px] pt-2 px-3 text-[#111b21] in-[.dark]:text-[#e9edef] leading-tight">
                                                         {selectedTemplate.languages[0].headerText}
                                                     </p>
                                                 )}
                                         </div>
 
-                                        <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-[#111b21] [.dark_&]:text-[#e9edef] whitespace-pre-wrap font-sans">
+                                        <div className="px-3 pt-1 pb-3 text-[13px] leading-snug text-[#111b21] in-[.dark]:text-[#e9edef] whitespace-pre-wrap font-sans">
                                             {(() => {
                                                 let body = selectedTemplate.languages[0]?.body || "";
                                                 templateVariables.forEach((val, idx) => {
@@ -256,7 +256,7 @@ export default function TemplatePicker({
                                             })()}
 
                                             {selectedTemplate.languages[0]?.footerText && (
-                                                <p className="mt-1.5 text-[11px] text-[#667781] [.dark_&]:text-[#8696a0] font-medium border-t border-black/5 [.dark_&]:border-white/5 pt-1.5">
+                                                <p className="mt-1.5 text-[11px] text-[#667781] in-[.dark]:text-[#8696a0] font-medium border-t border-black/5 in-[.dark]:border-white/5 pt-1.5">
                                                     {selectedTemplate.languages[0].footerText}
                                                 </p>
                                             )}
@@ -268,7 +268,7 @@ export default function TemplatePicker({
                                                 {selectedTemplate.buttons.map((btn, idx) => (
                                                     <button
                                                         key={idx}
-                                                        className="p-2.5 text-center text-[13px] font-medium text-[#00a884] flex items-center justify-center gap-2 hover:bg-black/5 [.dark_&]:hover:bg-white/5 transition-colors cursor-pointer"
+                                                        className="p-2.5 text-center text-[13px] font-medium text-[#00a884] flex items-center justify-center gap-2 hover:bg-black/5 in-[.dark]:hover:bg-white/5 transition-colors cursor-pointer"
                                                     >
                                                         {btn.type === "URL" ? (
                                                             <Globe className="w-3.5 h-3.5" />
@@ -291,7 +291,7 @@ export default function TemplatePicker({
                         {(selectedTemplate.templateType === "carousel" || (selectedTemplate.carouselCards && selectedTemplate.carouselCards.length > 0)) && (
                             <div className="flex overflow-x-auto gap-2 py-2 mt-1 snap-x scrollbar-thin scrollbar-thumb-gray-600/50">
                                 {(selectedTemplate.carouselCards || []).map((card, idx) => (
-                                    <div key={idx} className="flex-shrink-0 w-[200px] bg-wa-inbound rounded-2xl overflow-hidden shadow-sm border border-border/50 snap-center flex flex-col">
+                                    <div key={idx} className="shrink-0 w-50 bg-wa-inbound rounded-2xl overflow-hidden shadow-sm border border-border/50 snap-center flex flex-col">
                                         {/* Content Area */}
                                         <div className="p-3">
                                             {card.s3Url && (
@@ -354,7 +354,7 @@ export default function TemplatePicker({
                         <button
                             onClick={handleSendClick}
                             disabled={isSendingTemplate}
-                            className="flex-[2] py-3 rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                            className="flex-2 py-3 rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
                         >
                             {isSendingTemplate ? (
                                 <>

@@ -40,6 +40,7 @@ router.get(
             id: true,
             phoneNumber: true,
             companyName: true,
+            status: true,
           },
         },
         messages: {
@@ -111,6 +112,7 @@ router.get(
             phoneNumber: true,
             companyName: true,
             salesPersonId: true, // ✅ Ensure we select this for checking
+            status: true,
           },
         },
         messages: {

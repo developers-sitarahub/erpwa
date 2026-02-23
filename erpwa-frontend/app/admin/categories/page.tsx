@@ -785,7 +785,7 @@ export default function CategoriesPage() {
                 {/* Sort and Clear Filters */}
                 <div className="flex flex-wrap gap-2 items-center">
                   {/* Sort */}
-                  <div className="w-[200px]">
+                  <div className="w-50">
                     <Select
                       value={`${sortBy}:${sortOrder}`}
                       onChange={(e) => {
@@ -897,35 +897,35 @@ export default function CategoriesPage() {
                               <tr key={contact.id || `${contact.mobile_number}-${contact.company_name}`} className="border-b border-border hover:bg-muted/30">
                                 <td className="py-3 px-4">
                                   <CoolTooltip content={contact.company_name}>
-                                    <div className="truncate max-w-[150px] text-foreground">
+                                    <div className="truncate max-w-37.5 text-foreground">
                                       {contact.company_name || "--"}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4">
                                   <CoolTooltip content={contact.mobile_number}>
-                                    <div className="truncate max-w-[150px] text-muted-foreground">
+                                    <div className="truncate max-w-37.5 text-muted-foreground">
                                       {contact.mobile_number || "--"}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4 hidden md:table-cell">
                                   <CoolTooltip content={contact.category_name}>
-                                    <div className="truncate max-w-[150px] text-foreground">
+                                    <div className="truncate max-w-37.5 text-foreground">
                                       {contact.category_name || "--"}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4 hidden md:table-cell">
                                   <CoolTooltip content={contact.sub_category_name}>
-                                    <div className="truncate max-w-[150px] text-foreground">
+                                    <div className="truncate max-w-37.5 text-foreground">
                                       {contact.sub_category_name || "--"}
                                     </div>
                                   </CoolTooltip>
                                 </td>
                                 <td className="py-3 px-4 hidden md:table-cell">
                                   <CoolTooltip content={contact.sales_person_name}>
-                                    <div className="truncate max-w-[150px] text-foreground">
+                                    <div className="truncate max-w-37.5 text-foreground">
                                       {contact.sales_person_name || "--"}
                                     </div>
                                   </CoolTooltip>

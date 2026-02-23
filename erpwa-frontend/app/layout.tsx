@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+
 import { ThemeProvider } from "@/context/theme-provider";
 import { AuthProvider } from "@/context/authContext";
 import { ToastContainer } from "react-toastify";
@@ -9,12 +9,19 @@ import "react-toastify/dist/ReactToastify.css";
 
 import "./globals.css";
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: "GPS erp",
-  description: "Professional sales and support management dashboard",
+  title: "GPSERP - WhatsApp Automation & ERP",
+  description:
+    "Enterprise Resource Planning & WhatsApp Automation. Unlock native flows, dual workflow engines, and interactive catalogs.",
+  keywords:
+    "GPSERP, WhatsApp Automation, ERP, CRM, WhatsApp Business API, Lead Management",
+  openGraph: {
+    title: "GPSERP - WhatsApp Automation & ERP",
+    description:
+      "The complete toolkit for modern businesses to scale their messaging on WhatsApp.",
+    siteName: "GPSERP",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

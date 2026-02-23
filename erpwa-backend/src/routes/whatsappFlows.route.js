@@ -10,7 +10,7 @@ const router = express.Router();
  */
 
 // Data Exchange Endpoint (Real) - Must be public for Meta
-router.post('/endpoint', flowsController.handleFlowEndpoint);
+router.all('/endpoint', flowsController.handleFlowEndpoint);
 
 // Apply authentication to all routes below
 router.use(authenticate);

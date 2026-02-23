@@ -13,6 +13,7 @@ export type User = {
   email: string;
   role: "vendor_owner" | "vendor_admin" | "sales" | "owner";
   vendorId: string | null;
+  onboardingStatus?: string;
 };
 
 type AuthContextType = {
@@ -20,6 +21,7 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (data: Partial<User>) => void;
 };
 
 /* ================= CONTEXT ================= */
@@ -83,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "/create-password",
         "/privacy-policy",
         "/terms-n-condition",
+        "/",
       ];
       if (!publicPaths.includes(pathname)) {
         router.replace("/login");
@@ -109,7 +112,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 🔐 CONNECT SOCKET AFTER LOGIN
     connectSocket();
 
-    // ✅ ROLE-BASED REDIRECT
+    // ✅ REDIRECT LOGIC
+    if (
+      loggedInUser.onboardingStatus &&
+      loggedInUser.onboardingStatus !== "activated" &&
+      loggedInUser.role === "vendor_owner"
+    ) {
+      router.replace("/register");
+      return;
+    }
+
     if (
       loggedInUser.role === "vendor_owner" ||
       loggedInUser.role === "vendor_admin"
@@ -133,8 +145,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  /* ================= UPDATE USER ================= */
+  function updateUser(data: Partial<User>) {
+    setUser((prev) => (prev ? { ...prev, ...data } : null));
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

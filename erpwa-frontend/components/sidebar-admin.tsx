@@ -33,7 +33,7 @@ const menuItems = [
   { href: "/admin/inbox", icon: MessageSquare, label: "Inbox" },
   { href: "/admin/chatbot", icon: BotMessageSquare, label: "Chatbot" },
   { href: "/admin/templates", icon: FileText, label: "Templates" },
-  { href: "/admin/flows", icon: Layers, label: "Flows" },
+  { href: "/admin/flows", icon: Layers, label: "Forms" },
   { href: "/admin/campaigns", icon: Megaphone, label: "Campaigns" },
   { href: "/admin/leads", icon: Database, label: "Leads" },
   { href: "/admin/categories", icon: Folder, label: "Categories" },
@@ -122,7 +122,7 @@ export function SidebarAdmin() {
           )}
         >
           <div className="flex items-center justify-center px-2 h-16 border-b border-sidebar-border">
-            <Logo className="h-12 w-full max-w-[220px]" />
+            <Logo className="h-12 w-full max-w-55" />
           </div>
 
           <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
@@ -163,7 +163,7 @@ export function SidebarAdmin() {
             isSidebar={true}
             className={cn(
               "transition-all duration-300",
-              isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-[220px]",
+              isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-55",
             )}
           />
         </div>

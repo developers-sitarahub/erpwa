@@ -22,7 +22,7 @@ const StartNode = ({ id, data, selected }: NodeProps) => {
   };
 
   return (
-    <div className="relative min-w-[200px]">
+    <div className="relative min-w-50">
       <div
         className={`shadow-xl rounded-xl overflow-hidden bg-white dark:bg-slate-800 border-2 transition-all duration-300 ${
           selected

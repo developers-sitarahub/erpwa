@@ -10,6 +10,7 @@ import {
   Megaphone,
   Folder,
   Image as ImageIcon,
+  Layers,
   Settings,
   LogOut,
   ChevronRight,
@@ -26,6 +27,7 @@ const menuItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/inbox", icon: MessageSquare, label: "Inbox" },
   { href: "/templates", icon: FileText, label: "Templates" },
+  { href: "/flows", icon: Layers, label: "Forms" },
   { href: "/campaigns", icon: Megaphone, label: "Campaigns" },
   { href: "/categories", icon: Folder, label: "Categories" },
   { href: "/gallery", icon: ImageIcon, label: "Gallery" },
@@ -110,7 +112,7 @@ export function Sidebar() {
           )}
         >
           <div className="flex items-center justify-center px-2 h-16 border-b border-sidebar-border">
-            <Logo className="h-12 w-full max-w-[220px]" />
+            <Logo className="h-12 w-full max-w-55" />
           </div>
 
           <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
@@ -141,7 +143,7 @@ export function Sidebar() {
     >
       <div className="flex items-center justify-between px-2 h-16 border-b border-sidebar-border">
         <div className={cn("flex items-center transition-all duration-300", isCollapsed ? "justify-center w-full" : "justify-start pl-4 flex-1")}>
-          <Logo collapsed={isCollapsed} isSidebar={true} className={cn("transition-all duration-300", isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-[220px]")} />
+          <Logo collapsed={isCollapsed} isSidebar={true} className={cn("transition-all duration-300", isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-55")} />
         </div>
 
         {!isCollapsed && (

@@ -59,7 +59,7 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 min-w-[250px]">
+    <div className="flex items-center gap-2 px-3 py-2 min-w-62.5">
       {/* Play/Pause Button */}
       <button
         onClick={togglePlay}
@@ -266,7 +266,7 @@ export default function MessageBubble({
         className={`flex flex-col gap-1
         ${(isImage || isVideo) ? 'w-fit' :
             (msg.template?.header?.type === 'IMAGE' || msg.template?.header?.type === 'VIDEO')
-              ? 'w-fit max-w-[280px]'
+              ? 'w-fit max-w-70'
               : 'max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]'}
         ${msg.outboundPayload?.interactive || msg.template?.buttons
             ? "min-w-[200px]"
@@ -310,7 +310,7 @@ export default function MessageBubble({
                   <video
                     src={msg.template.header.mediaUrl}
                     controls
-                    className="w-full h-[180px] object-cover"
+                    className="w-full h-45 object-cover"
                   />
                 )}
               {msg.template.header.type === "DOCUMENT" &&
@@ -352,7 +352,7 @@ export default function MessageBubble({
           <div className={`flex flex-col ${!isImage && !isVideo ? 'p-1 gap-1' : ''}`}>
             {/* IMAGE MESSAGE - WhatsApp Style */}
             {isImage && effectiveMediaUrl && (
-              <div className="w-fit max-w-[300px]">
+              <div className="w-fit max-w-75">
                 {/* Image container with padding to create border effect */}
                 <div className="p-1">
                   <img
@@ -389,7 +389,7 @@ export default function MessageBubble({
 
             {/* VIDEO MESSAGE - WhatsApp Style */}
             {isVideo && effectiveMediaUrl && (
-              <div className="w-fit max-w-[300px]">
+              <div className="w-fit max-w-75">
                 {/* Video container with padding to create border effect */}
                 <div className="p-1">
                   <video
@@ -651,29 +651,6 @@ export default function MessageBubble({
                     </button>
                   )}
 
-                  {/* Right Navigation Button */}
-                  {showNavButtons && (
-                    <button
-                      className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 shadow-lg flex items-center justify-center transition-all active:scale-95 opacity-0 group-hover/carousel:opacity-100"
-                      onClick={() => scrollCarousel('right')}
-                      title="Scroll right"
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-white"
-                      >
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                      </svg>
-                    </button>
-                  )}
-
                   <div
                     className="flex overflow-x-auto gap-2 pb-2 snap-x snap-mandatory scrollbar-none scroll-smooth px-1"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -682,7 +659,7 @@ export default function MessageBubble({
                     {cards.map((card, idx) => (
                       <div
                         key={idx}
-                        className="shrink-0 w-[205px] snap-start flex flex-col gap-1"
+                        className="shrink-0 w-52 snap-start flex flex-col gap-1"
                       >
                         {/* Card Bubble - Image + Text */}
                         <div className="bg-wa-outbound rounded-lg overflow-hidden">
@@ -704,6 +681,15 @@ export default function MessageBubble({
                                   />
                                 )}
                               </div>
+                            </div>
+                          )}
+
+                          {/* Card Text (Body) */}
+                          {card.title && (
+                            <div className="px-2 py-1">
+                              <p className="text-[12px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[16px] line-clamp-2">
+                                {card.title}
+                              </p>
                             </div>
                           )}
 

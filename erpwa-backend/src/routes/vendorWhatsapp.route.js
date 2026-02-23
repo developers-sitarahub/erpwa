@@ -137,7 +137,7 @@ router.post(
       const err = await metaResp.json();
       return res.status(400).json({
         message: "Invalid WhatsApp credentials",
-        metaError: err?.error?.message,
+        metaError: err?.error || err,
       });
     }
 

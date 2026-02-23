@@ -126,7 +126,7 @@ const ButtonNode = ({ id, data, selected }: NodeProps) => {
   return (
     <>
       <div
-        className={`relative shadow-xl rounded-xl bg-white dark:bg-slate-800 transition-all duration-200 min-w-[280px]`}
+        className={`relative shadow-xl rounded-xl bg-white dark:bg-slate-800 transition-all duration-200 min-w-70`}
       >
         <div
           className={`absolute inset-0 rounded-xl border-2 transition-all duration-300 pointer-events-none z-10 ${

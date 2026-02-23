@@ -44,6 +44,15 @@ export const decryptRequest = (encryptedAesKey, initialVector, encryptedFlowData
         };
     } catch (error) {
         console.error('Flow Decryption Failed:', error);
+
+        // Provide more helpful error message for key mismatch
+        if (error.code === 'ERR_OSSL_RSA_OAEP_DECODING_ERROR') {
+            console.error('🔑 KEY MISMATCH: The private key does not match the public key Meta is using.');
+            console.error('   → FIX: Go to Flows page and click "Setup Security" to regenerate and upload new keys.');
+            console.error('   → Then wait 2-5 minutes for Meta to propagate the change.');
+            throw new Error('Encryption key mismatch. Please run "Setup Security" again from the Flows page.');
+        }
+
         throw new Error('Failed to decrypt request');
     }
 };

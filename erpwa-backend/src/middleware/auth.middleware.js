@@ -11,7 +11,7 @@ export async function authenticate(req, res, next) {
   try {
     const payload = jwt.verify(
       authHeader.split(" ")[1],
-      process.env.ACCESS_TOKEN_SECRET
+      process.env.ACCESS_TOKEN_SECRET,
     );
 
     // 🔑 Fetch user to get vendorId

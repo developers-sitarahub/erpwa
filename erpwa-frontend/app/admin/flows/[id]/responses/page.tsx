@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     ArrowLeft,
     Download,
     Eye,
     FileText,
-    Search,
-    Calendar,
     Filter,
     X,
     ChevronLeft,
@@ -43,13 +41,13 @@ export default function FlowResponsesPage() {
             fetchFlowDetails();
             fetchResponses(1);
         }
-    }, [flowId]);
+    }, [flowId, fetchFlowDetails, fetchResponses]);
 
     useEffect(() => {
         fetchResponses(1);
-    }, [statusFilter]);
+    }, [statusFilter, fetchResponses]);
 
-    const fetchFlowDetails = async () => {
+    const fetchFlowDetails = useCallback(async () => {
         try {
             const response = await api.get(`/whatsapp/flows/${flowId}`);
             if (response.data.success) {
@@ -59,9 +57,9 @@ export default function FlowResponsesPage() {
             console.error("Error fetching flow details:", error);
             toast.error("Failed to load flow details");
         }
-    };
+    }, [flowId]);
 
-    const fetchResponses = async (page: number) => {
+    const fetchResponses = useCallback(async (page: number) => {
         try {
             setLoading(true);
             const queryParams = new URLSearchParams({
@@ -87,7 +85,7 @@ export default function FlowResponsesPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [flowId, pagination.limit, statusFilter]);
 
     const exportResponses = async () => {
         try {
@@ -108,7 +106,7 @@ export default function FlowResponsesPage() {
             a.click();
 
             toast.success("Responses exported!");
-        } catch (error) {
+        } catch {
             toast.error("Failed to export responses");
         }
     };
@@ -258,70 +256,126 @@ export default function FlowResponsesPage() {
                             <p className="text-muted-foreground mt-1">When users complete this flow, their data will appear here.</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
-                                    <tr>
-                                        <th className="px-6 py-4">Date & Time</th>
-                                        <th className="px-6 py-4">Lead / Contact</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Preview</th>
-                                        <th className="px-6 py-4 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {responses.map((item) => (
-                                        <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-6 py-4 text-foreground whitespace-nowrap">
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">{new Date(item.createdAt).toLocaleDateString()}</span>
-                                                    <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString()}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium text-foreground">
-                                                        {item.conversation?.lead?.phoneNumber || "Unknown Number"}
-                                                    </span>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {item.conversation?.lead?.email || item.conversation?.lead?.companyName || "No extra info"}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                            ${item.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}
-                         `}>
-                                                    {item.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 max-w-xs truncate text-muted-foreground">
-                                                {JSON.stringify(item.responseData)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => setSelectedResponse(item)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-md text-xs font-medium transition-colors"
-                                                >
-                                                    <Eye className="w-3.5 h-3.5" />
-                                                    Details
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteResponse(item.id);
-                                                    }}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-md text-xs font-medium transition-colors ml-2"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                    Delete
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <>
+                            {/* Dynamic Table with all form fields as columns */}
+                            {(() => {
+                                // Extract all unique field names from all responses
+                                const allFields = new Set<string>();
+                                responses.forEach(item => {
+                                    const data = item.responseData || {};
+                                    Object.keys(data).forEach(key => {
+                                        if (key !== 'flow_token') {
+                                            allFields.add(key);
+                                        }
+                                    });
+                                });
+                                const fieldColumns = Array.from(allFields).sort();
+
+                                return (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border sticky top-0">
+                                                <tr>
+                                                    <th className="px-4 py-3 whitespace-nowrap bg-muted/50">Date</th>
+                                                    <th className="px-4 py-3 whitespace-nowrap bg-muted/50">Phone</th>
+                                                    <th className="px-4 py-3 whitespace-nowrap bg-muted/50">Status</th>
+                                                    {/* Dynamic Field Columns */}
+                                                    {fieldColumns.map(field => (
+                                                        <th
+                                                            key={field}
+                                                            className="px-4 py-3 whitespace-nowrap bg-primary/5 text-primary capitalize"
+                                                            title={`Form field: ${field}`}
+                                                        >
+                                                            {field.replace(/_/g, ' ')}
+                                                        </th>
+                                                    ))}
+                                                    <th className="px-4 py-3 text-right whitespace-nowrap bg-muted/50 sticky right-0">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {responses.map((item) => {
+                                                    const responseData = item.responseData || {};
+                                                    return (
+                                                        <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                                                            {/* Date Column */}
+                                                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-medium text-xs">{new Date(item.createdAt).toLocaleDateString()}</span>
+                                                                    <span className="text-[10px] text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString()}</span>
+                                                                </div>
+                                                            </td>
+                                                            {/* Phone Column */}
+                                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                                <span className="font-medium text-foreground text-xs">
+                                                                    {item.conversation?.lead?.phoneNumber || "—"}
+                                                                </span>
+                                                            </td>
+                                                            {/* Status Column */}
+                                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize
+                                                                    ${item.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}
+                                                                `}>
+                                                                    {item.status}
+                                                                </span>
+                                                            </td>
+                                                            {/* Dynamic Field Value Columns */}
+                                                            {fieldColumns.map(field => {
+                                                                const value = responseData[field];
+                                                                const displayValue = value === undefined || value === null || value === ''
+                                                                    ? '—'
+                                                                    : typeof value === 'object'
+                                                                        ? JSON.stringify(value)
+                                                                        : String(value);
+
+                                                                return (
+                                                                    <td
+                                                                        key={field}
+                                                                        className="px-4 py-3 max-w-50 truncate text-foreground text-xs"
+                                                                        title={displayValue}
+                                                                    >
+                                                                        {displayValue}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                            {/* Actions Column */}
+                                                            <td className="px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-card">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <button
+                                                                        onClick={() => setSelectedResponse(item)}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded text-[10px] font-medium transition-colors"
+                                                                        title="View full details"
+                                                                    >
+                                                                        <Eye className="w-3 h-3" />
+                                                                        View
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeleteResponse(item.id);
+                                                                        }}
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded text-[10px] font-medium transition-colors"
+                                                                        title="Delete response"
+                                                                    >
+                                                                        <Trash2 className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+
+                                        {/* Field Count Info */}
+                                        {fieldColumns.length > 0 && (
+                                            <div className="px-4 py-2 bg-muted/20 border-t border-border text-xs text-muted-foreground">
+                                                📊 Showing <strong>{fieldColumns.length}</strong> form field{fieldColumns.length !== 1 ? 's' : ''}: {fieldColumns.map(f => f.replace(/_/g, ' ')).join(', ')}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </>
                     )}
 
                     {/* Pagination */}

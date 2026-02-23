@@ -69,7 +69,7 @@ const MessageNode = ({ id, data, selected }: NodeProps) => {
 
   return (
     <>
-      <div className="relative min-w-[220px]">
+      <div className="relative min-w-55">
         <div
           className={`shadow-xl rounded-xl overflow-hidden bg-white dark:bg-slate-800 border-2 transition-all duration-300 ${
             selected
@@ -120,7 +120,7 @@ const MessageNode = ({ id, data, selected }: NodeProps) => {
                   autoFocus
                 />
                 <textarea
-                  className="w-full text-xs border-none bg-gray-50 dark:bg-slate-900 dark:text-gray-200 p-2 rounded-md focus:ring-1 focus:ring-primary outline-none min-h-[60px] resize-none"
+                  className="w-full text-xs border-none bg-gray-50 dark:bg-slate-900 dark:text-gray-200 p-2 rounded-md focus:ring-1 focus:ring-primary outline-none min-h-15 resize-none"
                   value={localData.content}
                   onChange={(e) =>
                     setLocalData({ ...localData, content: e.target.value })
@@ -136,7 +136,7 @@ const MessageNode = ({ id, data, selected }: NodeProps) => {
               </div>
             ) : (
               <div
-                className="cursor-text group min-h-[40px]"
+                className="cursor-text group min-h-10"
                 onDoubleClick={() => setIsEditing(true)}
               >
                 <div className="text-[11px] font-bold text-gray-800 dark:text-gray-200 mb-1 group-hover:text-primary transition-colors">

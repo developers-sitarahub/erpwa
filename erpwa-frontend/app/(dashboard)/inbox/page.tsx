@@ -51,6 +51,8 @@ interface ApiConversation {
     direction: "inbound" | "outbound";
     status?: "sent" | "delivered" | "read" | "failed" | "received";
     createdAt: string;
+    messageType?: string;
+    outboundPayload?: Record<string, unknown>;
   }[];
   lastMessageAt: string;
   unreadCount?: number; // ✅ Backend should provide this
@@ -73,6 +75,7 @@ interface ApiMessage {
     caption?: string;
   }>;
   outboundPayload?: Record<string, unknown>;
+  messageType?: string;
 }
 /* =======================
    CONVERSATION LIST (UI UNCHANGED)
@@ -862,7 +865,17 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
       if (lastMsg.content?.startsWith("[audio")) return "🎵 Audio";
       if (lastMsg.content?.startsWith("[document")) return "📄 Document";
 
-      return lastMsg.content;
+      // ✅ Add template detection (check messageType or if outboundPayload has template)
+      if (
+        lastMsg.messageType === "template" ||
+        (lastMsg.outboundPayload &&
+          typeof lastMsg.outboundPayload === "object" &&
+          "template" in lastMsg.outboundPayload)
+      ) {
+        return "📝 Template";
+      }
+
+      return lastMsg.content || "";
     })(),
     lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
       hour: "2-digit",
@@ -971,7 +984,7 @@ export default function InboxPage() {
 
             // ✅ Map outboundPayload for interactive messages
             outboundPayload: m.outboundPayload,
-            messageType: (m as any).messageType,
+            messageType: m.messageType,
           };
         },
       );
@@ -993,6 +1006,7 @@ export default function InboxPage() {
                 sessionStarted: res.data.sessionStarted,
                 sessionActive: res.data.sessionActive,
                 sessionExpiresAt: res.data.sessionExpiresAt,
+                status: res.data.lead?.status || c.status || "new",
               }
             : c,
         ),
@@ -1068,7 +1082,7 @@ export default function InboxPage() {
       <div
         className={`${
           showChat ? "hidden md:block" : "block"
-        } w-full md:w-auto h-full flex-shrink-0`}
+        } w-full md:w-auto h-full shrink-0`}
       >
         <ConversationList
           conversations={conversations}

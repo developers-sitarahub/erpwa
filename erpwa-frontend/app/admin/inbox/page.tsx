@@ -71,6 +71,8 @@ interface ApiConversation {
     direction: "inbound" | "outbound";
     status?: "sent" | "delivered" | "read" | "failed" | "received";
     createdAt: string;
+    messageType?: string;
+    outboundPayload?: Record<string, unknown>;
   }[];
   lastMessageAt: string;
   unreadCount?: number; // ✅ Backend should provide this
@@ -93,6 +95,7 @@ interface ApiMessage {
     caption?: string;
   }>;
   outboundPayload?: Record<string, unknown>;
+  messageType?: string;
 }
 /* =======================
    CONVERSATION LIST (UI UNCHANGED)
@@ -882,7 +885,17 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
       if (lastMsg.content?.startsWith("[audio")) return "🎵 Audio";
       if (lastMsg.content?.startsWith("[document")) return "📄 Document";
 
-      return lastMsg.content;
+      // ✅ Add template detection (check messageType or if outboundPayload has template)
+      if (
+        lastMsg.messageType === "template" ||
+        (lastMsg.outboundPayload &&
+          typeof lastMsg.outboundPayload === "object" &&
+          "template" in lastMsg.outboundPayload)
+      ) {
+        return "📝 Template";
+      }
+
+      return lastMsg.content || "";
     })(),
     lastActivity: new Date(c.lastMessageAt).toLocaleTimeString([], {
       hour: "2-digit",
@@ -935,13 +948,6 @@ export default function InboxPage() {
     }
   };
 
-  useEffect(() => {
-    loadInbox();
-    if (chatId) {
-      handleSelectConversation(chatId);
-    }
-  }, []);
-
   useInboxSocket({
     selectedConversation,
     readSentRef,
@@ -991,14 +997,14 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                  footer: m.outboundPayload.footer,
-                  buttons: m.outboundPayload.buttons,
-                }
+                    footer: m.outboundPayload.footer,
+                    buttons: m.outboundPayload.buttons,
+                  }
                 : undefined),
 
             // ✅ Map outboundPayload for interactive messages
             outboundPayload: m.outboundPayload,
-            messageType: (m as any).messageType,
+            messageType: m.messageType,
           };
         },
       );
@@ -1016,11 +1022,11 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-              ...c,
-              sessionStarted: res.data.sessionStarted,
-              sessionActive: res.data.sessionActive,
-              sessionExpiresAt: res.data.sessionExpiresAt,
-            }
+                ...c,
+                sessionStarted: res.data.sessionStarted,
+                sessionActive: res.data.sessionActive,
+                sessionExpiresAt: res.data.sessionExpiresAt,
+              }
             : c,
         ),
       );
@@ -1029,6 +1035,15 @@ export default function InboxPage() {
       setMessages([]);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadInbox();
+    if (chatId) {
+      handleSelectConversation(chatId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
 
   // ✅ Update conversation's last message status in real-time
   const handleUpdateConversationStatus = (
@@ -1069,7 +1084,9 @@ export default function InboxPage() {
       // Update local state
       setConversations((prev) =>
         prev.map((c) =>
-          c.leadId === leadId ? { ...c, status: status as any } : c,
+          c.leadId === leadId
+            ? { ...c, status: status as Conversation["status"] }
+            : c,
         ),
       );
       toast.success("Lead status updated");
@@ -1086,8 +1103,9 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden overflow-x-hidden bg-background">
       <div
-        className={`${showChat ? "hidden md:block" : "block"
-          } w-full md:w-auto h-full flex-shrink-0`}
+        className={`${
+          showChat ? "hidden md:block" : "block"
+        } w-full md:w-auto h-full flex-shrink-0`}
       >
         <ConversationList
           conversations={conversations}

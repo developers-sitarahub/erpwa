@@ -211,4 +211,6 @@ export interface Template {
     productId: string;
     position: number;
   }[];
+  createdByName?: string;
+  createdAt?: string;
 }

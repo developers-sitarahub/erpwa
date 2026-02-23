@@ -218,7 +218,7 @@ export default function GalleryModal({
         {/* Toolbar with Filters */}
         <div className="px-6 py-3 bg-gray-50 dark:bg-muted/30 border-b border-gray-100 dark:border-border flex flex-wrap gap-4 items-center">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-50">
             <Search
               className="absolute left-3 top-2.5 text-gray-400 dark:text-muted-foreground"
               size={18}
@@ -233,7 +233,7 @@ export default function GalleryModal({
           </div>
 
           {/* Category Filter */}
-          <div className="flex items-center gap-2 min-w-[150px]">
+          <div className="flex items-center gap-2 min-w-37.5">
             <Filter size={16} className="text-gray-500 dark:text-muted-foreground" />
             <select
               className="px-3 py-2 rounded-lg border border-gray-200 dark:border-border text-sm focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-background dark:text-foreground w-full"
@@ -251,7 +251,7 @@ export default function GalleryModal({
 
           {/* Subcategory Filter */}
           {subcategories.length > 0 && (
-            <div className="min-w-[150px]">
+            <div className="min-w-37.5">
               <select
                 className="px-3 py-2 rounded-lg border border-gray-200 dark:border-border text-sm focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-background dark:text-foreground w-full"
                 value={selectedSubcategory || ""}

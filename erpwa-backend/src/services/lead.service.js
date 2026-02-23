@@ -1,4 +1,5 @@
 import prisma from "../prisma.js";
+import { logActivity } from "./activityLog.service.js";
 
 class LeadService {
   static async create(user, data) {
@@ -60,6 +61,20 @@ class LeadService {
         channel: "whatsapp",
         isOpen: true,
       },
+    });
+
+    // 🔥 Log Activity
+    await logActivity({
+      vendorId,
+      type: "Lead",
+      event: "Lead Created",
+      status: "success",
+      phoneNumber: lead.phoneNumber,
+      payload: {
+        leadId: lead.id,
+        source: "manual",
+        salesPerson: lead.salesPersonName
+      }
     });
 
     return lead;
@@ -135,7 +150,7 @@ class LeadService {
       throw new Error("Lead not found or unauthorized");
     }
 
-    return prisma.lead.update({
+    const updatedLead = await prisma.lead.update({
       where: { id },
       data: {
         companyName: data.companyName ?? undefined,
@@ -150,6 +165,26 @@ class LeadService {
         updatedAt: new Date(),
       },
     });
+
+    // 🔥 Log Activity if status changed
+    if (data.status && data.status !== existingLead.status) {
+      await logActivity({
+        vendorId,
+        type: "Lead",
+        event: "Status Updated",
+        status: data.status,
+        phoneNumber: existingLead.phoneNumber,
+        payload: {
+          leadId: id,
+          oldStatus: existingLead.status,
+          newStatus: data.status,
+          updatedBy: user.name,
+          companyName: existingLead.companyName
+        }
+      });
+    }
+
+    return updatedLead;
   }
 
   static async delete(user, id) {

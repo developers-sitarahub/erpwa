@@ -12,8 +12,6 @@ import {
     AlertCircle,
     RefreshCw,
     Search,
-    ChevronLeft,
-    ChevronRight,
     Eye,
     X,
     Trash2,
@@ -21,10 +19,7 @@ import {
     Filter,
     AlertTriangle,
     Wifi,
-    WifiOff,
     Settings,
-    Link,
-    Link2Off,
     Image as ImageIcon,
     FileText,
     MessageSquare,
@@ -396,7 +391,7 @@ export default function ActivityLogsPage() {
         }
     };
     // Helper to format phone number
-    const formatPhone = (phone: string | null, direction: string | null): string => {
+    const formatPhone = (phone: string | null): string => {
         if (!phone) return "-";
         // Add + prefix if not present
         if (!phone.startsWith("+") && phone.length > 10) {
@@ -480,7 +475,7 @@ export default function ActivityLogsPage() {
             {/* Error Banner */}
             {error && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center gap-3">
-                    <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
+                    <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
                     <div className="flex-1">
                         <p className="font-medium text-destructive">Failed to load webhook logs</p>
                         <p className="text-sm text-destructive/80">{error}</p>
@@ -731,7 +726,7 @@ export default function ActivityLogsPage() {
                                 <th className="text-left px-3 py-3 font-medium">Reply Context ID</th>
                                 <th className="text-left px-3 py-3 font-medium">Category</th>
                                 <th className="text-left px-3 py-3 font-medium">Status</th>
-                                <th className="text-left px-3 py-3 font-medium max-w-[150px]">Error</th>
+                                <th className="text-left px-3 py-3 font-medium max-w-37.5">Error</th>
                                 <th className="text-center px-3 py-3 font-medium">View</th>
                             </tr>
                         </thead>
@@ -778,14 +773,14 @@ export default function ActivityLogsPage() {
 
                                         {/* Phone */}
                                         <td className="px-3 py-2 font-mono text-xs">
-                                            {formatPhone(log.phoneNumber, null)}
+                                            {formatPhone(log.phoneNumber)}
                                         </td>
 
                                         {/* Reply Context */}
                                         <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                                            {(log.payload as any)?.context?.id ? (
-                                                <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] truncate max-w-[100px] block" title={(log.payload as any).context.id}>
-                                                    {(log.payload as any).context.id.slice(0, 10)}...
+                                            {(log.payload as { context?: { id?: string } } | null)?.context?.id ? (
+                                                <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] truncate max-w-25 block" title={(log.payload as { context?: { id?: string } } | null)?.context?.id}>
+                                                    {(log.payload as { context?: { id?: string } } | null)?.context?.id?.slice(0, 10)}...
                                                 </span>
                                             ) : (
                                                 "-"
@@ -816,7 +811,7 @@ export default function ActivityLogsPage() {
                                         </td>
 
                                         {/* Error */}
-                                        <td className="px-3 py-2 max-w-[150px]">
+                                        <td className="px-3 py-2 max-w-37.5">
                                             {log.error ? (
                                                 <span className="text-xs text-destructive truncate block" title={log.error}>
                                                     {log.error.length > 30
@@ -900,7 +895,7 @@ export default function ActivityLogsPage() {
                                                     {showDots && <span className="px-2 text-muted-foreground">...</span>}
                                                     <button
                                                         onClick={() => fetchLogs(page)}
-                                                        className={`min-w-[32px] px-2 py-1 rounded-lg text-sm font-medium transition-colors ${page === pagination.page
+                                                        className={`min-w-8 px-2 py-1 rounded-lg text-sm font-medium transition-colors ${page === pagination.page
                                                             ? "bg-primary text-primary-foreground"
                                                             : "hover:bg-muted border border-border"
                                                             }`}
@@ -1013,7 +1008,7 @@ export default function ActivityLogsPage() {
                                 {selectedLog.payload && (
                                     <div>
                                         <p className="text-xs text-muted-foreground mb-1">Payload</p>
-                                        <pre className="bg-muted/50 border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-[300px]">
+                                        <pre className="bg-muted/50 border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-75">
                                             {JSON.stringify(selectedLog.payload, null, 2)}
                                         </pre>
                                     </div>

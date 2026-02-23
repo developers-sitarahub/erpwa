@@ -18,6 +18,12 @@ model Vendor {
   // WhatsApp Flows Encryption Keys
   whatsappFlowsPublicKey String?  // Stores the Public Key (PEM format)
   whatsappFlowsPrivateKey String? // Encrypted Private Key
+  
+  // Onboarding Fields
+  businessCategory      String?
+  country               String?
+  businessAttributes    Json?
+
   createdAt             DateTime       @default(now())
   campaigns             Campaign[]
   categories            Category[]
@@ -39,10 +45,12 @@ model User {
   id                String             @id @default(uuid())
   vendorId          String?
   name              String
-  email             String             @unique
-  passwordHash      String
+  mobileNumber      String?            @unique
+  email             String?            @unique
+  passwordHash      String?
   role              UserRole
   status            String             @default("active") // active, inactive
+  onboardingStatus  String             @default("pending") // pending, identity_verified, business_info_completed, whatsapp_connected, activated
   isOnline          Boolean            @default(false)
   lastLoginAt       DateTime?
   activatedAt       DateTime?          // When user first set password via invite link
@@ -73,6 +81,20 @@ model PasswordResetOtp {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model RegistrationOTP {
+  id            String   @id @default(uuid())
+  mobile        String
+  email         String
+  mobileOtpHash String
+  emailOtpHash  String
+  expiresAt     DateTime
+  used          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([mobile])
+  @@index([email])
 }
 
 
