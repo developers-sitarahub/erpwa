@@ -36,6 +36,7 @@ import {
   BookTemplate,
   LayoutGrid,
   List,
+  Layers,
 } from "lucide-react";
 import api from "@/lib/api";
 import { OFFICIAL_TEMPLATES } from "@/lib/officialTemplates";
@@ -1495,7 +1496,7 @@ export default function TemplatesPage() {
 
                             {variableSources[idx] === "company_name" ? (
                               <div className="h-9 px-3 rounded-md border bg-muted/20 flex items-center text-sm text-muted-foreground italic">
-                                Will use recipient's company name
+                                Will use recipient&apos;s company name
                               </div>
                             ) : (
                               <Input
@@ -2397,7 +2398,7 @@ export default function TemplatesPage() {
             </CardHeader>
             <CardContent>
               <p className="text-foreground mb-6">
-                Are you sure you want to delete "{deleteConf.title}"?
+                Are you sure you want to delete &quot;{deleteConf.title}&quot;?
                 <br />
                 <span className="text-sm text-muted-foreground mt-2 block">
                   This action cannot be undone.
