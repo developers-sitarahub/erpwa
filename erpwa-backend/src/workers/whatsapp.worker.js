@@ -16,7 +16,7 @@ function log(level, message, meta = {}) {
       level,
       message,
       ...meta,
-    })
+    }),
   );
 }
 
@@ -68,9 +68,19 @@ export async function processWhatsappQueue() {
 
       // 4️⃣ Dispatch based on message type
       if (message.messageType === "image") {
-        whatsappMsgId = await processImageMessage(message, accessToken, to, vendor);
+        whatsappMsgId = await processImageMessage(
+          message,
+          accessToken,
+          to,
+          vendor,
+        );
       } else if (message.messageType === "template") {
-        whatsappMsgId = await processTemplateMessage(message, accessToken, to, vendor);
+        whatsappMsgId = await processTemplateMessage(
+          message,
+          accessToken,
+          to,
+          vendor,
+        );
       } else {
         throw new Error(`Unsupported message type: ${message.messageType}`);
       }
@@ -165,11 +175,11 @@ export async function processWhatsappQueue() {
         // Increment failed count on campaign if final failure
         ...(retries >= MAX_RETRIES && message.campaignId
           ? [
-            prisma.campaign.update({
-              where: { id: message.campaignId },
-              data: { failedMessages: { increment: 1 } },
-            }),
-          ]
+              prisma.campaign.update({
+                where: { id: message.campaignId },
+                data: { failedMessages: { increment: 1 } },
+              }),
+            ]
           : []),
       ]);
 
@@ -229,7 +239,8 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
 
   // 1. CATALOG TEMPLATE (MPM)
   // Check explicit type OR presence of products
-  const isCatalog = template.templateType === "catalog" || template.catalogProducts.length > 0;
+  const isCatalog =
+    template.templateType === "catalog" || template.catalogProducts.length > 0;
 
   if (isCatalog && template.catalogProducts.length > 0) {
     // For Catalog templates, we must specify the thumbnail product
@@ -241,7 +252,8 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
         {
           type: "action",
           action: {
-            thumbnail_product_retailer_id: template.catalogProducts[0].productId,
+            thumbnail_product_retailer_id:
+              template.catalogProducts[0].productId,
           },
         },
       ],
@@ -250,7 +262,8 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
 
   // 2. CAROUSEL TEMPLATE (Marketing)
   // Check explicit type OR presence of cards
-  const isCarousel = template.templateType === "carousel" || template.carouselCards.length > 0;
+  const isCarousel =
+    template.templateType === "carousel" || template.carouselCards.length > 0;
 
   if (isCarousel && template.carouselCards.length > 0) {
     // Construct the Carousel Component
@@ -291,10 +304,7 @@ async function processTemplateMessage(message, accessToken, to, vendor) {
   // CRITICAL: Skip if Carousel or Catalog to avoid 132012 format error
   // Carousels do not accept standard header components in the same way.
   if (!isCarousel && !isCatalog) {
-    if (
-      templateLang.headerType &&
-      templateLang.headerType !== "TEXT"
-    ) {
+    if (templateLang.headerType && templateLang.headerType !== "TEXT") {
       const media = template.media[0];
       if (media?.s3Url) {
         components.push({

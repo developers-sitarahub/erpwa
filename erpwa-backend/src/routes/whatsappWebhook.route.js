@@ -16,7 +16,6 @@ const router = express.Router();
 =============================== */
 import { logActivity } from "../services/activityLog.service.js";
 
-
 /* ===============================
    WEBHOOK VERIFICATION (META)
 =============================== */
@@ -256,6 +255,7 @@ router.post("/", async (req, res) => {
         const inboundMessage = await prisma.message.create({
           data: {
             vendorId: vendor.id,
+            whatsappPhoneNumberId: vendor.whatsappPhoneNumberId,
             conversationId: conversation.id,
             direction: "inbound",
             channel: "whatsapp",
@@ -319,7 +319,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch { }
+        } catch {}
 
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
@@ -350,7 +350,7 @@ router.post("/", async (req, res) => {
             mimeType: fullMessage.media[0]?.mimeType,
             caption: fullMessage.media[0]?.caption,
           });
-        } catch (socketErr) { }
+        } catch (socketErr) {}
 
         // ============================================
         // 🚀 WORKFLOW ENGINE INTEGRATION
@@ -421,7 +421,8 @@ router.post("/", async (req, res) => {
             processingMs: Date.now() - startTime,
             responseCode: 200,
             whatsappBusinessId: wabaId,
-            whatsappPhoneNumberId: phoneNumberId || vendor.whatsappPhoneNumberId,
+            whatsappPhoneNumberId:
+              phoneNumberId || vendor.whatsappPhoneNumberId,
           });
           continue;
         }
@@ -454,7 +455,8 @@ router.post("/", async (req, res) => {
                 ? waStatus.errors[0].message
                 : null,
             whatsappBusinessId: wabaId,
-            whatsappPhoneNumberId: phoneNumberId || vendor.whatsappPhoneNumberId,
+            whatsappPhoneNumberId:
+              phoneNumberId || vendor.whatsappPhoneNumberId,
           });
           continue;
         }
@@ -510,7 +512,7 @@ router.post("/", async (req, res) => {
               status: waState,
             },
           );
-        } catch { }
+        } catch {}
       }
     }
 

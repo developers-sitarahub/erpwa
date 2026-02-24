@@ -11,8 +11,6 @@ import { upload } from "../middleware/upload.middleware.js";
 import { uploadTemplateMediaToMeta } from "../utils/uploadTemplateMediaToMeta.js";
 import { logActivity } from "../services/activityLog.service.js";
 
-
-
 const router = express.Router();
 
 /**
@@ -27,7 +25,18 @@ router.get(
   asyncHandler(async (req, res) => {
     console.log(`🔍 Fetching templates for Vendor ID: ${req.user.vendorId}`);
 
-    const where = { vendorId: req.user.vendorId };
+    // Get vendor's current phone number ID to scope templates
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+      select: { whatsappPhoneNumberId: true },
+    });
+
+    if (!vendor?.whatsappPhoneNumberId) {
+      return res.json([]); // No phone configured → no templates
+    }
+
+    // Filter by current phone number – changing phone number shows fresh templates
+    const where = { whatsappPhoneNumberId: vendor.whatsappPhoneNumberId };
 
     // 🔒 ROLE-BASED FILTERING: Sales users only see their own templates
     // 🔒 ROLE-BASED FILTERING: Sales users only see their own templates
@@ -42,13 +51,15 @@ router.get(
         media: true,
         buttons: true,
         catalogProducts: true, // Include catalog products
-        carouselCards: { orderBy: { position: 'asc' } }, // Include carousel cards ordered by position
+        carouselCards: { orderBy: { position: "asc" } }, // Include carousel cards ordered by position
       },
       orderBy: { createdAt: "desc" },
     });
 
     // Fetch creator names
-    const creatorIds = [...new Set(templates.map((t) => t.createdBy).filter(Boolean))];
+    const creatorIds = [
+      ...new Set(templates.map((t) => t.createdBy).filter(Boolean)),
+    ];
     const creators = await prisma.user.findMany({
       where: { id: { in: creatorIds } },
       select: { id: true, name: true },
@@ -56,19 +67,25 @@ router.get(
     const creatorMap = Object.fromEntries(creators.map((u) => [u.id, u.name]));
 
     const enrichedTemplates = templates.map((t) => {
-      const name = t.createdBy ? (creatorMap[t.createdBy] || "Unknown") : "System";
+      const name = t.createdBy
+        ? creatorMap[t.createdBy] || "Unknown"
+        : "System";
       return { ...t, createdByName: name };
     });
 
-    console.log(`✅ [${req.user.role}] Fetched ${enrichedTemplates.length} templates. Enriching with ${Object.keys(creatorMap).length} creator names.`);
+    console.log(
+      `✅ [${req.user.role}] Fetched ${enrichedTemplates.length} templates. Enriching with ${Object.keys(creatorMap).length} creator names.`,
+    );
 
     if (templates.length === 0) {
       const totalTemplates = await prisma.template.count();
-      console.log(`⚠️ Total templates in DB: ${totalTemplates}. Possible Vendor ID mismatch.`);
+      console.log(
+        `⚠️ Total templates in DB: ${totalTemplates}. Possible Vendor ID mismatch.`,
+      );
     }
 
     res.json(enrichedTemplates);
-  })
+  }),
 );
 
 /**
@@ -81,14 +98,18 @@ router.get(
   authenticate,
   requireRoles(["vendor_owner", "vendor_admin", "sales"]),
   asyncHandler(async (req, res) => {
-    console.log(`🔍 Fetching Meta templates for Vendor ID: ${req.user.vendorId}`);
+    console.log(
+      `🔍 Fetching Meta templates for Vendor ID: ${req.user.vendorId}`,
+    );
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: req.user.vendorId },
     });
 
     if (!vendor || !vendor.whatsappAccessToken || !vendor.whatsappBusinessId) {
-      return res.status(400).json({ message: "Vendor WhatsApp credentials missing" });
+      return res
+        .status(400)
+        .json({ message: "Vendor WhatsApp credentials missing" });
     }
 
     const accessToken = decrypt(vendor.whatsappAccessToken);
@@ -99,7 +120,7 @@ router.get(
         `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?limit=100`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
-        }
+        },
       );
 
       if (!metaResp.ok) {
@@ -107,7 +128,7 @@ router.get(
         console.error("Meta API Error:", error);
         return res.status(mapMetaStatus(metaResp.status)).json({
           message: "Failed to fetch from Meta",
-          details: error
+          details: error,
         });
       }
 
@@ -118,9 +139,11 @@ router.get(
       res.json(templates);
     } catch (error) {
       console.error("Fetch Meta Templates Error:", error);
-      res.status(500).json({ message: "Internal Server Error fetching from Meta" });
+      res
+        .status(500)
+        .json({ message: "Internal Server Error fetching from Meta" });
     }
-  })
+  }),
 );
 
 /**
@@ -145,7 +168,7 @@ router.post(
       buttons = [],
       metaId,
       status = "approved",
-      headerMediaUrl = null // Header image URL from Meta
+      headerMediaUrl = null, // Header image URL from Meta
     } = req.body;
 
     // Helper to process media
@@ -156,8 +179,13 @@ router.post(
         if (!mediaResp.ok) throw new Error("Failed to fetch media");
 
         const buffer = await mediaResp.arrayBuffer(); // use arrayBuffer for node-fetch
-        const mimeType = mediaResp.headers.get("content-type") ||
-          (type === "IMAGE" ? "image/jpeg" : type === "VIDEO" ? "video/mp4" : "application/pdf");
+        const mimeType =
+          mediaResp.headers.get("content-type") ||
+          (type === "IMAGE"
+            ? "image/jpeg"
+            : type === "VIDEO"
+              ? "video/mp4"
+              : "application/pdf");
         const ext = mimeType.split("/")[1] || "bin";
 
         const uploadResult = await uploadTemplateMediaToS3({
@@ -166,13 +194,13 @@ router.post(
           vendorId: req.user.vendorId,
           templateId: tId,
           language: lang,
-          extension: ext
+          extension: ext,
         });
 
         console.log(`✅ Re-uploaded media to S3: ${uploadResult.url}`);
         return {
           url: uploadResult.url,
-          mimeType
+          mimeType,
         };
       } catch (e) {
         console.error("Failed to process Meta media:", e);
@@ -180,25 +208,48 @@ router.post(
       }
     };
 
-    // Check if exists
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+      select: { whatsappPhoneNumberId: true },
+    });
+
+    if (!vendor?.whatsappPhoneNumberId) {
+      return res
+        .status(400)
+        .json({ message: "Vendor WhatsApp phone number not configured" });
+    }
+
+    const phoneNumberId = vendor.whatsappPhoneNumberId;
+
+    // Check if exists (scoped to phone number)
     const existing = await prisma.template.findFirst({
       where: {
-        vendorId: req.user.vendorId,
-        metaTemplateName: metaTemplateName
+        whatsappPhoneNumberId: phoneNumberId,
+        metaTemplateName: metaTemplateName,
       },
-      include: { languages: true, buttons: true, media: true }
+      include: { languages: true, buttons: true, media: true },
     });
 
     if (existing) {
       // Logic for existing templates...
       // If header type matches and URL is provided
       if (headerMediaUrl && headerType !== "TEXT") {
-        const needsUpload = !existing.media.length || existing.media[0].s3Url.includes("whatsapp.net") || existing.media[0].s3Url.includes("fbcdn");
+        const needsUpload =
+          !existing.media.length ||
+          existing.media[0].s3Url.includes("whatsapp.net") ||
+          existing.media[0].s3Url.includes("fbcdn");
 
         if (needsUpload) {
-          console.log(`📸 Updating media for existing template ${metaTemplateName}`);
+          console.log(
+            `📸 Updating media for existing template ${metaTemplateName}`,
+          );
 
-          const processed = await processMedia(headerMediaUrl, headerType, existing.id, language);
+          const processed = await processMedia(
+            headerMediaUrl,
+            headerType,
+            existing.id,
+            language,
+          );
 
           if (processed) {
             // Upsert media
@@ -208,13 +259,13 @@ router.post(
               mediaType: headerType.toLowerCase(),
               s3Url: processed.url,
               uploadStatus: "uploaded",
-              mimeType: processed.mimeType
+              mimeType: processed.mimeType,
             };
 
             if (existing.media.length > 0) {
               await prisma.templateMedia.update({
                 where: { id: existing.media[0].id },
-                data: mediaData
+                data: mediaData,
               });
             } else {
               await prisma.templateMedia.create({ data: mediaData });
@@ -226,15 +277,16 @@ router.post(
       // Return refreshed template
       const updated = await prisma.template.findUnique({
         where: { id: existing.id },
-        include: { languages: true, buttons: true, media: true }
+        include: { languages: true, buttons: true, media: true },
       });
       return res.json(updated);
     }
 
-    // Create template
+    // Create template (scoped to current phone number)
     const template = await prisma.template.create({
       data: {
         vendorId: req.user.vendorId,
+        whatsappPhoneNumberId: phoneNumberId,
         metaTemplateName,
         displayName,
         category,
@@ -252,17 +304,27 @@ router.post(
         headerText,
         footerText,
         metaStatus: status,
-        metaId: metaId
+        metaId: metaId,
       },
     });
 
     // Create TemplateMedia record if there's a header media URL (from Meta)
     if (headerMediaUrl && headerType !== "TEXT") {
       let finalUrl = headerMediaUrl;
-      let finalMime = headerType === "IMAGE" ? "image/jpeg" : headerType === "VIDEO" ? "video/mp4" : "application/pdf";
+      let finalMime =
+        headerType === "IMAGE"
+          ? "image/jpeg"
+          : headerType === "VIDEO"
+            ? "video/mp4"
+            : "application/pdf";
 
       // Download and upload to S3
-      const processed = await processMedia(headerMediaUrl, headerType, template.id, language);
+      const processed = await processMedia(
+        headerMediaUrl,
+        headerType,
+        template.id,
+        language,
+      );
       if (processed) {
         finalUrl = processed.url;
         finalMime = processed.mimeType;
@@ -275,8 +337,8 @@ router.post(
           mediaType: headerType.toLowerCase(),
           s3Url: finalUrl,
           uploadStatus: "uploaded",
-          mimeType: finalMime
-        }
+          mimeType: finalMime,
+        },
       });
     }
 
@@ -290,19 +352,22 @@ router.post(
             type: btn.type,
             text: btn.text,
             position: i,
-            value: (btn.type === "URL" || btn.type === "PHONE_NUMBER") ? btn.value : null,
-          }
+            value:
+              btn.type === "URL" || btn.type === "PHONE_NUMBER"
+                ? btn.value
+                : null,
+          },
         });
       }
     }
 
     const fullTemplate = await prisma.template.findUnique({
       where: { id: template.id },
-      include: { languages: true, buttons: true, media: true }
+      include: { languages: true, buttons: true, media: true },
     });
 
     res.json(fullTemplate);
-  })
+  }),
 );
 
 /**
@@ -326,7 +391,9 @@ router.delete(
     });
 
     if (!vendor || !vendor.whatsappAccessToken || !vendor.whatsappBusinessId) {
-      return res.status(400).json({ message: "Vendor WhatsApp credentials missing" });
+      return res
+        .status(400)
+        .json({ message: "Vendor WhatsApp credentials missing" });
     }
 
     const accessToken = decrypt(vendor.whatsappAccessToken);
@@ -345,7 +412,9 @@ router.delete(
       if (!metaResp.ok) {
         const error = await metaResp.json();
         console.error("Meta Delete Error:", error);
-        return res.status(400).json({ message: "Failed to delete from Meta", details: error });
+        return res
+          .status(400)
+          .json({ message: "Failed to delete from Meta", details: error });
       }
 
       res.json({ success: true, message: "Deleted from Meta" });
@@ -353,7 +422,7 @@ router.delete(
       console.error("Delete Meta Template Error:", error);
       res.status(500).json({ message: "Internal Server Error" });
     }
-  })
+  }),
 );
 
 function mapMetaStatus(status) {
@@ -384,7 +453,7 @@ router.post(
       body,
       footerText,
       buttons = [],
-      templateType = 'standard', // 'standard', 'catalog', 'carousel'
+      templateType = "standard", // 'standard', 'catalog', 'carousel'
     } = req.body;
 
     console.log("📝 Parsing buttons & catalog products...");
@@ -392,7 +461,7 @@ router.post(
     // Parse buttons if it's a string (FormData)
     let parsedButtons = [];
     try {
-      if (typeof req.body.buttons === 'string') {
+      if (typeof req.body.buttons === "string") {
         parsedButtons = JSON.parse(req.body.buttons);
       } else if (Array.isArray(req.body.buttons)) {
         parsedButtons = req.body.buttons;
@@ -405,7 +474,7 @@ router.post(
     // Parse catalogProducts if it's a string
     let parsedCatalogProducts = [];
     try {
-      if (typeof req.body.catalogProducts === 'string') {
+      if (typeof req.body.catalogProducts === "string") {
         parsedCatalogProducts = JSON.parse(req.body.catalogProducts);
       } else if (Array.isArray(req.body.catalogProducts)) {
         parsedCatalogProducts = req.body.catalogProducts;
@@ -417,12 +486,14 @@ router.post(
 
     // Parse Carousel Cards (if any)
     let carouselCardsData = [];
-    if (templateType === 'carousel') {
+    if (templateType === "carousel") {
       try {
         console.log("🎠 Parsing carousel cards...");
-        carouselCardsData = JSON.parse(req.body.carouselCards || '[]');
+        carouselCardsData = JSON.parse(req.body.carouselCards || "[]");
         if (carouselCardsData.length === 0) {
-          return res.status(400).json({ message: "At least one card is required for carousel templates" });
+          return res.status(400).json({
+            message: "At least one card is required for carousel templates",
+          });
         }
       } catch (e) {
         console.error("❌ Error parsing carousel cards:", e);
@@ -431,24 +502,35 @@ router.post(
     }
 
     if (!metaTemplateName || !category || !language || !body) {
-      console.error("❌ Missing required fields:", { metaTemplateName, category, language, body: !!body });
+      console.error("❌ Missing required fields:", {
+        metaTemplateName,
+        category,
+        language,
+        body: !!body,
+      });
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     // Validate catalog template
-    if (templateType === 'catalog') {
-      if (!Array.isArray(parsedCatalogProducts) || parsedCatalogProducts.length === 0) {
-        return res.status(400).json({ message: "At least one product is required for catalog templates" });
+    if (templateType === "catalog") {
+      if (
+        !Array.isArray(parsedCatalogProducts) ||
+        parsedCatalogProducts.length === 0
+      ) {
+        return res.status(400).json({
+          message: "At least one product is required for catalog templates",
+        });
       }
       if (parsedCatalogProducts.length > 30) {
-        return res.status(400).json({ message: "Maximum 30 products allowed per catalog template" });
+        return res.status(400).json({
+          message: "Maximum 30 products allowed per catalog template",
+        });
       }
     }
 
-
     const headerType = req.body["header.type"] || "TEXT";
     // Find header file by fieldname
-    const headerFile = req.files?.find(f => f.fieldname === "header.file");
+    const headerFile = req.files?.find((f) => f.fieldname === "header.file");
 
     console.log(`HEADER TYPE: ${headerType}, FILE PRESENT: ${!!headerFile}`);
 
@@ -456,10 +538,24 @@ router.post(
       return res.status(400).json({ message: "Invalid header type" });
     }
 
+    // Fetch vendor to get the current phone number ID
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+      select: { whatsappPhoneNumberId: true },
+    });
+
+    if (!vendor?.whatsappPhoneNumberId) {
+      return res
+        .status(400)
+        .json({ message: "Vendor WhatsApp phone number not configured" });
+    }
+
+    const phoneNumberId = vendor.whatsappPhoneNumberId;
+
     const existingTemplate = await prisma.template.findUnique({
       where: {
-        vendorId_metaTemplateName: {
-          vendorId: req.user.vendorId,
+        whatsappPhoneNumberId_metaTemplateName: {
+          whatsappPhoneNumberId: phoneNumberId,
           metaTemplateName,
         },
       },
@@ -467,9 +563,10 @@ router.post(
 
     if (existingTemplate) {
       console.warn("⚠️ Template with this name already exists");
-      return res
-        .status(409)
-        .json({ message: "Template with this name already exists for this vendor." });
+      return res.status(409).json({
+        message:
+          "Template with this name already exists for this phone number.",
+      });
     }
 
     console.log("💾 Creating template in DB...");
@@ -478,6 +575,7 @@ router.post(
     const template = await prisma.template.create({
       data: {
         vendorId: req.user.vendorId,
+        whatsappPhoneNumberId: phoneNumberId,
         metaTemplateName,
         displayName,
         category,
@@ -495,7 +593,10 @@ router.post(
         body,
         footerText,
         headerType,
-        headerText: headerType === "TEXT" ? (req.body["header.text"] || req.body.headerText) : null,
+        headerText:
+          headerType === "TEXT"
+            ? req.body["header.text"] || req.body.headerText
+            : null,
         metaStatus: "draft",
       },
     });
@@ -503,7 +604,9 @@ router.post(
     /** HEADER MEDIA (S3 ONLY, NO WHATSAPP YET) */
     if (["IMAGE", "VIDEO", "DOCUMENT"].includes(headerType)) {
       if (!headerFile) {
-        return res.status(400).json({ message: "Header media file is required" });
+        return res
+          .status(400)
+          .json({ message: "Header media file is required" });
       }
 
       const uploadResult = await uploadTemplateMediaToS3({
@@ -528,11 +631,13 @@ router.post(
     }
 
     /** CAROUSEL CARDS */
-    if (templateType === 'carousel' && carouselCardsData.length > 0) {
+    if (templateType === "carousel" && carouselCardsData.length > 0) {
       for (let i = 0; i < carouselCardsData.length; i++) {
         const card = carouselCardsData[i];
         // Find file by dynamic fieldname
-        const imageFile = req.files?.find(f => f.fieldname === `carouselImages_${i}`);
+        const imageFile = req.files?.find(
+          (f) => f.fieldname === `carouselImages_${i}`,
+        );
 
         let s3Url = card.s3Url || null; // Use existing URL if provided
         let mimeType = null;
@@ -545,7 +650,7 @@ router.post(
             templateId: template.id,
             language,
             extension: imageFile.originalname.split(".").pop(),
-            prefix: 'carousel'
+            prefix: "carousel",
           });
           s3Url = uploadResult.url;
           mimeType = imageFile.mimetype;
@@ -562,11 +667,10 @@ router.post(
             position: i,
             s3Url: s3Url,
             mimeType: mimeType,
-          }
+          },
         });
       }
     }
-
 
     /** BUTTONS */
     for (let i = 0; i < parsedButtons.length; i++) {
@@ -582,17 +686,17 @@ router.post(
             btn.type === "URL" || btn.type === "PHONE_NUMBER"
               ? btn.value
               : btn.type === "FLOW"
-                ? (btn.navigateScreen || btn.value) // Store screen ID for Flow buttons
+                ? btn.navigateScreen || btn.value // Store screen ID for Flow buttons
                 : null,
           // Flow button support
           flowId: btn.type === "FLOW" ? btn.flowId : null,
-          flowAction: btn.type === "FLOW" ? (btn.flowAction || "navigate") : null,
+          flowAction: btn.type === "FLOW" ? btn.flowAction || "navigate" : null,
         },
       });
     }
 
     /** CATALOG PRODUCTS (for catalog templates) */
-    if (templateType === 'catalog' && Array.isArray(parsedCatalogProducts)) {
+    if (templateType === "catalog" && Array.isArray(parsedCatalogProducts)) {
       for (let i = 0; i < parsedCatalogProducts.length; i++) {
         await prisma.templateCatalogProduct.create({
           data: {
@@ -613,11 +717,15 @@ router.post(
       messageId: null,
       whatsappBusinessId: null, // Will be fetched via vendorId inside service
       whatsappPhoneNumberId: null,
-      payload: { templateId: template.id, name: metaTemplateName, type: templateType },
+      payload: {
+        templateId: template.id,
+        name: metaTemplateName,
+        type: templateType,
+      },
     });
 
     res.json({ template, language: templateLanguage });
-  })
+  }),
 );
 
 /**
@@ -648,7 +756,7 @@ router.get(
     }
 
     res.json(template);
-  })
+  }),
 );
 
 /**
@@ -670,13 +778,13 @@ router.put(
       body,
       footerText,
       buttons,
-      templateType = 'standard',
+      templateType = "standard",
     } = req.body;
 
     // Parse buttons if it's a string (FormData)
     let parsedButtons = [];
     try {
-      if (typeof buttons === 'string') {
+      if (typeof buttons === "string") {
         parsedButtons = JSON.parse(buttons);
       } else if (Array.isArray(buttons)) {
         parsedButtons = buttons;
@@ -696,14 +804,16 @@ router.put(
     }
 
     if (template.status === "approved" || template.status === "pending") {
-      return res.status(403).json({ message: "Cannot edit approved or pending templates" });
+      return res
+        .status(403)
+        .json({ message: "Cannot edit approved or pending templates" });
     }
 
     // Parse Carousel Cards
     let carouselCardsData = [];
-    if (template.templateType === 'carousel' || templateType === 'carousel') {
+    if (template.templateType === "carousel" || templateType === "carousel") {
       try {
-        carouselCardsData = JSON.parse(req.body.carouselCards || '[]');
+        carouselCardsData = JSON.parse(req.body.carouselCards || "[]");
       } catch (e) {
         return res.status(400).json({ message: "Invalid carousel cards data" });
       }
@@ -711,8 +821,7 @@ router.put(
 
     // Handle Header File
     const headerType = req.body["header.type"] || "TEXT";
-    const headerFile = req.files?.find(f => f.fieldname === "header.file");
-
+    const headerFile = req.files?.find((f) => f.fieldname === "header.file");
 
     // Update Template
     await prisma.template.update({
@@ -721,14 +830,18 @@ router.put(
         displayName,
         category,
         // Update type if changed (rare but possible)
-        templateType: template.templateType === 'standard' ? templateType : template.templateType,
+        templateType:
+          template.templateType === "standard"
+            ? templateType
+            : template.templateType,
         status: "draft",
       },
     });
 
     // Update Language
-    const langId = template.languages.find((l) => l.language === langCode)?.id
-      || template.languages[0]?.id;
+    const langId =
+      template.languages.find((l) => l.language === langCode)?.id ||
+      template.languages[0]?.id;
 
     if (langId) {
       await prisma.templateLanguage.update({
@@ -738,7 +851,10 @@ router.put(
           body,
           footerText,
           headerType,
-          headerText: headerType === "TEXT" ? (req.body["header.text"] || req.body.headerText) : null,
+          headerText:
+            headerType === "TEXT"
+              ? req.body["header.text"] || req.body.headerText
+              : null,
           metaStatus: "draft",
         },
       });
@@ -757,13 +873,17 @@ router.put(
 
           // Upsert Media
           const existingMedia = await prisma.templateMedia.findFirst({
-            where: { templateId: template.id, language: langCode }
+            where: { templateId: template.id, language: langCode },
           });
 
           if (existingMedia) {
             await prisma.templateMedia.update({
               where: { id: existingMedia.id },
-              data: { s3Url: uploadResult.url, mimeType: headerFile.mimetype, uploadStatus: "pending" }
+              data: {
+                s3Url: uploadResult.url,
+                mimeType: headerFile.mimetype,
+                uploadStatus: "pending",
+              },
             });
           } else {
             await prisma.templateMedia.create({
@@ -774,7 +894,7 @@ router.put(
                 s3Url: uploadResult.url,
                 uploadStatus: "pending",
                 mimeType: headerFile.mimetype,
-              }
+              },
             });
           }
         }
@@ -782,13 +902,20 @@ router.put(
     }
 
     // Update Carousel Cards (Recreate)
-    if ((template.templateType === 'carousel' || templateType === 'carousel') && carouselCardsData.length > 0) {
-      await prisma.templateCarouselCard.deleteMany({ where: { templateId: id } });
+    if (
+      (template.templateType === "carousel" || templateType === "carousel") &&
+      carouselCardsData.length > 0
+    ) {
+      await prisma.templateCarouselCard.deleteMany({
+        where: { templateId: id },
+      });
 
       for (let i = 0; i < carouselCardsData.length; i++) {
         const card = carouselCardsData[i];
         // Find file by dynamic fieldname
-        const imageFile = req.files?.find(f => f.fieldname === `carouselImages_${i}`);
+        const imageFile = req.files?.find(
+          (f) => f.fieldname === `carouselImages_${i}`,
+        );
 
         let s3Url = card.s3Url || null;
         let mimeType = null;
@@ -801,7 +928,7 @@ router.put(
             templateId: template.id,
             language: langCode,
             extension: imageFile.originalname.split(".").pop(),
-            prefix: 'carousel'
+            prefix: "carousel",
           });
           s3Url = uploadResult.url;
           mimeType = imageFile.mimetype;
@@ -818,7 +945,7 @@ router.put(
             position: i,
             s3Url: s3Url,
             mimeType: mimeType,
-          }
+          },
         });
       }
     }
@@ -837,14 +964,16 @@ router.put(
             type: btn.type,
             text: btn.text,
             position: i,
-            value: (btn.type === "URL" || btn.type === "PHONE_NUMBER")
-              ? btn.value
-              : btn.type === "FLOW"
-                ? (btn.navigateScreen || btn.value)
-                : null,
+            value:
+              btn.type === "URL" || btn.type === "PHONE_NUMBER"
+                ? btn.value
+                : btn.type === "FLOW"
+                  ? btn.navigateScreen || btn.value
+                  : null,
             // Flow button support
             flowId: btn.type === "FLOW" ? btn.flowId : null,
-            flowAction: btn.type === "FLOW" ? (btn.flowAction || "navigate") : null,
+            flowAction:
+              btn.type === "FLOW" ? btn.flowAction || "navigate" : null,
           },
         });
       }
@@ -863,7 +992,7 @@ router.put(
     });
 
     res.json({ success: true, message: "Template updated" });
-  })
+  }),
 );
 
 /**
@@ -876,7 +1005,6 @@ router.post(
   authenticate,
   requireRoles(["vendor_owner", "vendor_admin", "sales"]),
   asyncHandler(async (req, res) => {
-
     const template = await prisma.template.findUnique({
       where: { id: req.params.id },
       include: {
@@ -897,21 +1025,25 @@ router.post(
     const appId = process.env.META_APP_ID;
 
     if (!appId) {
-      throw new Error("META_APP_ID environment variable is required for template media upload");
+      throw new Error(
+        "META_APP_ID environment variable is required for template media upload",
+      );
     }
 
     const components = [];
 
     // PRE-FETCH FLOW IDS IF NEEDED
-    const flowButtons = template.buttons.filter(b => b.type === "FLOW" && b.flowId);
+    const flowButtons = template.buttons.filter(
+      (b) => b.type === "FLOW" && b.flowId,
+    );
     let flowMap = {};
     if (flowButtons.length > 0) {
-      const flowIds = flowButtons.map(b => b.flowId);
+      const flowIds = flowButtons.map((b) => b.flowId);
       const flows = await prisma.whatsAppFlow.findMany({
         where: { id: { in: flowIds } },
-        select: { id: true, metaFlowId: true }
+        select: { id: true, metaFlowId: true },
       });
-      flowMap = Object.fromEntries(flows.map(f => [f.id, f.metaFlowId]));
+      flowMap = Object.fromEntries(flows.map((f) => [f.id, f.metaFlowId]));
     }
 
     console.log("SUBMIT BODY KEYS:", Object.keys(req.body || {}));
@@ -919,7 +1051,7 @@ router.post(
     // ===============================
     // 1. CAROUSEL TEMPLATE LOGIC
     // ===============================
-    if (template.templateType === 'carousel') {
+    if (template.templateType === "carousel") {
       // BODY
       const bodyVariables = language.body.match(/{{\d+}}/g) || [];
       const bodyComponent = {
@@ -927,7 +1059,9 @@ router.post(
         text: language.body,
       };
       if (bodyVariables.length > 0) {
-        bodyComponent.example = { body_text: [bodyVariables.map((_, i) => `Sample${i + 1}`)] };
+        bodyComponent.example = {
+          body_text: [bodyVariables.map((_, i) => `Sample${i + 1}`)],
+        };
       }
       components.push(bodyComponent);
 
@@ -937,9 +1071,13 @@ router.post(
         let headerHandle = null;
 
         if (card.s3Url) {
-          console.log("📥 Downloading carousel card media from S3:", card.s3Url);
+          console.log(
+            "📥 Downloading carousel card media from S3:",
+            card.s3Url,
+          );
           const s3Response = await fetch(card.s3Url);
-          if (!s3Response.ok) throw new Error("Failed to download media from S3");
+          if (!s3Response.ok)
+            throw new Error("Failed to download media from S3");
 
           const buffer = Buffer.from(await s3Response.arrayBuffer());
           const fileName = card.s3Url.split("/").pop() || "card-media";
@@ -948,23 +1086,25 @@ router.post(
             accessToken,
             appId,
             buffer,
-            mimeType: card.mimeType || 'image/jpeg',
+            mimeType: card.mimeType || "image/jpeg",
             fileName,
           });
 
           // Update card with handle
           await prisma.templateCarouselCard.update({
             where: { id: card.id },
-            data: { mediaHandle: headerHandle }
+            data: { mediaHandle: headerHandle },
           });
         }
 
-        const cardBodyText = [card.title, card.subtitle].filter(Boolean).join("\n");
+        const cardBodyText = [card.title, card.subtitle]
+          .filter(Boolean)
+          .join("\n");
 
         const buttonObj = {
           type: "URL",
           text: card.buttonText || "View",
-          url: card.buttonValue || "https://example.com"
+          url: card.buttonValue || "https://example.com",
         };
 
         // Only add example if the URL has a variable like {{1}}
@@ -972,13 +1112,16 @@ router.post(
           buttonObj.example = ["TRACK123"];
         }
 
-        const format = (card.mimeType && card.mimeType.startsWith('video')) ? "VIDEO" : "IMAGE";
+        const format =
+          card.mimeType && card.mimeType.startsWith("video")
+            ? "VIDEO"
+            : "IMAGE";
 
         const cardComponents = [
           {
             type: "HEADER",
             format: format,
-            example: { header_handle: [headerHandle] }
+            example: { header_handle: [headerHandle] },
           },
           {
             type: "BODY",
@@ -986,17 +1129,16 @@ router.post(
           },
           {
             type: "BUTTONS",
-            buttons: [buttonObj]
-          }
+            buttons: [buttonObj],
+          },
         ];
         cards.push({ components: cardComponents });
       }
 
       components.push({
         type: "CAROUSEL",
-        cards: cards
+        cards: cards,
       });
-
     } else {
       // ===============================
       // 2. STANDARD TEMPLATE LOGIC
@@ -1028,7 +1170,11 @@ router.post(
 
         await prisma.templateMedia.update({
           where: { id: media.id },
-          data: { whatsappMediaId: headerHandle, uploadStatus: "uploaded", uploadedAt: new Date() },
+          data: {
+            whatsappMediaId: headerHandle,
+            uploadStatus: "uploaded",
+            uploadedAt: new Date(),
+          },
         });
 
         components.push({
@@ -1045,7 +1191,9 @@ router.post(
         text: language.body,
       };
       if (bodyVariables.length > 0) {
-        bodyComponent.example = { body_text: [bodyVariables.map((_, i) => `Sample${i + 1}`)] };
+        bodyComponent.example = {
+          body_text: [bodyVariables.map((_, i) => `Sample${i + 1}`)],
+        };
       }
       components.push(bodyComponent);
 
@@ -1060,24 +1208,39 @@ router.post(
           type: "BUTTONS",
           buttons: template.buttons.map((b) => {
             if (b.type === "URL") {
-              return { type: "URL", text: b.text, url: b.value, example: ["TRACK123"] };
+              return {
+                type: "URL",
+                text: b.text,
+                url: b.value,
+                example: ["TRACK123"],
+              };
             }
             if (b.type === "PHONE_NUMBER") {
-              return { type: "PHONE_NUMBER", text: b.text, phone_number: b.value };
+              return {
+                type: "PHONE_NUMBER",
+                text: b.text,
+                phone_number: b.value,
+              };
             }
             if (b.type === "FLOW") {
               const metaFlowId = flowMap[b.flowId];
               // Extract screen ID from navigateScreen (new) or value (old)
               const screenId = b.navigateScreen || b.value;
 
-              console.log(`Processing FLOW button. UUID: ${b.flowId}, MetaID: ${metaFlowId}, Action: ${b.flowAction}, Screen: ${screenId}`);
+              console.log(
+                `Processing FLOW button. UUID: ${b.flowId}, MetaID: ${metaFlowId}, Action: ${b.flowAction}, Screen: ${screenId}`,
+              );
 
               if (!metaFlowId) {
-                throw new Error(`Validation Failed: The selected Flow (${b.flowId}) has no Meta ID. Ensure the Flow is created and synced correctly.`);
+                throw new Error(
+                  `Validation Failed: The selected Flow (${b.flowId}) has no Meta ID. Ensure the Flow is created and synced correctly.`,
+                );
               }
 
               if (!screenId) {
-                throw new Error(`Validation Failed: Navigate screen is required for Flow button. Please specify a valid screen ID.`);
+                throw new Error(
+                  `Validation Failed: Navigate screen is required for Flow button. Please specify a valid screen ID.`,
+                );
               }
 
               return {
@@ -1085,7 +1248,7 @@ router.post(
                 text: b.text,
                 flow_id: metaFlowId,
                 flow_action: b.flowAction || "navigate",
-                navigate_screen: screenId
+                navigate_screen: screenId,
               };
             }
             return { type: "QUICK_REPLY", text: b.text };
@@ -1093,8 +1256,6 @@ router.post(
         });
       }
     }
-
-
 
     /**
      * ===============================
@@ -1119,23 +1280,29 @@ router.post(
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
-      }
+      },
     );
 
     const metaData = await metaResp.json();
 
     if (!metaResp.ok) {
-      console.error("❌ Meta Submit Failed:", JSON.stringify(metaData, null, 2));
+      console.error(
+        "❌ Meta Submit Failed:",
+        JSON.stringify(metaData, null, 2),
+      );
 
       await prisma.template.update({
         where: { id: template.id },
         data: { status: "rejected" },
       });
 
-      const errorMessage = metaData?.error?.message || metaData?.error?.user_msg || "Unknown Meta API Error";
+      const errorMessage =
+        metaData?.error?.message ||
+        metaData?.error?.user_msg ||
+        "Unknown Meta API Error";
       return res.status(400).json({
         message: errorMessage,
-        details: metaData.error || metaData
+        details: metaData.error || metaData,
       });
     }
 
@@ -1172,7 +1339,7 @@ router.post(
       success: true,
       metaTemplateId: metaData.id,
     });
-  })
+  }),
 );
 
 /**
@@ -1213,8 +1380,14 @@ router.delete(
 
         if (!metaResp.ok) {
           const errData = await metaResp.json();
-          const errorMessage = errData?.error?.message || errData?.error?.user_msg || "Unknown Meta API Error";
-          console.error("❌ Meta Deletion Failed (proceeding with local delete):", errorMessage);
+          const errorMessage =
+            errData?.error?.message ||
+            errData?.error?.user_msg ||
+            "Unknown Meta API Error";
+          console.error(
+            "❌ Meta Deletion Failed (proceeding with local delete):",
+            errorMessage,
+          );
 
           // Proceed to delete locally, but maybe return a warning field?
           // We won't block the user from cleaning their dashboard.
@@ -1233,7 +1406,7 @@ router.delete(
     });
 
     res.json({ success: true, message: "Template deleted successfully" });
-  })
+  }),
 );
 
 /**
@@ -1266,12 +1439,14 @@ router.post(
       `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      },
     );
 
     if (!metaResp.ok) {
       const error = await metaResp.json();
-      return res.status(400).json({ message: "Failed to fetch from Meta", error });
+      return res
+        .status(400)
+        .json({ message: "Failed to fetch from Meta", error });
     }
 
     const metaData = await metaResp.json();
@@ -1310,7 +1485,7 @@ router.post(
       status: newStatus,
       message: `Template status updated to "${newStatus}"`,
     });
-  })
+  }),
 );
 
 export default router;
