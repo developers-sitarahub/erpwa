@@ -958,11 +958,13 @@ export default function InboxPage() {
   /* =======================
      SELECT CONVERSATION
   ======================= */
-  const handleSelectConversation = async (id: string) => {
+  const handleSelectConversation = async (id: string, updateUrl = true) => {
     // Update URL
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("chatId", id);
-    router.replace(`${pathname}?${params.toString()}`);
+    if (updateUrl) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("chatId", id);
+      router.replace(`${pathname}?${params.toString()}`);
+    }
 
     readSentRef.current.delete(id);
 
@@ -1018,32 +1020,66 @@ export default function InboxPage() {
         );
       });
 
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === id
-            ? {
-                ...c,
-                sessionStarted: res.data.sessionStarted,
-                sessionActive: res.data.sessionActive,
-                sessionExpiresAt: res.data.sessionExpiresAt,
-              }
-            : c,
-        ),
-      );
+      setConversations((prev) => {
+        const index = prev.findIndex((c) => c.id === id);
+        if (index >= 0) {
+          return prev.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  sessionStarted: res.data.sessionStarted,
+                  sessionActive: res.data.sessionActive,
+                  sessionExpiresAt: res.data.sessionExpiresAt,
+                }
+              : c,
+          );
+        } else {
+          // Append newly started conversation to the list so it can be selected
+          return [
+            {
+              id: res.data.conversationId,
+              companyName:
+                res.data.lead?.companyName || res.data.lead?.phoneNumber,
+              phone: res.data.lead?.phoneNumber,
+              status: res.data.lead?.status || "new",
+              leadId: res.data.lead?.id,
+              lastMessage: "New Conversation",
+              lastActivity: new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              unreadCount: 0,
+              hasUnread: false,
+              sessionStarted: res.data.sessionStarted,
+              sessionActive: res.data.sessionActive,
+              sessionExpiresAt: res.data.sessionExpiresAt,
+              templateRequired: !res.data.sessionActive,
+            },
+            ...prev,
+          ];
+        }
+      });
     } catch (err) {
       console.error("Failed to load conversation", err);
       setMessages([]);
     }
   };
 
+  const mounted = useRef(false);
+
   useEffect(() => {
+    if (mounted.current) return;
+    mounted.current = true;
+
+    const init = async () => {
+      await loadInbox(); // Wait for conversations before selecting
+      if (chatId) {
+        handleSelectConversation(chatId, false); // false = don't update URL again
+      }
+    };
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    loadInbox();
-    if (chatId) {
-      handleSelectConversation(chatId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId]);
+  }, []);
 
   // ✅ Update conversation's last message status in real-time
   const handleUpdateConversationStatus = (
