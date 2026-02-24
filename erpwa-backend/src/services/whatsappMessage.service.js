@@ -86,7 +86,6 @@ export async function sendMessage(vendorId, conversationId, contentObj) {
       const newMessage = await prisma.message.create({
         data: {
           vendorId,
-          whatsappPhoneNumberId: phoneNumberId,
           conversationId,
           direction: "outbound",
           channel: "whatsapp",

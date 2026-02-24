@@ -145,10 +145,10 @@ router.post(
           text: { body: text },
           ...(replyToMessageId
             ? {
-                context: {
-                  message_id: replyToMessageId,
-                },
-              }
+              context: {
+                message_id: replyToMessageId,
+              },
+            }
             : {}),
         }),
       },
@@ -178,7 +178,6 @@ router.post(
     const message = await prisma.message.create({
       data: {
         vendorId: conversation.vendorId,
-        whatsappPhoneNumberId: conversation.vendor.whatsappPhoneNumberId,
         conversationId: conversation.id,
         senderId: req.user.id,
         direction: "outbound",
@@ -407,7 +406,6 @@ router.post(
       message = await prisma.message.create({
         data: {
           vendorId: conversation.vendorId,
-          whatsappPhoneNumberId: conversation.vendor.whatsappPhoneNumberId,
           conversationId,
           senderId: req.user.id,
           direction: "outbound",
@@ -444,7 +442,6 @@ router.post(
       await prisma.message.create({
         data: {
           vendorId: conversation.vendorId,
-          whatsappPhoneNumberId: conversation.vendor.whatsappPhoneNumberId,
           conversationId,
           senderId: req.user.id,
           direction: "outbound",

@@ -20,25 +20,9 @@ router.get(
   asyncHandler(async (req, res) => {
     const vendorId = req.user.vendorId;
 
-    // Get vendor's current phone number to scope inbox
-    const vendor = await prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { whatsappPhoneNumberId: true },
-    });
-
-    const phoneNumberId = vendor?.whatsappPhoneNumberId;
-
-    if (!phoneNumberId) {
-      return res.json([]); // No phone configured → empty inbox
-    }
-
     const where = {
       vendorId,
       channel: "whatsapp",
-      // Only conversations that have at least one message for this phone number
-      messages: {
-        some: { whatsappPhoneNumberId: phoneNumberId },
-      },
     };
 
     // 🔒 ROLE-BASED FILTERING: Sales persons only see their assigned leads
@@ -60,7 +44,6 @@ router.get(
           },
         },
         messages: {
-          where: { whatsappPhoneNumberId: phoneNumberId },
           orderBy: { createdAt: "desc" },
           take: 1, // last message preview
         },
@@ -70,12 +53,12 @@ router.get(
       },
     });
 
-    // ✅ Fetch unread counts scoped to current phone number
+    // ✅ OPTIMIZED: Fetch ALL unread counts in ONE query instead of N queries
+    // This fixes the 8+ second load time by avoiding the N+1 problem
     const unreadCounts = await prisma.message.groupBy({
       by: ["conversationId"],
       where: {
         conversationId: { in: conversations.map((c) => c.id) },
-        whatsappPhoneNumberId: phoneNumberId,
         direction: "inbound",
         status: { not: "read" },
       },
@@ -113,14 +96,6 @@ router.get(
     const { conversationId } = req.params;
     const vendorId = req.user.vendorId;
 
-    // Get vendor's current phone number to scope messages
-    const vendor = await prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { whatsappPhoneNumberId: true },
-    });
-
-    const phoneNumberId = vendor?.whatsappPhoneNumberId;
-
     const where = {
       id: conversationId,
       vendorId,
@@ -141,8 +116,6 @@ router.get(
           },
         },
         messages: {
-          // Filter messages by current phone number ID
-          where: phoneNumberId ? { whatsappPhoneNumberId: phoneNumberId } : {},
           orderBy: { createdAt: "asc" },
           include: {
             media: true,
