@@ -15,6 +15,12 @@ model Vendor {
   whatsappStatus        String         @default("not_configured")
   whatsappVerifiedAt    DateTime?
   whatsappLastError     String?
+  whatsappVerificationStatus String?
+  whatsappQualityRating      String?
+  whatsappMessagingTier      String?
+  whatsappVerifiedName       String?
+  whatsappDisplayPhoneNumber String?
+
   // WhatsApp Flows Encryption Keys
   whatsappFlowsPublicKey String?  // Stores the Public Key (PEM format)
   whatsappFlowsPrivateKey String? // Encrypted Private Key

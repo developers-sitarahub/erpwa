@@ -33,6 +33,11 @@ export default function WhatsAppSetupPage() {
     whatsappBusinessId?: string;
     whatsappPhoneNumberId?: string;
     whatsappVerifiedAt?: string;
+    whatsappVerificationStatus?: string;
+    whatsappQualityRating?: string;
+    whatsappMessagingTier?: string;
+    whatsappVerifiedName?: string;
+    whatsappDisplayPhoneNumber?: string;
   }>({});
 
   const [form, setForm] = useState({
@@ -215,6 +220,24 @@ export default function WhatsAppSetupPage() {
     }
   }
 
+  /* ================= REFRESH ================= */
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefreshStatus() {
+    setRefreshing(true);
+    try {
+      const res = await api.post("/vendor/whatsapp/refresh-status");
+      setConfig(res.data);
+      toast.success("WhatsApp health status synced with Meta");
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error.response?.data?.message || "Failed to refresh status");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   /* ================= EMBEDDED SIGNUP ================= */
 
   function handleEmbeddedSignup() {
@@ -353,42 +376,193 @@ export default function WhatsAppSetupPage() {
 
       {/* ================= CONNECTED VIEW ================= */}
       {status === "connected" && !isEditing && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <p className="font-medium text-primary">
-            WhatsApp is currently connected
-          </p>
-
-          <div className="text-sm space-y-1">
-            <div>
-              <span className="text-muted-foreground">Business ID:</span>{" "}
-              {config.whatsappBusinessId}
-            </div>
-            <div>
-              <span className="text-muted-foreground">Phone Number ID:</span>{" "}
-              {config.whatsappPhoneNumberId}
-            </div>
-            {config.whatsappVerifiedAt && (
-              <div>
-                <span className="text-muted-foreground">Connected on:</span>{" "}
-                {new Date(config.whatsappVerifiedAt).toLocaleString()}
+        <div className="space-y-6">
+          {/* Main Alerts */}
+          {(() => {
+            if (
+              config.whatsappVerificationStatus &&
+              config.whatsappVerificationStatus !== "VERIFIED"
+            ) {
+              return (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-md p-4 text-sm space-y-1">
+                  <p className="font-semibold">
+                    ⚠️ Phone verification incomplete
+                  </p>
+                  <p>
+                    Your number is connected but verification is not complete.
+                    Messaging may be blocked.
+                  </p>
+                </div>
+              );
+            }
+            if (config.whatsappQualityRating === "RED") {
+              return (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-md p-4 text-sm space-y-1">
+                  <p className="font-semibold">
+                    ⚠️ Number connected but currently restricted by WhatsApp
+                    quality system
+                  </p>
+                  <p>
+                    Quality rating is RED. Your messaging capabilities might be
+                    limited or disabled until the rating improves.
+                  </p>
+                </div>
+              );
+            }
+            if (config.whatsappQualityRating === "YELLOW") {
+              return (
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-md p-4 text-sm space-y-1">
+                  <p className="font-semibold">
+                    ⚠️ WhatsApp active with reduced quality
+                  </p>
+                  <p>
+                    Quality rating is YELLOW. Please be cautious with messaging
+                    behavior.
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="bg-green-500/10 border border-green-500/20 text-green-700 dark:text-green-400 rounded-md p-4 text-sm space-y-1">
+                <p className="font-semibold">✅ WhatsApp active & healthy</p>
+                <p>Your number is verified and has a good quality rating.</p>
               </div>
-            )}
+            );
+          })()}
+
+          {/* Health & Status Cards */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-medium">WhatsApp Health Status</h3>
+              <button
+                onClick={handleRefreshStatus}
+                disabled={refreshing}
+                className="text-sm border border-border bg-background hover:bg-muted px-3 py-1 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {refreshing ? (
+                  <span className="animate-spin text-xs">⏳</span>
+                ) : (
+                  <span className="text-xs">🔄</span>
+                )}
+                {refreshing ? "Syncing..." : "Sync Health"}
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Verification Status */}
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1">
+                <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">
+                  Verification
+                </span>
+                <span className="flex items-center gap-2 font-medium">
+                  {config.whatsappVerificationStatus === "VERIFIED" ? (
+                    <>
+                      <span className="text-green-500">●</span> Verified
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-destructive">●</span>{" "}
+                      {config.whatsappVerificationStatus || "Unknown"}
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Quality Rating */}
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1">
+                <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">
+                  Quality Rating
+                </span>
+                <span className="flex items-center gap-2 font-medium">
+                  {config.whatsappQualityRating === "GREEN" ? (
+                    <>
+                      <span className="text-green-500">●</span> High (Green)
+                    </>
+                  ) : config.whatsappQualityRating === "YELLOW" ? (
+                    <>
+                      <span className="text-amber-500">●</span> Medium (Yellow)
+                    </>
+                  ) : config.whatsappQualityRating === "RED" ? (
+                    <>
+                      <span className="text-destructive">●</span> Low (Red)
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-muted-foreground">●</span> Unknown
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Messaging Tier */}
+              <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1">
+                <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">
+                  Messaging Tier
+                </span>
+                <span className="font-medium">
+                  {config.whatsappMessagingTier
+                    ? config.whatsappMessagingTier.replace(/_/g, " ")
+                    : "Unknown"}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <button
-            onClick={() =>
-              showConfirmToast({
-                title: "Edit WhatsApp configuration?",
-                message:
-                  "Reconfiguring will replace the existing connection and may interrupt message delivery.",
-                confirmLabel: "Yes, edit",
-                onConfirm: () => setIsEditing(true),
-              })
-            }
-            className="border border-border rounded-md px-4 py-2 text-sm hover:bg-muted"
-          >
-            Reconfigure
-          </button>
+          {/* Connection Details */}
+          <div className="bg-card border border-border rounded-lg p-5 space-y-4">
+            <h3 className="font-medium text-primary">Connection Details</h3>
+
+            <div className="text-sm space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <span className="text-muted-foreground block text-xs mb-1">
+                    Business Name
+                  </span>
+                  <span className="font-medium text-lg">
+                    {config.whatsappVerifiedName || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-xs mb-1">
+                    Phone Number
+                  </span>
+                  <span className="font-medium text-lg">
+                    {config.whatsappDisplayPhoneNumber || "—"}
+                  </span>
+                </div>
+              </div>
+
+              {config.whatsappVerifiedAt && (
+                <div className="pt-2 border-t border-border mt-2">
+                  <span className="text-muted-foreground text-xs mb-1 flex justify-between">
+                    <span>Integration Date</span>
+                    <span className="font-mono text-[10px] text-muted-foreground opacity-50 text-right">
+                      PID: {config.whatsappPhoneNumberId}
+                    </span>
+                  </span>
+                  <span>
+                    {new Date(config.whatsappVerifiedAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-border mt-4">
+              <button
+                onClick={() =>
+                  showConfirmToast({
+                    title: "Edit WhatsApp configuration?",
+                    message:
+                      "Reconfiguring will replace the existing connection and may interrupt message delivery.",
+                    confirmLabel: "Yes, edit",
+                    onConfirm: () => setIsEditing(true),
+                  })
+                }
+                className="border border-border rounded-md px-4 py-2 text-sm hover:bg-muted"
+              >
+                Reconfigure Connection
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

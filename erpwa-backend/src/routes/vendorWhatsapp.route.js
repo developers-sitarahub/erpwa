@@ -4,7 +4,7 @@ import prisma from "../prisma.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { requireRoles } from "../middleware/requireRole.middleware.js";
-import { encrypt } from "../utils/encryption.js";
+import { encrypt, decrypt } from "../utils/encryption.js";
 
 const router = express.Router();
 
@@ -125,7 +125,7 @@ router.post(
 
     // 2️⃣ Validate credentials with Meta API
     const metaResp = await fetch(
-      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number`,
+      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
       {
         headers: {
           Authorization: `Bearer ${whatsappAccessToken}`,
@@ -141,6 +141,33 @@ router.post(
       });
     }
 
+    const phoneData = await metaResp.json();
+    const whatsappVerificationStatus =
+      phoneData?.code_verification_status || "NOT_VERIFIED";
+    const whatsappQualityRating = phoneData?.quality_rating || "UNKNOWN";
+    const whatsappVerifiedName = phoneData?.verified_name || null;
+    const whatsappDisplayPhoneNumber = phoneData?.display_phone_number || null;
+
+    // Attempt to get tier if possible via separate endpoint but keep UI fast
+    let whatsappMessagingTier = "UNKNOWN";
+    try {
+      const phoneHealthResp = await fetch(
+        `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+        { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
+      );
+      const phoneHealthData = await phoneHealthResp.json();
+      if (phoneHealthData?.data && Array.isArray(phoneHealthData.data)) {
+        const numberObj = phoneHealthData.data.find(
+          (n) => n.id === whatsappPhoneNumberId,
+        );
+        if (numberObj) {
+          whatsappMessagingTier = numberObj.messaging_limit_tier || "UNKNOWN";
+        }
+      }
+    } catch (e) {
+      console.error("Could not fetch tier", e);
+    }
+
     // 3️⃣ Encrypt access token
     const encryptedToken = encrypt(whatsappAccessToken);
 
@@ -154,11 +181,23 @@ router.post(
         whatsappStatus: "connected",
         whatsappVerifiedAt: new Date(),
         whatsappLastError: null,
+        whatsappVerificationStatus,
+        whatsappQualityRating,
+        whatsappMessagingTier,
+        whatsappVerifiedName,
+        whatsappDisplayPhoneNumber,
       },
     });
 
     res.json({
       message: "WhatsApp successfully connected",
+      data: {
+        whatsappVerificationStatus,
+        whatsappQualityRating,
+        whatsappMessagingTier,
+        whatsappVerifiedName,
+        whatsappDisplayPhoneNumber,
+      },
     });
   }),
 );
@@ -250,20 +289,43 @@ router.post(
     }
 
     /**
-     * ✅ OPTIONAL → Phone Health Check (Add Here)
+     * ✅ Check Verification Status & Quality Rating
      */
-    const phoneResp = await fetch(
-      `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+    const phoneDetailResp = await fetch(
+      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       },
     );
+    const phoneDetailData = await phoneDetailResp.json();
+    const whatsappVerificationStatus =
+      phoneDetailData?.code_verification_status || "NOT_VERIFIED";
+    const whatsappQualityRating = phoneDetailData?.quality_rating || "UNKNOWN";
+    const whatsappVerifiedName = phoneDetailData?.verified_name || null;
+    const whatsappDisplayPhoneNumber =
+      phoneDetailData?.display_phone_number || null;
 
-    const phoneData = await phoneResp.json();
+    // Tier fetch
+    let whatsappMessagingTier = "UNKNOWN";
+    try {
+      const phoneHealthResp = await fetch(
+        `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      const phoneHealthData = await phoneHealthResp.json();
+      if (phoneHealthData?.data && Array.isArray(phoneHealthData.data)) {
+        const numberObj = phoneHealthData.data.find(
+          (n) => n.id === whatsappPhoneNumberId,
+        );
+        if (numberObj) {
+          whatsappMessagingTier = numberObj.messaging_limit_tier || "UNKNOWN";
+        }
+      }
+    } catch (e) {}
 
-    console.log("📱 Phone Health:", JSON.stringify(phoneData, null, 2));
+    console.log("📱 Phone Details:", JSON.stringify(phoneDetailData, null, 2));
 
     /**
      * ✅ STEP 2 → Subscribe App
@@ -294,6 +356,11 @@ router.post(
         whatsappStatus: "connected",
         whatsappVerifiedAt: new Date(),
         whatsappLastError: null,
+        whatsappVerificationStatus,
+        whatsappQualityRating,
+        whatsappMessagingTier,
+        whatsappVerifiedName,
+        whatsappDisplayPhoneNumber,
       },
     });
 
@@ -320,10 +387,110 @@ router.get(
         whatsappStatus: true,
         whatsappVerifiedAt: true,
         whatsappLastError: true,
+        whatsappVerificationStatus: true,
+        whatsappQualityRating: true,
+        whatsappMessagingTier: true,
+        whatsappVerifiedName: true,
+        whatsappDisplayPhoneNumber: true,
       },
     });
 
     res.json(vendor);
+  }),
+);
+
+/**
+ * ===============================
+ * REFRESH WHATSAPP STATUS
+ * ===============================
+ * Access: vendor_owner, vendor_admin
+ */
+router.post(
+  "/whatsapp/refresh-status",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin"]),
+  asyncHandler(async (req, res) => {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+    });
+
+    if (
+      !vendor ||
+      !vendor.whatsappAccessToken ||
+      !vendor.whatsappPhoneNumberId
+    ) {
+      return res.status(400).json({ message: "WhatsApp not fully configured" });
+    }
+
+    const { whatsappPhoneNumberId, whatsappBusinessId } = vendor;
+    const whatsappAccessToken = decrypt(vendor.whatsappAccessToken);
+
+    try {
+      const phoneDetailResp = await fetch(
+        `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+        { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
+      );
+      const phoneDetailData = await phoneDetailResp.json();
+
+      const whatsappVerificationStatus =
+        phoneDetailData?.code_verification_status || "NOT_VERIFIED";
+      const whatsappQualityRating =
+        phoneDetailData?.quality_rating ||
+        vendor.whatsappQualityRating ||
+        "UNKNOWN";
+      const whatsappVerifiedName =
+        phoneDetailData?.verified_name || vendor.whatsappVerifiedName || null;
+      const whatsappDisplayPhoneNumber =
+        phoneDetailData?.display_phone_number ||
+        vendor.whatsappDisplayPhoneNumber ||
+        null;
+
+      let whatsappMessagingTier = vendor.whatsappMessagingTier || "UNKNOWN";
+      try {
+        const phoneHealthResp = await fetch(
+          `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+          { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
+        );
+        const phoneHealthData = await phoneHealthResp.json();
+        if (phoneHealthData?.data && Array.isArray(phoneHealthData.data)) {
+          const numberObj = phoneHealthData.data.find(
+            (n) => n.id === whatsappPhoneNumberId,
+          );
+          if (numberObj) {
+            whatsappMessagingTier =
+              numberObj.messaging_limit_tier || whatsappMessagingTier;
+          }
+        }
+      } catch (e) {}
+
+      const updatedVendor = await prisma.vendor.update({
+        where: { id: req.user.vendorId },
+        data: {
+          whatsappVerificationStatus,
+          whatsappQualityRating,
+          whatsappMessagingTier,
+          whatsappVerifiedName,
+          whatsappDisplayPhoneNumber,
+        },
+        select: {
+          whatsappBusinessId: true,
+          whatsappPhoneNumberId: true,
+          whatsappStatus: true,
+          whatsappVerifiedAt: true,
+          whatsappLastError: true,
+          whatsappVerificationStatus: true,
+          whatsappQualityRating: true,
+          whatsappMessagingTier: true,
+          whatsappVerifiedName: true,
+          whatsappDisplayPhoneNumber: true,
+        },
+      });
+
+      res.json(updatedVendor);
+    } catch (err) {
+      console.error("Refresh status error:", err);
+      res.status(500).json({ message: "Failed to refresh WhatsApp status." });
+    }
   }),
 );
 
