@@ -243,22 +243,23 @@ model Conversation {
 }
 
 model Template {
-  id               String             @id @default(uuid())
-  vendorId         String
-  metaTemplateName String
-  displayName      String
-  category         String
-  status           String             @default("draft")
-  templateType     String             @default("standard") // standard, catalog, carousel
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  campaigns        Campaign[]
-  vendor           Vendor             @relation(fields: [vendorId], references: [id])
-  buttons          TemplateButton[]
-  languages        TemplateLanguage[]
-  media            TemplateMedia[]
-  catalogProducts  TemplateCatalogProduct[] // For multi-product catalog templates
-  carouselCards    TemplateCarouselCard[]   // For carousel templates
+  id                    String             @id @default(uuid())
+  vendorId              String
+  whatsappPhoneNumberId String             // Plain string – scopes template to a phone number (no FK)
+  metaTemplateName      String
+  displayName           String
+  category              String
+  status                String             @default("draft")
+  templateType          String             @default("standard") // standard, catalog, carousel
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  campaigns             Campaign[]
+  vendor                Vendor             @relation(fields: [vendorId], references: [id])
+  buttons               TemplateButton[]
+  languages             TemplateLanguage[]
+  media                 TemplateMedia[]
+  catalogProducts       TemplateCatalogProduct[] // For multi-product catalog templates
+  carouselCards         TemplateCarouselCard[]   // For carousel templates
 
   createdBy        String?            // User ID who created this template
   
@@ -266,8 +267,9 @@ model Template {
   flowId           String?
   flow             WhatsAppFlow?      @relation(fields: [flowId], references: [id], onDelete: SetNull)
 
-  @@unique([vendorId, metaTemplateName])
+  @@unique([whatsappPhoneNumberId, metaTemplateName])
   @@index([vendorId])
+  @@index([whatsappPhoneNumberId])
   @@index([createdBy])
   @@index([flowId])
 
@@ -419,12 +421,13 @@ model Campaign {
 
 
 model Message {
-  id                String            @id @default(uuid())
-  vendorId          String
-  conversationId    String
-  campaignId        String?
-  senderId          String?
-  albumId           String?
+  id                    String            @id @default(uuid())
+  vendorId              String
+  whatsappPhoneNumberId String            // Plain string – scopes message to a phone number (no FK)
+  conversationId        String
+  campaignId            String?
+  senderId              String?
+  albumId               String?
 
   direction         String
   channel           String            @default("whatsapp")
@@ -452,6 +455,9 @@ model Message {
 
   media         MessageMedia[]
   deliveries    MessageDelivery[]
+
+  @@index([vendorId])
+  @@index([whatsappPhoneNumberId])
 }
 
 

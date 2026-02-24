@@ -4,6 +4,14 @@ import { logActivity } from "./activityLog.service.js";
 class CampaignService {
   static async createTemplateCampaign(user, payload) {
     const vendorId = user.vendorId;
+
+    // Fetch phone number ID to scope messages
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { whatsappPhoneNumberId: true },
+    });
+    const whatsappPhoneNumberId = vendor?.whatsappPhoneNumberId || null;
+
     const {
       name,
       templateId,
@@ -42,7 +50,9 @@ class CampaignService {
       const providedCount = bodyVariables?.length || 0;
 
       if (requiredVariableCount > 0 && providedCount < requiredVariableCount) {
-        console.warn(`[Campaign] Template ${template.metaTemplateName} requires ${requiredVariableCount} body variables, but only ${providedCount} provided. Using fallback values.`);
+        console.warn(
+          `[Campaign] Template ${template.metaTemplateName} requires ${requiredVariableCount} body variables, but only ${providedCount} provided. Using fallback values.`,
+        );
       }
     }
 
@@ -153,6 +163,7 @@ class CampaignService {
         prisma.message.create({
           data: {
             vendorId,
+            whatsappPhoneNumberId,
             conversationId: conv.id,
             campaignId: campaign.id,
             direction: "outbound",
@@ -191,8 +202,8 @@ class CampaignService {
         campaignName: name,
         type: "TEMPLATE",
         recipientCount: validConversations.length,
-        scheduledAt: scheduledAt
-      }
+        scheduledAt: scheduledAt,
+      },
     });
 
     return {
@@ -203,6 +214,14 @@ class CampaignService {
   }
   static async createImageCampaign(user, payload) {
     const vendorId = user.vendorId;
+
+    // Fetch phone number ID to scope messages
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { whatsappPhoneNumberId: true },
+    });
+    const whatsappPhoneNumberId = vendor?.whatsappPhoneNumberId || null;
+
     const {
       name,
       categoryId,
@@ -223,7 +242,10 @@ class CampaignService {
 
     // 1️⃣ Fetch images
     const MAX_IMAGES_PER_CONVERSATION = 30;
-    const finalLimit = Math.min(imageIds?.length || imageLimit, MAX_IMAGES_PER_CONVERSATION);
+    const finalLimit = Math.min(
+      imageIds?.length || imageLimit,
+      MAX_IMAGES_PER_CONVERSATION,
+    );
 
     const where = {
       vendorId,
@@ -321,6 +343,7 @@ class CampaignService {
         const message = await prisma.message.create({
           data: {
             vendorId,
+            whatsappPhoneNumberId,
             conversationId: conv.id,
             campaignId: campaign.id,
             direction: "outbound",
@@ -373,8 +396,8 @@ class CampaignService {
         campaignName: name,
         type: "IMAGE",
         recipientCount: conversations.length,
-        imageCount: safeImages.length
-      }
+        imageCount: safeImages.length,
+      },
     });
 
     return {

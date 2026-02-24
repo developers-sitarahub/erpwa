@@ -44,8 +44,8 @@ router.post(
         languages: true,
         buttons: true,
         carouselCards: {
-          orderBy: { position: 'asc' }
-        }
+          orderBy: { position: "asc" },
+        },
       },
     });
 
@@ -54,19 +54,25 @@ router.post(
     }
 
     if (templateRaw.status !== "approved") {
-      return res.status(400).json({ message: `Template is not approved (Status: ${templateRaw.status})` });
+      return res.status(400).json({
+        message: `Template is not approved (Status: ${templateRaw.status})`,
+      });
     }
 
-    const approvedLanguage = templateRaw.languages.find(l => l.metaStatus === "approved");
+    const approvedLanguage = templateRaw.languages.find(
+      (l) => l.metaStatus === "approved",
+    );
 
     if (!approvedLanguage) {
-      return res.status(400).json({ message: "No approved language version found for this template" });
+      return res.status(400).json({
+        message: "No approved language version found for this template",
+      });
     }
 
     // Use the raw template but with the filtered language for compatibility with existing code
     const template = {
       ...templateRaw,
-      languages: [approvedLanguage]
+      languages: [approvedLanguage],
     };
 
     const language = approvedLanguage;
@@ -74,7 +80,12 @@ router.post(
     /** 3️⃣ Load header media (if any) */
     let media = null;
 
-    if (language.headerType && language.headerType !== "TEXT" && template.templateType !== 'carousel' && template.templateType !== 'catalog') {
+    if (
+      language.headerType &&
+      language.headerType !== "TEXT" &&
+      template.templateType !== "carousel" &&
+      template.templateType !== "catalog"
+    ) {
       media = await prisma.templateMedia.findFirst({
         where: {
           templateId: template.id,
@@ -83,7 +94,9 @@ router.post(
       });
 
       if (!media?.s3Url) {
-        console.warn(`⚠️ Header media record or S3 URL missing for template ${template.displayName} (${language.headerType}). Proceeding without header component.`);
+        console.warn(
+          `⚠️ Header media record or S3 URL missing for template ${template.displayName} (${language.headerType}). Proceeding without header component.`,
+        );
       }
     }
 
@@ -91,7 +104,11 @@ router.post(
     let messagesToSend = [];
 
     // Check if we have custom messages (per-recipient variables)
-    if (customMessages && Array.isArray(customMessages) && customMessages.length > 0) {
+    if (
+      customMessages &&
+      Array.isArray(customMessages) &&
+      customMessages.length > 0
+    ) {
       messagesToSend = customMessages;
     } else {
       // Default: same variables for all recipients
@@ -106,7 +123,11 @@ router.post(
 
     /** 5️⃣ Send to recipients */
     for (const msg of messagesToSend) {
-      const { to: rawTo, bodyVariables: msgBodyVars, buttonVariables: msgButtonVars } = msg;
+      const {
+        to: rawTo,
+        bodyVariables: msgBodyVars,
+        buttonVariables: msgButtonVars,
+      } = msg;
 
       // Use message specific variables or fall back to global ones
       const currentBodyVars = msgBodyVars || bodyVariables;
@@ -164,43 +185,53 @@ router.post(
         }
 
         /** 🔹 CAROUSEL */
-        if (template.templateType === 'carousel' && template.carouselCards?.length > 0) {
-          const carouselCardsPayload = template.carouselCards.map((card, index) => {
-            const mediaType = (card.mimeType && card.mimeType.startsWith('video')) ? "VIDEO" : "IMAGE";
-            return {
-              card_index: index,
-              components: [
-                {
-                  type: "HEADER",
-                  parameters: [
-                    {
-                      type: mediaType.toLowerCase(),
-                      [mediaType.toLowerCase()]: {
-                        link: card.s3Url
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
-          });
+        if (
+          template.templateType === "carousel" &&
+          template.carouselCards?.length > 0
+        ) {
+          const carouselCardsPayload = template.carouselCards.map(
+            (card, index) => {
+              const mediaType =
+                card.mimeType && card.mimeType.startsWith("video")
+                  ? "VIDEO"
+                  : "IMAGE";
+              return {
+                card_index: index,
+                components: [
+                  {
+                    type: "HEADER",
+                    parameters: [
+                      {
+                        type: mediaType.toLowerCase(),
+                        [mediaType.toLowerCase()]: {
+                          link: card.s3Url,
+                        },
+                      },
+                    ],
+                  },
+                ],
+              };
+            },
+          );
 
           components.push({
             type: "CAROUSEL",
-            cards: carouselCardsPayload
+            cards: carouselCardsPayload,
           });
         }
 
         /** 🔹 BUTTONS */
-        if (template.templateType !== 'carousel') {
+        if (template.templateType !== "carousel") {
           // Check if we have FLOW buttons
-          const flowButton = template.buttons?.find(btn => btn.type === "FLOW");
+          const flowButton = template.buttons?.find(
+            (btn) => btn.type === "FLOW",
+          );
 
           if (flowButton && flowButton.flowId) {
             // Get the Flow details
             const flow = await prisma.whatsAppFlow.findUnique({
               where: { id: flowButton.flowId },
-              select: { metaFlowId: true, status: true }
+              select: { metaFlowId: true, status: true },
             });
 
             if (flow) {
@@ -233,7 +264,6 @@ router.post(
           }
         }
 
-
         /** 🔹 SEND TO WHATSAPP */
         const metaResp = await fetch(
           `https://graph.facebook.com/v24.0/${vendor.whatsappPhoneNumberId}/messages`,
@@ -253,7 +283,7 @@ router.post(
                 components,
               },
             }),
-          }
+          },
         );
 
         const metaData = await metaResp.json();
@@ -266,7 +296,10 @@ router.post(
         let content = language.body;
         if (currentBodyVars && currentBodyVars.length) {
           currentBodyVars.forEach((v, i) => {
-            content = content.replace(new RegExp(`\\{\\{${i + 1}\\}\\}`, "g"), String(v));
+            content = content.replace(
+              new RegExp(`\\{\\{${i + 1}\\}\\}`, "g"),
+              String(v),
+            );
           });
         }
 
@@ -320,6 +353,7 @@ router.post(
         const message = await prisma.message.create({
           data: {
             vendorId: vendor.id,
+            whatsappPhoneNumberId: vendor.whatsappPhoneNumberId,
             conversationId: conversation.id,
             senderId: req.user.id,
             direction: "outbound",
@@ -336,10 +370,10 @@ router.post(
                 name: template.displayName,
                 footer: language.footerText,
                 buttons: template.buttons || [],
-                carouselCards: template.carouselCards || [] // ✅ Persist carousel cards
+                carouselCards: template.carouselCards || [], // ✅ Persist carousel cards
               },
               templateId: template.id, // ✅ CRITICAL: Save templateId for enrichment
-              templateType: template.templateType // ✅ Save type
+              templateType: template.templateType, // ✅ Save type
             },
           },
         });
@@ -349,7 +383,14 @@ router.post(
           await prisma.messageMedia.create({
             data: {
               messageId: message.id,
-              mediaType: media.mediaType === "IMAGE" ? "image" : media.mediaType === "VIDEO" ? "video" : media.mediaType === "DOCUMENT" ? "document" : "image",
+              mediaType:
+                media.mediaType === "IMAGE"
+                  ? "image"
+                  : media.mediaType === "VIDEO"
+                    ? "video"
+                    : media.mediaType === "DOCUMENT"
+                      ? "document"
+                      : "image",
               mimeType: media.mimeType || "image/jpeg",
               mediaUrl: media.s3Url,
             },
@@ -376,10 +417,10 @@ router.post(
               footer: language.footerText,
               footer: language.footerText,
               buttons: template.buttons || [],
-              carouselCards: template.carouselCards || [] // ✅ Socket: Send cards
+              carouselCards: template.carouselCards || [], // ✅ Socket: Send cards
             },
             templateType: template.templateType || "standard", // ✅ Socket: Send type
-            carouselCards: template.carouselCards || [] // ✅ Socket: Send cards (top level for compatibility)
+            carouselCards: template.carouselCards || [], // ✅ Socket: Send cards (top level for compatibility)
           });
 
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
@@ -401,7 +442,7 @@ router.post(
     }
 
     res.json({ success: true, results });
-  })
+  }),
 );
 
 export default router;
