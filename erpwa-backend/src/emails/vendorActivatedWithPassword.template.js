@@ -33,7 +33,7 @@ export function vendorActivatedWithPasswordTemplate({ name, email, password }) {
             </div>
 
             <center>
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" class="btn">Log In Now</a>
+              <a href="${process.env.FRONTEND_URL || "https://gpserp.com"}/login" class="btn">Log In Now</a>
             </center>
           </div>
           <div class="footer">

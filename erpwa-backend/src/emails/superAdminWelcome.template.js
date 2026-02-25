@@ -12,7 +12,7 @@ Your Super Admin account has been successfully created.
 
 Email   : ${email}
 Role    : Super Admin
-Login   : http://localhost:3000/admin-login
+Login   : ${process.env.FRONTEND_URL || "https://gpserp.com"}/admin-login
 
 Keep your credentials safe. If you need to change your password,
 use the Settings > Change Password flow after logging in.
@@ -49,7 +49,7 @@ use the Settings > Change Password flow after logging in.
                   </tr>
                 </table>
 
-                <a href="http://localhost:3000/admin-login"
+                <a href="${process.env.FRONTEND_URL || "https://gpserp.com"}/admin-login"
                    style="display:inline-block; background:#6366f1; color:#ffffff;
                           text-decoration:none; padding:12px 28px; border-radius:6px;
                           font-weight:600; font-size:14px; margin:8px 0;">

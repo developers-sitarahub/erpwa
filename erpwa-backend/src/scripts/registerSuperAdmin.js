@@ -63,8 +63,8 @@ function isValidEmail(email) {
 }
 
 const BORDER = "╔══════════════════════════════════════════════╗";
-const MID    = "╠══════════════════════════════════════════════╣";
-const END    = "╚══════════════════════════════════════════════╝";
+const MID = "╠══════════════════════════════════════════════╣";
+const END = "╚══════════════════════════════════════════════╝";
 
 /* ─── Main ────────────────────────────────────────────────── */
 
@@ -77,13 +77,20 @@ const existing = await prisma.superAdmin.findFirst();
 if (existing) {
   console.log("⚠️  A Super Admin already exists in the database.");
   console.log(`   Email: ${existing.email}`);
-  console.log("\n   To change the password, use Settings → Change Password after logging in.");
-  console.log("   To reset everything, delete the record from Prisma Studio first.\n");
+  console.log(
+    "\n   To change the password, use Settings → Change Password after logging in.",
+  );
+  console.log(
+    "   To reset everything, delete the record from Prisma Studio first.\n",
+  );
   await prisma.$disconnect();
   process.exit(0);
 }
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 
 // Collect inputs
 const name = (await ask(rl, "👤 Full Name   : ")).trim();
@@ -91,16 +98,17 @@ const email = (await ask(rl, "📧 Email       : ")).trim();
 rl.close();
 
 const password = await askPassword("🔒 Password    : ");
-const confirm  = await askPassword("🔒 Confirm     : ");
+const confirm = await askPassword("🔒 Confirm     : ");
 
 // Validate
 const errors = [];
-if (!name)                          errors.push("  • Name is required");
-if (!email)                         errors.push("  • Email is required");
-else if (!isValidEmail(email))      errors.push("  • Email format is invalid");
-if (!password)                      errors.push("  • Password is required");
-else if (password.length < 8)       errors.push("  • Password must be at least 8 characters");
-if (password !== confirm)           errors.push("  • Passwords do not match");
+if (!name) errors.push("  • Name is required");
+if (!email) errors.push("  • Email is required");
+else if (!isValidEmail(email)) errors.push("  • Email format is invalid");
+if (!password) errors.push("  • Password is required");
+else if (password.length < 8)
+  errors.push("  • Password must be at least 8 characters");
+if (password !== confirm) errors.push("  • Passwords do not match");
 
 if (errors.length > 0) {
   console.error("\n❌  Validation failed:\n" + errors.join("\n") + "\n");
@@ -132,7 +140,10 @@ try {
   });
 
   if (mailResult.error) {
-    console.warn("⚠️  Account created but welcome email failed:", mailResult.error.message);
+    console.warn(
+      "⚠️  Account created but welcome email failed:",
+      mailResult.error.message,
+    );
   } else {
     console.log(`✅ Welcome email sent to: ${email}`);
   }
@@ -143,7 +154,7 @@ try {
   console.log(`║  Name  : ${admin.name.padEnd(36)}║`);
   console.log(`║  Email : ${admin.email.padEnd(36)}║`);
   console.log(MID);
-  console.log("║  Login at: localhost:3000/admin-login        ║");
+  console.log("║  Login at: gpserp.com/admin-login        ║");
   console.log(END + "\n");
 } catch (err) {
   console.error("\n❌ Failed to create Super Admin:", err.message, "\n");
