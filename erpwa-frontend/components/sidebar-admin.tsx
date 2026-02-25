@@ -21,11 +21,13 @@ import {
   Plug,
   Activity,
   Layers,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/sidebar-provider";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
+import { toast } from "react-toastify";
 
 /* ✅ Menu config outside component */
 const menuItems = [
@@ -47,10 +49,30 @@ const menuItems = [
 export function SidebarAdmin() {
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const isSetupIncomplete = user?.vendor?.whatsappStatus !== "connected";
 
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const blockedPaths = [
+    "/admin/inbox",
+    "/admin/chatbot",
+    "/admin/templates",
+    "/admin/flows",
+    "/admin/campaigns",
+    "/admin/activity-logs",
+  ];
+
+  // Tooltip tracking state
+  const [blockedHoverIndex, setBlockedHoverIndex] = useState<string | null>(
+    null,
+  );
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
 
   /* ✅ Detect mobile safely */
   useEffect(() => {
@@ -60,42 +82,94 @@ export function SidebarAdmin() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const renderMenuItems = (collapsed = false) =>
-    menuItems.map((item) => {
-      const Icon = item.icon;
-      const isActive = pathname.startsWith(item.href);
+  const renderMenuItems = (collapsed = false) => (
+    <>
+      {menuItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = pathname.startsWith(item.href);
+        const isBlocked =
+          isSetupIncomplete &&
+          blockedPaths.some((p) => item.href.startsWith(p));
 
-      return (
-        <div key={item.href} className="group relative">
-          <Link
-            href={item.href}
-            onClick={() => {
-              if (isMobile) setIsMobileOpen(false); // ✅ close only on user action
-            }}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-              isActive
-                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-              collapsed && "justify-center px-0",
-            )}
-            title={collapsed ? item.label : undefined}
+        // 🛡️ Wrapper div for handling the tooltip and cursor correctly when blocked
+        return (
+          <div
+            key={item.href}
+            className="group relative"
+            title={isBlocked ? undefined : collapsed ? item.label : undefined}
+            onMouseEnter={() => isBlocked && setBlockedHoverIndex(item.href)}
+            onMouseLeave={() => isBlocked && setBlockedHoverIndex(null)}
+            onMouseMove={isBlocked ? handleMouseMove : undefined}
           >
-            <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </Link>
-
-          {/* Tooltip when collapsed */}
-          {collapsed && (
-            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-              <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap">
-                {item.label}
+            {isBlocked ? (
+              <div
+                onClick={() =>
+                  toast.error(
+                    "To use this feature, please complete the setup first.",
+                    { autoClose: 3000, theme: "colored" },
+                  )
+                }
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-not-allowed opacity-50",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                    : "text-sidebar-foreground",
+                  collapsed && "justify-center px-0",
+                )}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </div>
-            </div>
-          )}
+            ) : (
+              <Link
+                href={item.href}
+                onClick={() => {
+                  if (isMobile) setIsMobileOpen(false); // ✅ close only on user action
+                }}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+                  collapsed && "justify-center px-0",
+                )}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </Link>
+            )}
+
+            {/* Tooltip when collapsed (only if not blocked, since blocked uses native title) */}
+            {collapsed && !isBlocked && (
+              <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap">
+                  {item.label}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Awesome Cursor-Following Tooltip for Blocked Items */}
+      {blockedHoverIndex && (
+        <div
+          className="fixed z-50 pointer-events-none bg-destructive/95 backdrop-blur-md text-destructive-foreground px-3 py-2 rounded-xl shadow-2xl flex items-center gap-2.5 font-medium border border-destructive-foreground/20 animate-in fade-in zoom-in-95 duration-200"
+          style={{
+            left: mousePos.x + 15,
+            top: mousePos.y + 15,
+          }}
+        >
+          <div className="bg-destructive-foreground/20 p-1 rounded-full flex items-center justify-center">
+            <Lock className="w-3.5 h-3.5" />
+          </div>
+          <p className="text-xs leading-none m-0 shadow-sm">
+            Setup required for this feature
+          </p>
         </div>
-      );
-    });
+      )}
+    </>
+  );
 
   /* ================= MOBILE ================= */
   if (isMobile) {

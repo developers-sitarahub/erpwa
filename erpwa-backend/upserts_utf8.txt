@@ -1,0 +1,25 @@
+﻿
+src\routes\vendorTemplate.route.js:204:            // Upsert media
+src\routes\vendorTemplate.route.js:758:          // Upsert Media
+src\routes\vendorWhatsappTemplateSend.route.js:274:        const lead = await 
+prisma.lead.upsert({
+src\routes\vendorWhatsappTemplateSend.route.js:302:        const conversation = 
+await prisma.conversation.upsert({
+src\routes\whatsappWebhook.route.js:184:        const lead = await 
+prisma.lead.upsert({
+src\routes\whatsappWebhook.route.js:202:        const conversation = await 
+prisma.conversation.upsert({
+src\routes\whatsappWebhook.route.js:478:        // 📝 Log activity for status 
+update - logic inside logActivity will handle upsert via WAMID
+src\services\campaign.service.js:71:        // Upsert Lead
+src\services\campaign.service.js:73:        const lead = await 
+prisma.lead.upsert({
+src\services\campaign.service.js:92:        // Upsert Conversation
+src\services\campaign.service.js:93:        const conv = await 
+prisma.conversation.upsert({
+src\services\lead.service.js:11:    const lead = await prisma.lead.upsert({
+src\services\lead.service.js:50:    await prisma.conversation.upsert({
+src\services\leadManagement.service.js:245:      await prisma.contact.upsert({
+src\services\leadManagement.service.js:424:        await prisma.contact.upsert({
+
+

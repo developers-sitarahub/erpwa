@@ -9,7 +9,18 @@ import { hashToken } from "../../utils/hash.js";
 /* ================= LOGIN ================= */
 
 export async function login(email, password) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: {
+      vendor: {
+        select: {
+          subscriptionEnd: true,
+          subscriptionStart: true,
+          whatsappStatus: true,
+        },
+      },
+    },
+  });
   if (!user) throw new Error("Invalid credentials");
 
   const valid = await bcrypt.compare(password, user.passwordHash);

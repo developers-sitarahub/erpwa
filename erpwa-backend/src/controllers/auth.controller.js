@@ -23,6 +23,7 @@ export async function login(req, res) {
         id: data.user.id,
         email: data.user.email,
         role: data.user.role,
+        vendor: data.user.vendor,
       },
     });
   } catch (err) {

@@ -9,6 +9,7 @@ import {
   FileText,
   Megaphone,
   Folder,
+  Users,
   Image as ImageIcon,
   Layers,
   Settings,
@@ -16,11 +17,13 @@ import {
   ChevronRight,
   Menu,
   X,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/context/sidebar-provider";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
+import { toast } from "react-toastify";
 
 /* ✅ Menu config matching Sales routes */
 const menuItems = [
@@ -29,6 +32,7 @@ const menuItems = [
   { href: "/templates", icon: FileText, label: "Templates" },
   { href: "/flows", icon: Layers, label: "Forms" },
   { href: "/campaigns", icon: Megaphone, label: "Campaigns" },
+  { href: "/users", icon: Users, label: "Team" },
   { href: "/categories", icon: Folder, label: "Categories" },
   { href: "/gallery", icon: ImageIcon, label: "Gallery" },
   { href: "/settings", icon: Settings, label: "Settings" },
@@ -37,10 +41,30 @@ const menuItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const isSetupIncomplete = user?.vendor?.whatsappStatus !== "connected";
+
+  const blockedPaths = [
+    "/inbox",
+    "/chatbot",
+    "/templates",
+    "/flows",
+    "/campaigns",
+    "/activity-logs",
+  ];
 
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Tooltip tracking state
+  const [blockedHoverIndex, setBlockedHoverIndex] = useState<string | null>(
+    null,
+  );
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
 
   /* ✅ Detect mobile safely */
   useEffect(() => {
@@ -50,42 +74,94 @@ export function Sidebar() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const renderMenuItems = (collapsed = false) =>
-    menuItems.map((item) => {
-      const Icon = item.icon;
-      const isActive = pathname.startsWith(item.href);
+  const renderMenuItems = (collapsed = false) => (
+    <>
+      {menuItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = pathname.startsWith(item.href);
+        const isBlocked =
+          isSetupIncomplete &&
+          blockedPaths.some((p) => item.href.startsWith(p));
 
-      return (
-        <div key={item.href} className="group relative">
-          <Link
-            href={item.href}
-            onClick={() => {
-              if (isMobile) setIsMobileOpen(false); // ✅ close only on user action
-            }}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-              isActive
-                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-              collapsed && "justify-center px-0"
-            )}
-            title={collapsed ? item.label : undefined}
+        // 🛡️ Wrapper div for handling the tooltip and cursor correctly when blocked
+        return (
+          <div
+            key={item.href}
+            className="group relative"
+            title={isBlocked ? undefined : collapsed ? item.label : undefined}
+            onMouseEnter={() => isBlocked && setBlockedHoverIndex(item.href)}
+            onMouseLeave={() => isBlocked && setBlockedHoverIndex(null)}
+            onMouseMove={isBlocked ? handleMouseMove : undefined}
           >
-            <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </Link>
-
-          {/* Tooltip when collapsed */}
-          {collapsed && (
-            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-              <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap">
-                {item.label}
+            {isBlocked ? (
+              <div
+                onClick={() =>
+                  toast.error(
+                    "To use this feature, please complete the setup first.",
+                    { autoClose: 3000, theme: "colored" },
+                  )
+                }
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-not-allowed opacity-50",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                    : "text-sidebar-foreground",
+                  collapsed && "justify-center px-0",
+                )}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </div>
-            </div>
-          )}
+            ) : (
+              <Link
+                href={item.href}
+                onClick={() => {
+                  if (isMobile) setIsMobileOpen(false); // ✅ close only on user action
+                }}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+                  collapsed && "justify-center px-0",
+                )}
+              >
+                <Icon className="w-5 h-5 shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </Link>
+            )}
+
+            {/* Tooltip when collapsed */}
+            {collapsed && !isBlocked && (
+              <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                <div className="bg-sidebar-foreground text-sidebar px-2 py-1 rounded text-xs shadow-lg whitespace-nowrap">
+                  {item.label}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Awesome Cursor-Following Tooltip for Blocked Items */}
+      {blockedHoverIndex && (
+        <div
+          className="fixed z-50 pointer-events-none bg-destructive/95 backdrop-blur-md text-destructive-foreground px-3 py-2 rounded-xl shadow-2xl flex items-center gap-2.5 font-medium border border-destructive-foreground/20 animate-in fade-in zoom-in-95 duration-200"
+          style={{
+            left: mousePos.x + 15,
+            top: mousePos.y + 15,
+          }}
+        >
+          <div className="bg-destructive-foreground/20 p-1 rounded-full flex items-center justify-center">
+            <Lock className="w-3.5 h-3.5" />
+          </div>
+          <p className="text-xs leading-none m-0 shadow-sm">
+            Setup required for this feature
+          </p>
         </div>
-      );
-    });
+      )}
+    </>
+  );
 
   /* ================= MOBILE ================= */
   if (isMobile) {
@@ -108,7 +184,7 @@ export function Sidebar() {
         <aside
           className={cn(
             "fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border transition-transform duration-300",
-            isMobileOpen ? "translate-x-0" : "-translate-x-full"
+            isMobileOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
           <div className="flex items-center justify-center px-2 h-16 border-b border-sidebar-border">
@@ -128,7 +204,7 @@ export function Sidebar() {
               Logout
             </button>
           </div>
-        </aside >
+        </aside>
       </>
     );
   }
@@ -138,12 +214,24 @@ export function Sidebar() {
     <aside
       className={cn(
         "hidden md:flex fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border flex-col transition-all duration-300",
-        isCollapsed ? "w-20" : "w-64"
+        isCollapsed ? "w-20" : "w-64",
       )}
     >
       <div className="flex items-center justify-between px-2 h-16 border-b border-sidebar-border">
-        <div className={cn("flex items-center transition-all duration-300", isCollapsed ? "justify-center w-full" : "justify-start pl-4 flex-1")}>
-          <Logo collapsed={isCollapsed} isSidebar={true} className={cn("transition-all duration-300", isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-55")} />
+        <div
+          className={cn(
+            "flex items-center transition-all duration-300",
+            isCollapsed ? "justify-center w-full" : "justify-start pl-4 flex-1",
+          )}
+        >
+          <Logo
+            collapsed={isCollapsed}
+            isSidebar={true}
+            className={cn(
+              "transition-all duration-300",
+              isCollapsed ? "h-12 w-12" : "h-12 w-full max-w-55",
+            )}
+          />
         </div>
 
         {!isCollapsed && (
@@ -173,7 +261,7 @@ export function Sidebar() {
           onClick={logout}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-sidebar-accent/50 w-full",
-            isCollapsed && "justify-center px-0"
+            isCollapsed && "justify-center px-0",
           )}
         >
           <LogOut className="w-5 h-5" />

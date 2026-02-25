@@ -35,7 +35,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 /* ================= REFRESH QUEUE ================= */
@@ -71,12 +71,28 @@ api.interceptors.response.use(
 
     const url = originalRequest.url || "";
 
-    /* 🚫 NEVER refresh auth endpoints */
+    /* 🚫 NEVER refresh for these routes:
+       - auth endpoints (would cause loops)
+       - super-admin routes (use saToken cookie, not Bearer/refresh token) */
     if (
       url.includes("/auth/login") ||
       url.includes("/auth/logout") ||
-      url.includes("/auth/refresh")
+      url.includes("/auth/refresh") ||
+      url.includes("/super-admin/")
     ) {
+      // ✅ Redirect super-admin to login if any sa-protected route returns 401
+      if (
+        url.includes("/super-admin/") &&
+        !url.includes("/super-admin/login") &&
+        error.response.status === 401
+      ) {
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/admin-super")
+        ) {
+          window.location.href = "/admin-login";
+        }
+      }
       return Promise.reject(error);
     }
 
@@ -100,7 +116,7 @@ api.interceptors.response.use(
 
       try {
         const res = await refreshApi.post<{ accessToken: string }>(
-          "/auth/refresh"
+          "/auth/refresh",
         );
 
         const newToken = res.data.accessToken;
@@ -129,7 +145,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

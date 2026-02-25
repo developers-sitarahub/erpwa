@@ -2,7 +2,13 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { MoreVertical, Check, CheckCheck, AlertCircle, ShoppingBag } from "lucide-react";
+import {
+  MoreVertical,
+  Check,
+  CheckCheck,
+  AlertCircle,
+  ShoppingBag,
+} from "lucide-react";
 import type { Message, Conversation } from "@/lib/types";
 import { useState, useRef } from "react";
 
@@ -105,10 +111,11 @@ function AudioPlayer({ mediaUrl }: { mediaUrl: string }) {
               return (
                 <div
                   key={i}
-                  className={`flex-1 rounded-full transition-all ${isFilled
-                    ? "bg-primary"
-                    : "bg-primary/30 hover:bg-primary/40"
-                    }`}
+                  className={`flex-1 rounded-full transition-all ${
+                    isFilled
+                      ? "bg-primary"
+                      : "bg-primary/30 hover:bg-primary/40"
+                  }`}
                   style={{ height: `${height * 3}px`, minWidth: "2px" }}
                 />
               );
@@ -147,14 +154,18 @@ export default function MessageBubble({
   onOpenMenu,
   onReply,
 }: Props) {
-  const repliedMessage =
-    msg.replyTo ??
-    allMessages.find((m) => m.whatsappMessageId === msg.replyToMessageId);
-
-  // Type guard to check if repliedMessage is a full Message (not just replyTo)
-  const isFullMessage = (msg: typeof repliedMessage): msg is Message => {
-    return msg !== undefined && "id" in msg && "timestamp" in msg;
-  };
+  // Prioritize finding the full message from history.
+  // If not found, fall back to the snapshot in `msg.replyTo` but cast/shape it as a Message.
+  const repliedMessage: Message | undefined =
+    allMessages.find((m) => m.whatsappMessageId === msg.replyToMessageId) ??
+    (msg.replyTo
+      ? ({
+          ...msg.replyTo,
+          id: msg.replyToMessageId || "unknown",
+          whatsappMessageId: msg.replyToMessageId,
+          timestamp: "", // Fallback as we don't have the original timestamp
+        } as Message)
+      : undefined);
 
   const cleanText =
     (msg.text || "")
@@ -232,10 +243,11 @@ export default function MessageBubble({
   } = {}) => (
     <div className={`flex items-center gap-0.5 select-none ${customClass}`}>
       <span
-        className={`text-[10px] lowercase leading-none ${isOverlay
-          ? "text-white drop-shadow-sm font-medium"
-          : "text-muted-foreground/60"
-          }`}
+        className={`text-[10px] lowercase leading-none ${
+          isOverlay
+            ? "text-white drop-shadow-sm font-medium"
+            : "text-muted-foreground/60"
+        }`}
       >
         {formattedTime}
       </span>
@@ -259,28 +271,37 @@ export default function MessageBubble({
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      className={`flex items-end gap-2 ${msg.sender === "executive" ? "justify-end" : "justify-start"
-        }`}
+      className={`flex items-end gap-2 ${
+        msg.sender === "executive" ? "justify-end" : "justify-start"
+      }`}
     >
       <div
         className={`flex flex-col gap-1
-        ${(isImage || isVideo) ? 'w-fit' :
-            (msg.template?.header?.type === 'IMAGE' || msg.template?.header?.type === 'VIDEO')
-              ? 'w-fit max-w-70'
-              : 'max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]'}
-        ${msg.outboundPayload?.interactive || msg.template?.buttons
+        ${
+          isImage || isVideo
+            ? "w-fit"
+            : msg.template?.header?.type === "IMAGE" ||
+                msg.template?.header?.type === "VIDEO"
+              ? "w-fit max-w-70"
+              : "max-w-[70%] sm:max-w-[60%] md:max-w-[50%] lg:max-w-[40%] xl:max-w-[35%]"
+        }
+        ${
+          msg.outboundPayload?.interactive || msg.template?.buttons
             ? "min-w-[200px]"
-            : (isImage || isVideo) ? "" : "min-w-[120px]"
-          }
-        ${(msg.template?.templateType === "carousel" || msg.carouselCards?.length) ? 'overflow-visible' : ''}`}
+            : isImage || isVideo
+              ? ""
+              : "min-w-[120px]"
+        }
+        ${msg.template?.templateType === "carousel" || msg.carouselCards?.length ? "overflow-visible" : ""}`}
       >
         {/* MAIN TEXT/MEDIA BUBBLE */}
         <div
           className={`group relative shadow-none overflow-hidden flex flex-col p-0
-          ${msg.sender === "executive"
+          ${
+            msg.sender === "executive"
               ? "bg-wa-outbound rounded-br-none"
               : "bg-wa-inbound rounded-bl-none"
-            }
+          }
           rounded-lg max-w-full`}
         >
           {/* TEMPLATE HEADER (Rich Media) */}
@@ -349,7 +370,9 @@ export default function MessageBubble({
           )}
 
           {/* INNER CONTENT WRAPPER */}
-          <div className={`flex flex-col ${!isImage && !isVideo ? 'p-1 gap-1' : ''}`}>
+          <div
+            className={`flex flex-col ${!isImage && !isVideo ? "px-1 py-1.5 gap-1" : ""}`}
+          >
             {/* IMAGE MESSAGE - WhatsApp Style */}
             {isImage && effectiveMediaUrl && (
               <div className="w-fit max-w-75">
@@ -358,7 +381,7 @@ export default function MessageBubble({
                   <img
                     src={effectiveMediaUrl}
                     alt="Image"
-                    className={`w-full h-auto object-cover cursor-pointer ${cleanText ? 'rounded-t-md' : 'rounded-md'}`}
+                    className={`w-full h-auto object-cover cursor-pointer ${cleanText ? "rounded-t-md" : "rounded-md"}`}
                     onClick={() => window.open(effectiveMediaUrl!, "_blank")}
                   />
                 </div>
@@ -366,7 +389,9 @@ export default function MessageBubble({
                 {/* Caption - Inside the same bubble, directly below image */}
                 {cleanText && (
                   <div className="relative px-2 pb-2">
-                    <p className={`text-[13px] break-words whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? 'pb-1' : 'pb-4'}`}>
+                    <p
+                      className={`text-[13px] break-words whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? "pb-1" : "pb-4"}`}
+                    >
                       {cleanText}
                     </p>
                     {/* Timestamp - Bottom right inside bubble (hide if template has footer) */}
@@ -395,14 +420,16 @@ export default function MessageBubble({
                   <video
                     src={effectiveMediaUrl}
                     controls
-                    className={`w-full h-auto object-cover ${cleanText ? 'rounded-t-md' : 'rounded-md'}`}
+                    className={`w-full h-auto object-cover ${cleanText ? "rounded-t-md" : "rounded-md"}`}
                   />
                 </div>
 
                 {/* Caption - Inside the same bubble, directly below video */}
                 {cleanText && (
                   <div className="relative px-2 pb-2">
-                    <p className={`text-[13px] break-words whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? 'pb-1' : 'pb-4'}`}>
+                    <p
+                      className={`text-[13px] break-words whitespace-pre-wrap leading-[18px] pr-14 ${msg.template?.footer ? "pb-1" : "pb-4"}`}
+                    >
                       {cleanText}
                     </p>
                     {/* Timestamp - Bottom right inside bubble (hide if template has footer) */}
@@ -540,7 +567,7 @@ export default function MessageBubble({
 
             {/* TEXT - Only for non-media messages */}
             {cleanText && !isImage && !isVideo && (
-              <div className="px-2 text-sm break-words whitespace-pre-wrap">
+              <div className="px-2 py-1 text-sm break-words whitespace-pre-wrap">
                 {cleanText}
                 {/* Hide timestamp if template has footer */}
                 {!msg.template?.footer && (
@@ -584,24 +611,35 @@ export default function MessageBubble({
         {msg.template?.buttons && msg.template.buttons.length > 0 && (
           <div className="w-full flex flex-col gap-1">
             <div
-              className={`flex gap-1.5 w-full ${msg.template.buttons.length === 2 ? "flex-row" : "flex-col"
-                }`}
+              className={`flex gap-1.5 w-full ${
+                msg.template.buttons.length === 2 ? "flex-row" : "flex-col"
+              }`}
             >
               {msg.template.buttons.map((btn, idx) => (
                 <button
                   key={idx}
-                  className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 ${msg.sender === "executive"
-                    ? "bg-wa-outbound"
-                    : "bg-wa-inbound"
-                    }`}
+                  className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 ${
+                    msg.sender === "executive"
+                      ? "bg-wa-outbound"
+                      : "bg-wa-inbound"
+                  }`}
                   onClick={() => {
                     if (btn.type === "URL" && btn.value) {
                       window.open(btn.value, "_blank");
                     }
                   }}
                 >
-                  {btn.type === "URL" && "🔗 "}
-                  {btn.type === "PHONE_NUMBER" && "📞 "}
+                  {(btn.type === "URL" || btn.type === "url") && (
+                    <SquareArrowOutUpRight className="w-4 h-4" />
+                  )}
+                  {(btn.type === "PHONE_NUMBER" ||
+                    btn.type === "phone_number") && (
+                    <Phone className="w-4 h-4" />
+                  )}
+                  {(btn.type === "QUICK_REPLY" ||
+                    btn.type === "quick_reply") && (
+                    <Reply className="w-4 h-4" />
+                  )}
                   {btn.text}
                 </button>
               ))}
@@ -613,122 +651,125 @@ export default function MessageBubble({
         {(msg.template?.templateType === "carousel" ||
           (msg.carouselCards && msg.carouselCards.length > 0) ||
           (msg.template?.carouselCards &&
-            msg.template.carouselCards.length > 0)) && (() => {
-              const cards = msg.carouselCards || msg.template?.carouselCards || [];
-              const showNavButtons = cards.length > 2;
+            msg.template.carouselCards.length > 0)) &&
+          (() => {
+            const cards =
+              msg.carouselCards || msg.template?.carouselCards || [];
+            const showNavButtons = cards.length > 2;
 
-              const scrollCarousel = (direction: 'left' | 'right') => {
-                const container = document.getElementById(`carousel-${msg.id}`);
-                if (container) {
-                  const cardWidth = 200 + 8; // card max-width + gap
-                  const scrollAmount = direction === 'left' ? -cardWidth * 2 : cardWidth * 2;
-                  container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-                }
-              };
+            const scrollCarousel = (direction: "left" | "right") => {
+              const container = document.getElementById(`carousel-${msg.id}`);
+              if (container) {
+                const cardWidth = 200 + 8; // card max-width + gap
+                const scrollAmount =
+                  direction === "left" ? -cardWidth * 2 : cardWidth * 2;
+                container.scrollBy({ left: scrollAmount, behavior: "smooth" });
+              }
+            };
 
-              return (
-                <div className="relative mt-2 group/carousel">
-                  {/* Left Navigation Button */}
-                  {showNavButtons && (
-                    <button
-                      className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 shadow-lg flex items-center justify-center transition-all active:scale-95 opacity-0 group-hover/carousel:opacity-100"
-                      onClick={() => scrollCarousel('left')}
-                      title="Scroll left"
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-white"
-                      >
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                      </svg>
-                    </button>
-                  )}
-
-                  <div
-                    className="flex overflow-x-auto gap-2 pb-2 snap-x snap-mandatory scrollbar-none scroll-smooth px-1"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    id={`carousel-${msg.id}`}
+            return (
+              <div className="relative mt-2 group/carousel">
+                {/* Left Navigation Button */}
+                {showNavButtons && (
+                  <button
+                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 shadow-lg flex items-center justify-center transition-all active:scale-95 opacity-0 group-hover/carousel:opacity-100"
+                    onClick={() => scrollCarousel("left")}
+                    title="Scroll left"
                   >
-                    {cards.map((card, idx) => (
-                      <div
-                        key={idx}
-                        className="shrink-0 w-52 snap-start flex flex-col gap-1"
-                      >
-                        {/* Card Bubble - Image + Text */}
-                        <div className="bg-wa-outbound rounded-lg overflow-hidden">
-                          {/* Card Image with padding (green border effect) */}
-                          {(card.mediaUrl || card.s3Url) && (
-                            <div className="p-0.5">
-                              <div className="relative w-full aspect-square rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
-                                {card.mimeType?.startsWith("video") ? (
-                                  <video
-                                    src={card.mediaUrl || card.s3Url}
-                                    className="w-full h-full object-cover"
-                                    controls={false}
-                                  />
-                                ) : (
-                                  <img
-                                    src={card.mediaUrl || card.s3Url}
-                                    alt={card.title}
-                                    className="w-full h-full object-cover"
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          )}
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-white"
+                    >
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                )}
 
-                          {/* Card Text (Body) */}
-                          {card.title && (
-                            <div className="px-2 py-1">
-                              <p className="text-[12px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[16px] line-clamp-2">
-                                {card.title}
-                              </p>
+                <div
+                  className="flex overflow-x-auto gap-2 pb-2 snap-x snap-mandatory scrollbar-none scroll-smooth px-1"
+                  style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                  id={`carousel-${msg.id}`}
+                >
+                  {cards.map((card, idx) => (
+                    <div
+                      key={idx}
+                      className="shrink-0 w-52 snap-start flex flex-col gap-1"
+                    >
+                      {/* Card Bubble - Image + Text */}
+                      <div className="bg-wa-outbound rounded-lg overflow-hidden">
+                        {/* Card Image with padding (green border effect) */}
+                        {(card.mediaUrl || card.s3Url) && (
+                          <div className="p-0.5">
+                            <div className="relative w-full aspect-square rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
+                              {card.mimeType?.startsWith("video") ? (
+                                <video
+                                  src={card.mediaUrl || card.s3Url}
+                                  className="w-full h-full object-cover"
+                                  controls={false}
+                                />
+                              ) : (
+                                <img
+                                  src={card.mediaUrl || card.s3Url}
+                                  alt={card.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          {/* Card Text (Body) */}
-                          {card.title && (
-                            <div className="px-2 py-1">
-                              <p className="text-[12px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[16px] line-clamp-2">
-                                {card.title}
-                              </p>
+                        {/* Card Text (Body) */}
+                        {card.title && (
+                          <div className="px-2 py-1">
+                            <p className="text-[12px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[16px] line-clamp-2">
+                              {card.title}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Card Text (Body) */}
+                        {card.title && (
+                          <div className="px-2 py-1">
+                            <p className="text-[12px] text-gray-900 dark:text-gray-100 break-words whitespace-pre-wrap leading-[16px] line-clamp-2">
+                              {card.title}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Card Footer */}
+                        {card.subtitle && (
+                          <div className="relative px-2 pb-1.5">
+                            <div className="text-[10px] text-muted-foreground italic opacity-80 line-clamp-1">
+                              {card.subtitle}
                             </div>
-                          )}
-
-                          {/* Card Footer */}
-                          {card.subtitle && (
-                            <div className="relative px-2 pb-1.5">
-                              <div className="text-[10px] text-muted-foreground italic opacity-80 line-clamp-1">
-                                {card.subtitle}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Reply Button - Separate from bubble */}
-                        <button
-                          className="w-full py-2 text-[12px] text-[#00a884] dark:text-[#53bdeb] font-medium bg-wa-outbound rounded-lg hover:bg-wa-outbound/90 transition-colors"
-                          onClick={() => {
-                            if (card.buttonType === "URL" && card.buttonValue) {
-                              window.open(card.buttonValue, "_blank");
-                            }
-                          }}
-                        >
-                          {card.buttonText || "Reply"}
-                        </button>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Reply Button - Separate from bubble */}
+                      <button
+                        className="w-full py-2 text-[12px] text-[#00a884] dark:text-[#53bdeb] font-medium bg-wa-outbound rounded-lg hover:bg-wa-outbound/90 transition-colors"
+                        onClick={() => {
+                          if (card.buttonType === "URL" && card.buttonValue) {
+                            window.open(card.buttonValue, "_blank");
+                          }
+                        }}
+                      >
+                        {card.buttonText || "Reply"}
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              );
-            })()}
+              </div>
+            );
+          })()}
 
         {/* CATALOG PRODUCTS */}
         {msg.template?.templateType === "catalog" &&
@@ -736,19 +777,26 @@ export default function MessageBubble({
           msg.template.catalogProducts.length > 0 && (
             <div className="w-full mt-2 p-2 bg-wa-inbound rounded-xl border border-border/50 overflow-hidden">
               <div className="grid grid-cols-2 gap-2">
-                {msg.template.catalogProducts.slice(0, 4).map((product, idx) => (
-                  <div
-                    key={idx}
-                    className="aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden group border border-border/20"
-                  >
-                    <ShoppingBag className="w-8 h-8 text-primary/20" />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-1.5 backdrop-blur-[2px]">
-                      <div className="text-[10px] text-white truncate font-medium text-center">
-                        {product.productId}
+                {msg.template.catalogProducts
+                  .slice(0, 4)
+                  .map((product, idx) => (
+                    <div
+                      key={idx}
+                      className="aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden group border border-border/20"
+                    >
+                      <div className="relative w-full aspect-square bg-muted/20 rounded mb-1">
+                        {prod.productId ? (
+                          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
+                            {/* Placeholder since we don't have catalog image fetcher yet */}
+                            <ShoppingBag className="w-6 h-6 opacity-20" />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="font-medium text-xs truncate">
+                        Code: {prod.productId}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
               {msg.template.catalogProducts.length > 4 && (
                 <div className="text-center mt-2.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-widest bg-muted/50 py-1 rounded">
@@ -769,10 +817,11 @@ export default function MessageBubble({
           msg.outboundPayload.interactive.type === "list" && (
             <div className="w-full">
               <button
-                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${msg.sender === "executive"
-                  ? "bg-wa-outbound"
-                  : "bg-wa-inbound"
-                  }`}
+                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${
+                  msg.sender === "executive"
+                    ? "bg-wa-outbound"
+                    : "bg-wa-inbound"
+                }`}
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -798,20 +847,26 @@ export default function MessageBubble({
           msg.outboundPayload.interactive.type === "button" && (
             <div className="w-full flex flex-col gap-1">
               <div
-                className={`flex gap-1.5 w-full ${msg.outboundPayload.interactive.action?.buttons?.length === 2
-                  ? "flex-row"
-                  : "flex-col"
-                  }`}
+                className={`flex gap-1.5 w-full ${
+                  msg.outboundPayload.interactive.action?.buttons?.length === 2
+                    ? "flex-row"
+                    : "flex-col"
+                }`}
               >
                 {msg.outboundPayload.interactive.action?.buttons?.map(
-                  (btn: { reply: { title: string } }, idx: number) => (
+                  (
+                    btn: { reply?: { title: string; id?: string } },
+                    idx: number,
+                  ) => (
                     <button
                       key={idx}
-                      className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 ${msg.sender === "executive"
-                        ? "bg-wa-outbound"
-                        : "bg-wa-inbound"
-                        }`}
+                      className={`flex-1 w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] border border-black/5 dark:border-white/5 flex items-center justify-center gap-2 ${
+                        msg.sender === "executive"
+                          ? "bg-wa-outbound"
+                          : "bg-wa-inbound"
+                      }`}
                     >
+                      <Reply className="w-4 h-4" />
                       {btn.reply?.title}
                     </button>
                   ),
@@ -825,17 +880,18 @@ export default function MessageBubble({
           msg.outboundPayload.interactive.type === "cta_url" && (
             <div className="w-full">
               <button
-                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 border border-black/5 dark:border-white/5 ${msg.sender === "executive"
-                  ? "bg-wa-outbound"
-                  : "bg-wa-inbound"
-                  }`}
+                className={`w-full hover:brightness-95 shadow-sm rounded-lg py-2 px-3 text-[#00a884] dark:text-[#53bdeb] font-semibold text-center text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 border border-black/5 dark:border-white/5 ${
+                  msg.sender === "executive"
+                    ? "bg-wa-outbound"
+                    : "bg-wa-inbound"
+                }`}
                 onClick={() => {
                   const url =
                     msg.outboundPayload?.interactive?.action?.parameters?.url;
                   if (url) window.open(url, "_blank");
                 }}
               >
-                🔗{" "}
+                <SquareArrowOutUpRight className="w-4 h-4" />
                 {msg.outboundPayload.interactive.action?.parameters
                   ?.display_text || "Click Here"}
               </button>

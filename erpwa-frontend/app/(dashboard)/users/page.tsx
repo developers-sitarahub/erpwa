@@ -1,59 +1,56 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { Plus, X } from "lucide-react"
+import type React from "react";
+import { useState, useEffect } from "react";
+import { Plus, X, Loader2, Search } from "lucide-react";
 
-import { Button } from "@/components/button"
-import { Badge } from "@/components/badge"
-import { Select } from "@/components/select"
-
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/card"
-
-/* ===================== TYPES ===================== */
-
-interface User {
-  id: string
-  name: string
-  role: "admin" | "sales_executive"
-  status: "active" | "inactive"
-}
+import { Button } from "@/components/button";
+import { Badge } from "@/components/badge";
+import { Select } from "@/components/select";
+import { useAuth } from "@/context/authContext";
+import { usersAPI, User } from "@/lib/usersApi";
+import { toast } from "react-toastify";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/card";
 
 /* ===================== BADGES ===================== */
 
-function RoleBadge({ role }: { role: User["role"] }) {
+function RoleBadge({ role }: { role: string }) {
+  const displayRole = role.replace("vendor_", "").replace("_", " ");
   return (
     <Badge
       variant="outline"
       className={
-        role === "admin"
-          ? "bg-red-500/20 text-red-400 border-red-500/30"
-          : "bg-blue-500/20 text-blue-400 border-blue-500/30"
+        role.includes("admin") || role.includes("owner")
+          ? "bg-red-500/20 text-red-400 border-red-500/30 capitalize"
+          : "bg-blue-500/20 text-blue-400 border-blue-500/30 capitalize"
       }
     >
-      {role === "admin" ? "Admin" : "Sales Executive"}
+      {displayRole}
     </Badge>
-  )
+  );
 }
 
-function StatusBadge({ status }: { status: User["status"] }) {
+function StatusBadge({
+  status,
+  activatedAt,
+}: {
+  status: string;
+  activatedAt?: string;
+}) {
+  const isActive =
+    status === "active" || (status !== "inactive" && activatedAt);
   return (
     <Badge
       variant="outline"
       className={
-        status === "active"
+        isActive
           ? "bg-green-500/20 text-green-400 border-green-500/30"
           : "bg-gray-500/20 text-gray-400 border-gray-500/30"
       }
     >
-      {status === "active" ? "Active" : "Inactive"}
+      {isActive ? "Active" : activatedAt ? "Inactive" : "Pending Setup"}
     </Badge>
-  )
+  );
 }
 
 /* ===================== MODAL ===================== */
@@ -61,24 +58,36 @@ function StatusBadge({ status }: { status: User["status"] }) {
 function AddUserModal({
   isOpen,
   onClose,
+  onSuccess,
 }: {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
 }) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "",
-  })
+    role: "sales",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // submit logic here
-    setFormData({ name: "", email: "", role: "" })
-    onClose()
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await usersAPI.create(formData);
+      toast.success("📧 Invitation email sent!");
+      onSuccess();
+      onClose();
+      setFormData({ name: "", email: "", role: "sales" });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to add user");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -124,7 +133,6 @@ function AddUserModal({
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Role</label>
-
               <Select
                 required
                 value={formData.role}
@@ -132,17 +140,18 @@ function AddUserModal({
                   setFormData({ ...formData, role: e.target.value })
                 }
               >
-                <option value="" disabled>
-                  Select role...
-                </option>
-                <option value="sales_executive">Sales Executive</option>
-                <option value="admin">Admin</option>
+                <option value="sales">Sales Executive</option>
+                <option value="vendor_admin">Admin</option>
               </Select>
             </div>
 
             <div className="flex gap-2 pt-4">
-              <Button type="submit" className="flex-1">
-                Add User
+              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <Loader2 className="animate-spin h-4 w-4" />
+                ) : (
+                  "Add User"
+                )}
               </Button>
               <Button
                 type="button"
@@ -157,21 +166,53 @@ function AddUserModal({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 /* ===================== PAGE ===================== */
 
 export default function UsersPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const { user: currentUser } = useAuth();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const users: User[] = [
-    { id: "1", name: "You", role: "admin", status: "active" },
-    { id: "2", name: "Mike Wilson", role: "sales_executive", status: "active" },
-    { id: "3", name: "Sarah Johnson", role: "sales_executive", status: "active" },
-    { id: "4", name: "Alex Chen", role: "sales_executive", status: "active" },
-    { id: "5", name: "John Doe", role: "sales_executive", status: "inactive" },
-  ]
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await usersAPI.list();
+      if (res.data) {
+        setUsers(res.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch users", error);
+      toast.error("Failed to load team members");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredUsers = users.filter(
+    (u) =>
+      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const isOwnerOrAdmin =
+    currentUser?.role === "vendor_owner" ||
+    currentUser?.role === "vendor_admin";
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto p-6">
@@ -180,52 +221,94 @@ export default function UsersPage() {
           <div>
             <h2 className="text-xl font-semibold">Team Members</h2>
             <p className="text-sm text-muted-foreground">
-              Manage users and their roles
+              View and manage users in your organization
             </p>
           </div>
 
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add User
-          </Button>
+          {isOwnerOrAdmin && (
+            <Button onClick={() => setIsModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add User
+            </Button>
+          )}
         </div>
 
         <Card className="overflow-hidden">
-          <CardHeader>
-            <CardTitle>All Users</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>All Users ({users.length})</CardTitle>
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search users..."
+                className="w-full pl-9 pr-4 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </CardHeader>
 
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="border-b bg-secondary/30">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Name
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
+                      Name & Email
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
                       Role
                     </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
                       Status
+                    </th>
+                    <th className="px-6 py-4 font-medium text-muted-foreground text-right">
+                      Joined
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
-                    <tr
-                      key={user.id}
-                      className="border-b hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-4 py-3">{user.name}</td>
-                      <td className="px-4 py-3">
-                        <RoleBadge role={user.role} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={user.status} />
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="text-center py-12 text-muted-foreground italic"
+                      >
+                        No team members found
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredUsers.map((u) => (
+                      <tr
+                        key={u.id}
+                        className="border-b hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-medium text-foreground">
+                              {u.name}
+                              {u.id === currentUser?.id && " (You)"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {u.email}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <RoleBadge role={u.role} />
+                        </td>
+                        <td className="px-6 py-4">
+                          <StatusBadge
+                            status={u.status}
+                            activatedAt={u.activatedAt}
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-right text-muted-foreground">
+                          {new Date(u.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -236,7 +319,8 @@ export default function UsersPage() {
       <AddUserModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchUsers}
       />
     </div>
-  )
+  );
 }

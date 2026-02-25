@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -47,7 +47,11 @@ import { processMedia } from "@/lib/mediaProcessor";
 
 const formatError = (error: any, defaultMsg: string) => {
   const errorData = error.response?.data;
-  let msg = errorData?.details?.error_user_msg || errorData?.details?.message || errorData?.message || defaultMsg;
+  let msg =
+    errorData?.details?.error_user_msg ||
+    errorData?.details?.message ||
+    errorData?.message ||
+    defaultMsg;
   const title = errorData?.details?.error_user_title;
 
   // Shorten specific common Meta messages
@@ -147,7 +151,7 @@ export default function TemplatesPage() {
   // --- Send Modal State ---
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
-    null
+    null,
   );
   const [recipientInput, setRecipientInput] = useState("");
   const [recipientList, setRecipientList] = useState<string[]>([]);
@@ -193,10 +197,12 @@ export default function TemplatesPage() {
         .filter((t: any) => t !== null);
 
       // Filter out Meta templates that already exist locally
-      const localNames = new Set(localTemplates.map((l: any) => l.metaTemplateName));
+      const localNames = new Set(
+        localTemplates.map((l: any) => l.metaTemplateName),
+      );
 
       const uniqueMetaTemplates = parsedMeta.filter(
-        (m: any) => !localNames.has(m.originalName)
+        (m: any) => !localNames.has(m.originalName),
       );
 
       // Filter out FLOW templates as they belong in the Flow Templates page
@@ -221,20 +227,22 @@ export default function TemplatesPage() {
       // If no body, skip
       if (!bodyComp || !bodyComp.text) return null;
 
-      const buttons = buttonsComp?.buttons?.map((b: any) => ({
-        type: b.type,
-        text: b.text,
-        url: b.url,
-        phone_number: b.phone_number,
-        value: b.url || b.phone_number || ""
-      })) || [];
+      const buttons =
+        buttonsComp?.buttons?.map((b: any) => ({
+          type: b.type,
+          text: b.text,
+          url: b.url,
+          phone_number: b.phone_number,
+          value: b.url || b.phone_number || "",
+        })) || [];
 
       const headerType = headerComp?.format || "TEXT";
 
       // Extract header media URL from Meta's example field for preview
       let headerMediaUrl: string | null = null;
       if (headerComp && headerType !== "TEXT" && headerComp.example) {
-        const urlArray = headerComp.example.header_url || headerComp.example.header_handle;
+        const urlArray =
+          headerComp.example.header_url || headerComp.example.header_handle;
         if (Array.isArray(urlArray) && urlArray.length > 0) {
           headerMediaUrl = urlArray[0];
         }
@@ -254,7 +262,9 @@ export default function TemplatesPage() {
       return {
         isMetaOnly: true,
         id: metaTpl.id,
-        displayName: metaTpl.name.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+        displayName: metaTpl.name
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c: string) => c.toUpperCase()),
         metaTemplateName: metaTpl.name,
         category: metaTpl.category,
         status: metaTpl.status.toLowerCase(),
@@ -271,7 +281,7 @@ export default function TemplatesPage() {
         buttons: buttons,
         media: media,
         createdAt: new Date().toISOString(),
-        originalName: metaTpl.name
+        originalName: metaTpl.name,
       };
     } catch (e) {
       console.error("Error parsing meta template:", e);
@@ -339,8 +349,13 @@ export default function TemplatesPage() {
     const headerType = lang?.headerType;
 
     // If it's a special type, use the Catalog/Carousel modal
-    if (template.templateType === 'carousel' || template.templateType === 'catalog' ||
-      headerType === 'CAROUSEL' || headerType === 'CATALOG' || template.metaTemplateName.includes('carousel')) {
+    if (
+      template.templateType === "carousel" ||
+      template.templateType === "catalog" ||
+      headerType === "CAROUSEL" ||
+      headerType === "CATALOG" ||
+      template.metaTemplateName.includes("carousel")
+    ) {
       setSelectedTemplate(template);
       setShowCatalogModal(true);
       return;
@@ -476,12 +491,12 @@ export default function TemplatesPage() {
           prev.map((t) =>
             t.id === editId
               ? {
-                ...t,
-                displayName: formData.displayName,
-                category: formData.category,
-              }
-              : t
-          )
+                  ...t,
+                  displayName: formData.displayName,
+                  category: formData.category,
+                }
+              : t,
+          ),
         );
         fetchTemplates(true);
       } else {
@@ -557,7 +572,7 @@ export default function TemplatesPage() {
 
   const handleSubmitToMeta = async (
     template: Template,
-    e: React.MouseEvent
+    e: React.MouseEvent,
   ) => {
     e.stopPropagation();
     if (submitting) return;
@@ -566,7 +581,11 @@ export default function TemplatesPage() {
     try {
       await api.post(`/vendor/templates/${template.id}/submit`);
       toast.success("Template submitted to Meta successfully!");
-      setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, status: 'pending' } : t));
+      setTemplates((prev) =>
+        prev.map((t) =>
+          t.id === template.id ? { ...t, status: "pending" } : t,
+        ),
+      );
       fetchTemplates(true); // Silent update to ensure full sync
     } catch (error: any) {
       toast.error(formatError(error, "Failed to submit template"));
@@ -582,7 +601,11 @@ export default function TemplatesPage() {
       const res = await api.post(`/vendor/templates/${id}/sync-status`);
       toast.success(res.data.message || "Status synced successfully");
       if (res.data.status) {
-        setTemplates(prev => prev.map(t => t.id === id ? { ...t, status: res.data.status } : t));
+        setTemplates((prev) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, status: res.data.status } : t,
+          ),
+        );
       }
       fetchTemplates(true); // Silent update for full consistency
     } catch (error: any) {
@@ -608,7 +631,9 @@ export default function TemplatesPage() {
     if (deleteConf.isMeta && deleteConf.metaName) {
       setDeleting(deleteConf.metaName);
       try {
-        await api.delete(`/vendor/templates/meta?name=${encodeURIComponent(deleteConf.metaName)}`);
+        await api.delete(
+          `/vendor/templates/meta?name=${encodeURIComponent(deleteConf.metaName)}`,
+        );
         toast.success("Template deleted from Meta");
         fetchTemplates(true); // Refresh list to remove it
       } catch (error: any) {
@@ -637,7 +662,11 @@ export default function TemplatesPage() {
     }
   };
 
-  const handleMetaDelete = (metaName: string, displayName: string, e: React.MouseEvent) => {
+  const handleMetaDelete = (
+    metaName: string,
+    displayName: string,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     setDeleteConf({
       isOpen: true,
@@ -645,6 +674,58 @@ export default function TemplatesPage() {
       isMeta: true,
       metaName: metaName,
     });
+  };
+
+  const handleMetaSyncStatus = async (metaTpl: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSyncing(metaTpl.id || metaTpl.metaTemplateName);
+    try {
+      const headerMediaUrl = metaTpl.media?.[0]?.s3Url || null;
+      const res = await api.post("/vendor/templates/import", {
+        metaTemplateName: metaTpl.metaTemplateName,
+        displayName: metaTpl.displayName,
+        category: metaTpl.category,
+        language: metaTpl.languages[0].language,
+        body: metaTpl.languages[0].body,
+        headerType: metaTpl.languages[0].headerType,
+        headerText: metaTpl.languages[0].headerText,
+        footerText: metaTpl.languages[0].footerText,
+        buttons: metaTpl.buttons,
+        metaId: metaTpl.id,
+        status: metaTpl.status,
+        headerMediaUrl: headerMediaUrl,
+        templateType: metaTpl.templateType || "standard",
+        carouselCards: metaTpl.carouselCards || [],
+      });
+
+      const newTemplate = res.data;
+
+      // Merge media and cards from the parsed Meta template/backend response
+      const templateWithMedia = {
+        ...newTemplate,
+        media:
+          newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media,
+        carouselCards:
+          newTemplate.carouselCards?.length > 0
+            ? newTemplate.carouselCards
+            : metaTpl.carouselCards,
+      };
+
+      setTemplates((prev) => {
+        return prev.map((p) =>
+          p.metaTemplateName === newTemplate.metaTemplateName
+            ? templateWithMedia
+            : p,
+        );
+      });
+      toast.success(
+        `"${newTemplate.displayName}" synced and approved successfully`,
+      );
+    } catch (error: any) {
+      toast.error(formatError(error, "Failed to sync template status"));
+    } finally {
+      setSyncing(null);
+    }
   };
 
   const handleMetaSend = async (metaTpl: any, e: React.MouseEvent) => {
@@ -679,12 +760,15 @@ export default function TemplatesPage() {
 
       // Update local list with the new template
       setTemplates((prev) => {
-        return prev.map(p => (p.metaTemplateName === newTemplate.metaTemplateName) ? templateWithMedia : p);
+        return prev.map((p) =>
+          p.metaTemplateName === newTemplate.metaTemplateName
+            ? templateWithMedia
+            : p,
+        );
       });
 
       // Open send modal directly with media included
       openSendModal(templateWithMedia);
-
     } catch (error: any) {
       toast.error(formatError(error, "Failed to prepare template for sending"));
     } finally {
@@ -694,7 +778,7 @@ export default function TemplatesPage() {
 
   const handleCardClick = (template: Template) => {
     if (template.isMetaOnly) {
-      handleMetaSend(template, { stopPropagation: () => { } } as any);
+      handleMetaSyncStatus(template, { stopPropagation: () => {} } as any);
       return;
     }
 
@@ -743,7 +827,7 @@ export default function TemplatesPage() {
     try {
       // Check if we need dynamic variables
       const hasDynamicVariables = Object.values(variableSources).some(
-        (v) => v === "company_name"
+        (v) => v === "company_name",
       );
       let payload: any = {
         templateId: selectedTemplate.id,
@@ -778,7 +862,7 @@ export default function TemplatesPage() {
 
       const res = await api.post(
         "/vendor/whatsapp/template/send-template",
-        payload
+        payload,
       );
 
       const results = res.data.results || [];
@@ -794,8 +878,9 @@ export default function TemplatesPage() {
           toast.error(`Failed to send: ${firstError}`);
         } else {
           toast.warning(
-            `${results.length - failed.length} sent, ${failed.length
-            } failed. First error: ${firstError}`
+            `${results.length - failed.length} sent, ${
+              failed.length
+            } failed. First error: ${firstError}`,
           );
         }
       } else {
@@ -844,23 +929,30 @@ export default function TemplatesPage() {
   const formatTime = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch (e) {
       return "12:00";
     }
   };
 
   const filteredTemplates = templates.filter((t) => {
-    const matchesSearch = t.displayName.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch =
+      t.displayName.toLowerCase().includes(search.toLowerCase()) ||
       t.languages[0]?.body?.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === "ALL" || t.category === categoryFilter;
+    const matchesCategory =
+      categoryFilter === "ALL" || t.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
   const filteredLibrary = OFFICIAL_TEMPLATES.filter((t) => {
-    const matchesSearch = t.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
+    const matchesSearch =
+      t.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
       t.body.toLowerCase().includes(librarySearch.toLowerCase());
-    const matchesCategory = libraryCategory === "ALL" || t.category === libraryCategory;
+    const matchesCategory =
+      libraryCategory === "ALL" || t.category === libraryCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -896,8 +988,6 @@ export default function TemplatesPage() {
           </div>
         </div>
 
-
-
         {/* Tabs with Icons */}
         <div className="flex border-b border-border/40 space-x-8">
           <button
@@ -906,7 +996,7 @@ export default function TemplatesPage() {
               "pb-4 text-sm font-medium transition-all relative flex items-center gap-2",
               activeTab === "local"
                 ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <LayoutGrid className="w-4 h-4" />
@@ -924,7 +1014,7 @@ export default function TemplatesPage() {
               "pb-4 text-sm font-medium transition-all relative flex items-center gap-2",
               activeTab === "library"
                 ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <BookTemplate className="w-4 h-4" />
@@ -937,8 +1027,6 @@ export default function TemplatesPage() {
             )}
           </button>
         </div>
-
-
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-50">
@@ -970,7 +1058,7 @@ export default function TemplatesPage() {
                   { value: "ALL", label: "All Categories" },
                   { value: "MARKETING", label: "Marketing" },
                   { value: "UTILITY", label: "Utility" },
-                  { value: "AUTHENTICATION", label: "Authentication" }
+                  { value: "AUTHENTICATION", label: "Authentication" },
                 ].map((cat) => (
                   <button
                     key={cat.value}
@@ -979,7 +1067,7 @@ export default function TemplatesPage() {
                       "text-xs font-medium transition-all whitespace-nowrap pb-1 border-b-2",
                       categoryFilter === cat.value
                         ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {cat.label}
@@ -996,7 +1084,8 @@ export default function TemplatesPage() {
                   </div>
                   <h3 className="text-lg font-semibold">No templates yet</h3>
                   <p className="text-muted-foreground text-center max-w-sm text-sm">
-                    Get started by creating your first WhatsApp template approval.
+                    Get started by creating your first WhatsApp template
+                    approval.
                   </p>
                   <Button
                     variant="link"
@@ -1008,7 +1097,9 @@ export default function TemplatesPage() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <p className="text-muted-foreground">No templates match your search.</p>
+                  <p className="text-muted-foreground">
+                    No templates match your search.
+                  </p>
                   <Button
                     variant="link"
                     onClick={() => {
@@ -1035,7 +1126,7 @@ export default function TemplatesPage() {
                       onClick={() => handleCardClick(t)}
                       className={cn(
                         "h-full flex flex-col cursor-pointer border-border/50 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden group-hover:border-primary/20",
-                        t.status === "approved" && "hover:border-green-500/30"
+                        t.status === "approved" && "hover:border-green-500/30",
                       )}
                     >
                       {/* Card Header area */}
@@ -1049,18 +1140,25 @@ export default function TemplatesPage() {
                               {t.displayName}
                             </h3>
                           </div>
-                          <div className="shrink-0">{t.isMetaOnly ? (
-                            <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px]">
-                              Meta
-                            </Badge>
-                          ) : getStatusBadge(t.status)}</div>
+                          <div className="shrink-0">
+                            {t.isMetaOnly ? (
+                              <Badge
+                                variant="outline"
+                                className="border-blue-200 bg-blue-50 text-blue-700 text-[10px]"
+                              >
+                                Meta
+                              </Badge>
+                            ) : (
+                              getStatusBadge(t.status)
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="outline"
                             className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground shrink-0 uppercase"
                           >
-                            {t.templateType || 'STANDARD'}
+                            {t.templateType || "STANDARD"}
                           </Badge>
                           <Badge
                             variant="outline"
@@ -1069,7 +1167,7 @@ export default function TemplatesPage() {
                             {t.category}
                           </Badge>
                           <span className="text-[10px] text-muted-foreground/60">
-                            •
+                            â€¢
                           </span>
                           <span className="text-[10px] text-muted-foreground/60">
                             {t.languages[0]?.language}
@@ -1084,14 +1182,18 @@ export default function TemplatesPage() {
                           <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
                           <div className="bg-white dark:bg-muted rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-none p-3 shadow-sm border border-border/20 text-xs text-foreground/80 leading-relaxed font-sans relative z-10 max-w-[90%] before:content-[''] before:absolute before:top-0 before:-left-1.5 before:w-3 before:h-3 before:bg-white dark:before:bg-muted before:[clip-path:polygon(100%_0,0_0,100%_100%)]">
-                            {t.languages[0]?.headerType !== "TEXT" && (
+                            {(t.languages[0]?.headerType !== "TEXT" ||
+                              t.templateType === "catalog" ||
+                              t.templateType === "carousel") && (
                               <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                                 {t.languages[0]?.headerType === "IMAGE" ? (
                                   <ImageIcon className="w-3 h-3" />
                                 ) : (
                                   <Paperclip className="w-3 h-3" />
                                 )}
-                                {t.languages[0]?.headerType}
+                                {t.languages[0]?.headerType !== "TEXT"
+                                  ? t.languages[0]?.headerType
+                                  : t.templateType}
                               </div>
                             )}
                             <p className="line-clamp-4 whitespace-pre-wrap">
@@ -1143,11 +1245,11 @@ export default function TemplatesPage() {
                                 ? "text-blue-600 bg-blue-500/5 hover:bg-blue-500/10"
                                 : t.status === "approved"
                                   ? "text-green-600 bg-green-500/5 hover:bg-green-500/10"
-                                  : "text-muted-foreground bg-muted/30 hover:bg-muted/50"
+                                  : "text-muted-foreground bg-muted/30 hover:bg-muted/50",
                             )}
                             onClick={(e) => {
                               if (t.isMetaOnly) {
-                                handleMetaSend(t, e);
+                                handleMetaSyncStatus(t, e);
                                 return;
                               }
 
@@ -1162,8 +1264,13 @@ export default function TemplatesPage() {
                             }}
                             disabled={!!syncing || !!submitting}
                           >
-                            {syncing === t.id || submitting === t.id ? (
+                            {syncing === t.id ||
+                            syncing === t.metaTemplateName ||
+                            submitting === t.id ||
+                            importing === t.id ? (
                               <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
+                            ) : t.isMetaOnly ? (
+                              <RefreshCw className="w-3 h-3 mr-1.5" />
                             ) : t.status === "draft" ? (
                               <Upload className="w-3 h-3 mr-1.5" />
                             ) : t.status === "approved" ? (
@@ -1171,11 +1278,15 @@ export default function TemplatesPage() {
                             ) : (
                               <RefreshCw className="w-3 h-3 mr-1.5" />
                             )}
-                            {t.status === "draft"
-                              ? "Submit"
-                              : t.status === "approved"
-                                ? "Send"
-                                : "Sync"}
+                            {t.isMetaOnly
+                              ? "Status"
+                              : t.status === "draft"
+                                ? "Submit"
+                                : t.status === "approved"
+                                  ? importing === t.id
+                                    ? "Preparing..."
+                                    : "Send"
+                                  : "Sync"}
                           </Button>
                           <div className="w-px h-4 bg-border/60"></div>
                           <Button
@@ -1218,7 +1329,7 @@ export default function TemplatesPage() {
                   { value: "ALL", label: "All Categories" },
                   { value: "MARKETING", label: "Marketing" },
                   { value: "UTILITY", label: "Utility" },
-                  { value: "AUTHENTICATION", label: "Authentication" }
+                  { value: "AUTHENTICATION", label: "Authentication" },
                 ].map((cat) => (
                   <button
                     key={cat.value}
@@ -1227,7 +1338,7 @@ export default function TemplatesPage() {
                       "text-xs font-medium transition-all whitespace-nowrap pb-1 border-b-2",
                       libraryCategory === cat.value
                         ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {cat.label}
@@ -1249,15 +1360,24 @@ export default function TemplatesPage() {
                     <div className="p-5 flex flex-col gap-3 border-b border-border/40 bg-gradient-to-b from-muted/30 to-transparent">
                       <div className="flex justify-between items-start gap-3">
                         <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-base text-foreground truncate" title={t.title}>
+                          <h3
+                            className="font-semibold text-base text-foreground truncate"
+                            title={t.title}
+                          >
                             {t.title}
                           </h3>
                         </div>
-                        <Badge variant="outline" className="text-[10px] h-5 border-primary/20 bg-primary/5 text-primary">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] h-5 border-primary/20 bg-primary/5 text-primary"
+                        >
                           LIB
                         </Badge>
                       </div>
-                      <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground w-fit">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-normal px-1.5 py-0 h-5 border-border/50 text-muted-foreground w-fit"
+                      >
                         {t.category}
                       </Badge>
                     </div>
@@ -1292,7 +1412,9 @@ export default function TemplatesPage() {
 
               {filteredLibrary.length === 0 && (
                 <div className="col-span-full py-24 text-center">
-                  <p className="text-muted-foreground">No templates found in library.</p>
+                  <p className="text-muted-foreground">
+                    No templates found in library.
+                  </p>
                 </div>
               )}
             </div>
@@ -1451,7 +1573,7 @@ export default function TemplatesPage() {
                           <div key={idx} className="space-y-1.5">
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] font-medium text-muted-foreground uppercase">
-                                Variable {`{{${idx + 1}}}`}
+                                Variable {"{{" + (idx + 1) + "}}"}
                               </span>
 
                               <div className="flex bg-muted rounded-md p-0.5">
@@ -1467,7 +1589,7 @@ export default function TemplatesPage() {
                                     !variableSources[idx] ||
                                       variableSources[idx] === "custom"
                                       ? "bg-background shadow-sm text-foreground font-medium"
-                                      : "text-muted-foreground hover:text-foreground"
+                                      : "text-muted-foreground hover:text-foreground",
                                   )}
                                 >
                                   Custom
@@ -1483,7 +1605,7 @@ export default function TemplatesPage() {
                                     "px-2 py-0.5 text-[10px] rounded-sm transition-all",
                                     variableSources[idx] === "company_name"
                                       ? "bg-background shadow-sm text-foreground font-medium"
-                                      : "text-muted-foreground hover:text-foreground"
+                                      : "text-muted-foreground hover:text-foreground",
                                   )}
                                 >
                                   Company
@@ -1536,8 +1658,8 @@ export default function TemplatesPage() {
                         <SelectOption value="">All Categories</SelectOption>
                         {Array.from(
                           new Set(
-                            leads.map((l) => l.category_name).filter(Boolean)
-                          )
+                            leads.map((l) => l.category_name).filter(Boolean),
+                          ),
                         ).map((c) => (
                           <SelectOption key={c} value={c as string}>
                             {c}
@@ -1556,11 +1678,11 @@ export default function TemplatesPage() {
                               .filter(
                                 (l) =>
                                   !selectedCategory ||
-                                  l.category_name === selectedCategory
+                                  l.category_name === selectedCategory,
                               )
                               .map((l) => l.sub_category_name)
-                              .filter(Boolean)
-                          )
+                              .filter(Boolean),
+                          ),
                         ).map((sc) => (
                           <SelectOption key={sc} value={sc as string}>
                             {sc}
@@ -1595,7 +1717,8 @@ export default function TemplatesPage() {
                                   (!selectedCategory ||
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
-                                    l.sub_category_name === selectedSubCategory)
+                                    l.sub_category_name ===
+                                      selectedSubCategory),
                               ).length > 0 &&
                               leads
                                 .filter(
@@ -1604,19 +1727,19 @@ export default function TemplatesPage() {
                                       l.company_name
                                         .toLowerCase()
                                         .includes(
-                                          recipientInput.toLowerCase()
+                                          recipientInput.toLowerCase(),
                                         ) ||
                                       l.mobile_number.includes(
-                                        recipientInput
+                                        recipientInput,
                                       )) &&
                                     (!selectedCategory ||
                                       l.category_name === selectedCategory) &&
                                     (!selectedSubCategory ||
                                       l.sub_category_name ===
-                                      selectedSubCategory)
+                                        selectedSubCategory),
                                 )
                                 .every((l) =>
-                                  recipientList.includes(l.mobile_number)
+                                  recipientList.includes(l.mobile_number),
                                 )
                             }
                             onChange={() => {
@@ -1630,24 +1753,25 @@ export default function TemplatesPage() {
                                   (!selectedCategory ||
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
-                                    l.sub_category_name === selectedSubCategory)
+                                    l.sub_category_name ===
+                                      selectedSubCategory),
                               );
                               const allSelected = filtered.every((l) =>
-                                recipientList.includes(l.mobile_number)
+                                recipientList.includes(l.mobile_number),
                               );
 
                               if (allSelected) {
                                 const visiblePhones = filtered.map(
-                                  (l) => l.mobile_number
+                                  (l) => l.mobile_number,
                                 );
                                 setRecipientList(
                                   recipientList.filter(
-                                    (p) => !visiblePhones.includes(p)
-                                  )
+                                    (p) => !visiblePhones.includes(p),
+                                  ),
                                 );
                               } else {
                                 const visiblePhones = filtered.map(
-                                  (l) => l.mobile_number
+                                  (l) => l.mobile_number,
                                 );
                                 setRecipientList([
                                   ...new Set([
@@ -1671,7 +1795,8 @@ export default function TemplatesPage() {
                                   (!selectedCategory ||
                                     l.category_name === selectedCategory) &&
                                   (!selectedSubCategory ||
-                                    l.sub_category_name === selectedSubCategory)
+                                    l.sub_category_name ===
+                                      selectedSubCategory),
                               ).length
                             }
                             )
@@ -1692,7 +1817,7 @@ export default function TemplatesPage() {
                               (!selectedCategory ||
                                 l.category_name === selectedCategory) &&
                               (!selectedSubCategory ||
-                                l.sub_category_name === selectedSubCategory)
+                                l.sub_category_name === selectedSubCategory),
                           )
                           .map((lead) => (
                             <div
@@ -1704,8 +1829,8 @@ export default function TemplatesPage() {
                                 ) {
                                   setRecipientList(
                                     recipientList.filter(
-                                      (p) => p !== lead.mobile_number
-                                    )
+                                      (p) => p !== lead.mobile_number,
+                                    ),
                                   );
                                 } else {
                                   setRecipientList([
@@ -1717,9 +1842,10 @@ export default function TemplatesPage() {
                             >
                               <Checkbox
                                 checked={recipientList.includes(
-                                  lead.mobile_number
+                                  lead.mobile_number,
                                 )}
-                                onChange={() => { }} // handled by parent div click
+                                onChange={() => {}} // handled by parent div click
+                                onChange={() => {}} // handled by parent div click
                                 className="pointer-events-none"
                               />
                               <div className="flex flex-col">
@@ -1753,7 +1879,7 @@ export default function TemplatesPage() {
                               (!selectedCategory ||
                                 l.category_name === selectedCategory) &&
                               (!selectedSubCategory ||
-                                l.sub_category_name === selectedSubCategory)
+                                l.sub_category_name === selectedSubCategory),
                           ).length === 0 && (
                             <div className="p-8 text-center text-muted-foreground text-sm">
                               No matching leads found
@@ -1904,7 +2030,7 @@ export default function TemplatesPage() {
                                   "px-3 py-1.5 rounded-md border text-xs cursor-pointer transition-all",
                                   formData.language === lang
                                     ? "bg-primary/10 border-primary text-primary font-medium shadow-sm"
-                                    : "bg-background border-border hover:bg-muted"
+                                    : "bg-background border-border hover:bg-muted",
                                 )}
                               >
                                 {lang === "en_US"
@@ -1942,7 +2068,7 @@ export default function TemplatesPage() {
                                     "px-3 py-1.5 rounded-md border text-xs cursor-pointer transition-all flex items-center gap-2",
                                     formData.headerType === type
                                       ? "bg-primary/10 border-primary text-primary font-medium shadow-sm"
-                                      : "bg-background border-border hover:bg-muted scale-95 opacity-80 hover:opacity-100 hover:scale-100"
+                                      : "bg-background border-border hover:bg-muted scale-95 opacity-80 hover:opacity-100 hover:scale-100",
                                   )}
                                   onClick={() => {
                                     setFormData({
@@ -1963,7 +2089,7 @@ export default function TemplatesPage() {
                                   )}
                                   {type}
                                 </div>
-                              )
+                              ),
                             )}
                           </div>
 
@@ -2021,7 +2147,9 @@ export default function TemplatesPage() {
                                   <div className="flex items-center gap-2 bg-background p-1.5 rounded border border-border/50 text-xs shadow-sm">
                                     <Paperclip className="w-3 h-3" />
                                     <span className="font-medium truncate max-w-[150px]">
-                                      {headerFile ? headerFile.name : (formData.headerType + " Attached")}
+                                      {headerFile
+                                        ? headerFile.name
+                                        : formData.headerType + " Attached"}
                                     </span>
                                     <Button
                                       variant="ghost"
@@ -2224,7 +2352,7 @@ export default function TemplatesPage() {
                     "lg:flex lg:col-span-5 xl:col-span-4 lg:static lg:z-auto lg:p-4 lg:pt-4", // Desktop defaults
                     showMobilePreview
                       ? "flex fixed inset-0 z-50 pt-24 pb-8"
-                      : "hidden" // Mobile overlay
+                      : "hidden", // Mobile overlay
                   )}
                 >
                   {showMobilePreview && (
@@ -2259,34 +2387,34 @@ export default function TemplatesPage() {
                             {/* Header Media */}
                             {(formData.headerType === "IMAGE" ||
                               formData.headerType === "VIDEO") && (
-                                <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
-                                  {headerPreview ? (
-                                    formData.headerType === "VIDEO" ? (
-                                      <video
-                                        src={headerPreview}
-                                        className="w-full h-full object-contain"
-                                      />
-                                    ) : (
-                                      <img
-                                        src={headerPreview}
-                                        alt="Header"
-                                        className="w-full h-full object-contain"
-                                      />
-                                    )
+                              <div className="rounded-xl overflow-hidden bg-muted min-h-[140px] relative group flex items-center justify-center">
+                                {headerPreview ? (
+                                  formData.headerType === "VIDEO" ? (
+                                    <video
+                                      src={headerPreview}
+                                      className="w-full h-full object-contain"
+                                    />
                                   ) : (
-                                    <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
-                                      {formData.headerType === "IMAGE" ? (
-                                        <ImageIcon className="w-6 h-6" />
-                                      ) : (
-                                        <Video className="w-6 h-6" />
-                                      )}
-                                      <span className="text-[8px] font-bold uppercase">
-                                        {formData.headerType}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                    <img
+                                      src={headerPreview}
+                                      alt="Header"
+                                      className="w-full h-full object-contain"
+                                    />
+                                  )
+                                ) : (
+                                  <div className="flex flex-col items-center gap-1 opacity-20 text-muted-foreground">
+                                    {formData.headerType === "IMAGE" ? (
+                                      <ImageIcon className="w-6 h-6" />
+                                    ) : (
+                                      <Video className="w-6 h-6" />
+                                    )}
+                                    <span className="text-[8px] font-bold uppercase">
+                                      {formData.headerType}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             {/* Header Text */}
                             {formData.headerType === "TEXT" &&
@@ -2372,54 +2500,52 @@ export default function TemplatesPage() {
       </AnimatePresence>
 
       {/* Confirmation Modal */}
-      {
-        deleteConf.isOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-[2px]">
-            <Card className="w-full max-w-md bg-card border-border shadow-2xl">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="w-5 h-5" />
-                  <h2 className="text-xl font-semibold text-foreground">
-                    Confirm Deletion
-                  </h2>
-                </div>
-                <button
-                  onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+      {deleteConf.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-[2px]">
+          <Card className="w-full max-w-md bg-card border-border shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                <h2 className="text-xl font-semibold text-foreground">
+                  Confirm Deletion
+                </h2>
+              </div>
+              <button
+                onClick={() => setDeleteConf({ ...deleteConf, isOpen: false })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground mb-6">
+                Are you sure you want to delete "{deleteConf.title}"?
+                <br />
+                <span className="text-sm text-muted-foreground mt-2 block">
+                  This action cannot be undone.
+                </span>
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
+                  onClick={() =>
+                    setDeleteConf({ ...deleteConf, isOpen: false })
+                  }
                 >
-                  <X className="w-5 h-5" />
-                </button>
-              </CardHeader>
-              <CardContent>
-                <p className="text-foreground mb-6">
-                  Are you sure you want to delete "{deleteConf.title}"?
-                  <br />
-                  <span className="text-sm text-muted-foreground mt-2 block">
-                    This action cannot be undone.
-                  </span>
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 bg-secondary border-border text-foreground hover:bg-muted"
-                    onClick={() =>
-                      setDeleteConf({ ...deleteConf, isOpen: false })
-                    }
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1 bg-destructive hover:bg-destructive/90"
-                    onClick={handleConfirmDelete}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )
-      }
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-destructive hover:bg-destructive/90"
+                  onClick={handleConfirmDelete}
+                >
+                  Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* CATALOG TEMPLATE MODAL */}
       <AnimatePresence>
@@ -2435,6 +2561,6 @@ export default function TemplatesPage() {
           />
         )}
       </AnimatePresence>
-    </div >
+    </div>
   );
 }

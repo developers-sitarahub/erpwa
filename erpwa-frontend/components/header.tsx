@@ -38,7 +38,7 @@ export function Header() {
         <div className="flex items-center gap-4 ml-auto">
           {showSearch && (
             <div className="hidden md:flex items-center gap-2 bg-input rounded-lg px-3 py-2 w-64">
-              <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <Search className="w-4 h-4 text-muted-foreground shrink-0" />
               <input
                 type="text"
                 placeholder="Search..."
@@ -48,7 +48,11 @@ export function Header() {
           )}
 
           {/* Notification Bell */}
-          <Button variant="ghost" size="sm" className="text-foreground hover:bg-muted">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-foreground hover:bg-muted"
+          >
             <Bell className="w-5 h-5" />
             <span className="sr-only">Notifications</span>
           </Button>
@@ -69,8 +73,12 @@ export function Header() {
             {userMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-lg shadow-lg py-2 z-50">
                 <div className="px-4 py-3 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground truncate">{user?.name || "User"}</p>
-                  <p className="text-xs text-muted-foreground capitalize mt-1">{user?.role || "user"}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {user?.name || "User"}
+                  </p>
+                  <p className="text-xs text-muted-foreground capitalize mt-1">
+                    {user?.role || "user"}
+                  </p>
                 </div>
 
                 <Link href="/settings">

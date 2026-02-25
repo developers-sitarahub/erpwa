@@ -14,6 +14,11 @@ export type User = {
   role: "vendor_owner" | "vendor_admin" | "sales" | "owner";
   vendorId: string | null;
   onboardingStatus?: string;
+  vendor?: {
+    subscriptionStart: string | null;
+    subscriptionEnd: string | null;
+    whatsappStatus?: string;
+  } | null;
 };
 
 type AuthContextType = {
@@ -81,12 +86,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const publicPaths = [
         "/login",
+        "/admin-login",
+        "/register",
         "/forgot-password",
         "/create-password",
         "/privacy-policy",
         "/terms-n-condition",
         "/",
       ];
+
+      // ✅ Do not redirect super-admins to normal login
+      if (pathname.startsWith("/admin-super")) {
+        return;
+      }
+
       if (!publicPaths.includes(pathname)) {
         router.replace("/login");
       }

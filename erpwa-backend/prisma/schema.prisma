@@ -30,6 +30,10 @@ model Vendor {
   country               String?
   businessAttributes    Json?
 
+  // Subscription Fields
+  subscriptionStart     DateTime?
+  subscriptionEnd       DateTime?
+
   createdAt             DateTime       @default(now())
   campaigns             Campaign[]
   categories            Category[]
@@ -44,6 +48,7 @@ model Vendor {
   activityLogs          ActivityLog[]
   workflows             Workflow[]
   whatsappFlows         WhatsAppFlow[]
+  vendorRegistrations   VendorRegistration[]
 }
 
 
@@ -65,6 +70,7 @@ model User {
   messages          Message[]          @relation("UserMessages")
   passwordResetOtps PasswordResetOtp[]
   refreshTokens     RefreshToken[]
+  vendorRegistrations VendorRegistration[]
   vendor            Vendor?            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 }
 
@@ -101,6 +107,37 @@ model RegistrationOTP {
 
   @@index([mobile])
   @@index([email])
+}
+
+// Stores a complete snapshot of all data submitted during the vendor registration flow
+// Step 1: identity info, Step 2: business info
+model VendorRegistration {
+  id               String    @id @default(uuid())
+
+  // Step 1 — Identity
+  ownerName        String
+  ownerEmail       String
+  ownerMobile      String
+
+  // Step 2 — Business Info
+  businessName     String?
+  businessCategory String?
+  country          String?
+
+  // Relations
+  userId           String       // The vendor_owner User
+  vendorId         String?      // Set after vendor is created in step2
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor           Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // Timestamps
+  step1CompletedAt DateTime  @default(now())
+  step2CompletedAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([vendorId])
 }
 
 
@@ -640,4 +677,17 @@ model FlowResponse {
   @@index([conversationId])
   @@index([flowToken])
   @@index([status])
+}
+
+// ============================================================
+// SaaS Super Admin – platform-level administrator
+// Completely separate from regular Vendor Users
+// ============================================================
+model SuperAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

@@ -18,7 +18,8 @@ export function requireRoles(allowedRoles = []) {
     console.log(`✅ Permission Granted - Role "${req.user.role}" is allowed`);
 
     // Vendor context check (for vendor-scoped actions)
-    if (!req.user.vendorId) {
+    // ⚠️ Allow 'owner' (Super Admin) to bypass this check
+    if (req.user.role !== "owner" && !req.user.vendorId) {
       return res.status(400).json({
         message: "Vendor not initialized for this account",
       });

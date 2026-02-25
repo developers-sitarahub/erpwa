@@ -52,7 +52,6 @@ export default function CampaignCard({
   const sent = campaign.sentMessages || 0;
   const failed = campaign.failedMessages || 0;
   const progress = total > 0 ? ((sent + failed) / total) * 100 : 0;
-  const successRate = total > 0 ? (sent / total) * 100 : 0;
 
   // Derive display status: if completed but all failed, show as "failed"
   const displayStatus: Campaign["status"] =
@@ -94,7 +93,7 @@ export default function CampaignCard({
           </div>
 
           {/* Progress Bar Section - Fixed height container */}
-          <div className="min-h-[80px] flex items-center">
+          <div className="min-h-20 flex items-center">
             {total > 0 && (displayStatus === "active" || displayStatus === "completed" || displayStatus === "pending" || displayStatus === "failed") ? (
               <div className="space-y-2 w-full">
                 <div className="flex justify-between text-xs text-muted-foreground">

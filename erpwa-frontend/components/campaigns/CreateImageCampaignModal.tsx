@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import axios from "axios";
+import { useState, useEffect, useRef, useCallback } from "react";
 import api from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -9,7 +10,7 @@ import type { Category, WhatsAppRecipient, GalleryImage } from "@/lib/types";
 import { toast } from "react-toastify";
 
 const ImageSkeleton = () => (
-  <div className="h-[120px] rounded-lg bg-gradient-to-br from-muted to-secondary animate-pulse" />
+  <div className="h-[120px] rounded-lg bg-linear-to-br from-muted to-secondary animate-pulse" />
 );
 
 export default function CreateImageCampaignModal({
@@ -62,7 +63,7 @@ export default function CreateImageCampaignModal({
       .catch(console.error);
   }, [isOpen]);
 
-  const fetchRecipients = async (
+  const fetchRecipients = useCallback(async (
     categoryId?: number | null,
     subcategoryId?: number | null,
   ) => {
@@ -80,12 +81,12 @@ export default function CreateImageCampaignModal({
       console.error("Failed to fetch session-active recipients:", error);
       setContacts([]); // Set empty array on error
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
     fetchRecipients(recipientCategoryId, recipientSubcategoryId);
-  }, [isOpen, recipientCategoryId, recipientSubcategoryId]);
+  }, [isOpen, recipientCategoryId, recipientSubcategoryId, fetchRecipients]);
 
   const handleRecipientCategoryChange = (categoryId: number | null) => {
     setRecipientCategoryId(categoryId);
@@ -113,7 +114,7 @@ export default function CreateImageCampaignModal({
     }
   }, [isOpen]);
 
-  const fetchImages = async (pageNumber: number, reset = false) => {
+  const fetchImages = useCallback(async (pageNumber: number, reset = false) => {
     if (!selectedCategoryId || isFetchingRef.current || !hasMoreImages) return;
 
     isFetchingRef.current = true;
@@ -143,7 +144,7 @@ export default function CreateImageCampaignModal({
       setLoadingImages(false);
       isFetchingRef.current = false;
     }
-  };
+  }, [selectedCategoryId, selectedSubcategoryId, hasMoreImages]);
 
   const handleCategoryChange = (categoryId: number) => {
     setSelectedCategoryId(categoryId);
@@ -173,7 +174,7 @@ export default function CreateImageCampaignModal({
       // For page 1, fetch with reset
       fetchImages(1, true);
     }
-  }, [page, selectedCategoryId, selectedSubcategoryId]);
+  }, [page, selectedCategoryId, selectedSubcategoryId, fetchImages]);
 
   useEffect(() => {
     if (!loadMoreRef.current || !hasMoreImages) return;
@@ -221,7 +222,11 @@ export default function CreateImageCampaignModal({
 
   const handleToggleRecipient = (id: number) => {
     const newSelected = new Set(selectedRecipients);
-    newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
     setSelectedRecipients(newSelected);
   };
 
@@ -281,12 +286,16 @@ export default function CreateImageCampaignModal({
       // Success! Trigger refresh
       onSuccess?.();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Campaign creation error:", err);
-      const errorMessage =
-        err?.response?.data?.error ||
-        err?.message ||
-        "Failed to create campaign";
+      let errorMessage = "Failed to create campaign";
+
+      if (axios.isAxiosError(err)) {
+        errorMessage = err.response?.data?.error || err.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+
       alert(errorMessage);
     } finally {
       setIsLaunching(false);
@@ -333,7 +342,7 @@ export default function CreateImageCampaignModal({
             {/* Left Panel: Image Selection */}
             <div className="flex-1 overflow-auto flex flex-col border-b lg:border-b-0 lg:border-r border-border p-6 bg-background">
               <div className="space-y-4 flex flex-col h-full">
-                <div className="space-y-3 flex-shrink-0">
+                <div className="space-y-3 shrink-0">
                   <div className="flex items-center gap-2 mb-4">
                     <Filter className="w-4 h-4 text-primary" />
                     <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -390,7 +399,7 @@ export default function CreateImageCampaignModal({
                 </div>
 
                 {/* Image Grid Section */}
-                <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                <div className="flex items-center justify-between mb-3 shrink-0">
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       Images <span className="text-red-400">*</span>
@@ -506,7 +515,7 @@ export default function CreateImageCampaignModal({
                 <button
                   type="button"
                   onClick={() => setWithCaption(!withCaption)}
-                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card ${withCaption
+                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card ${withCaption
                     ? "bg-primary shadow-lg shadow-primary/30"
                     : "bg-muted border border-border"
                     }`}
@@ -647,8 +656,7 @@ export default function CreateImageCampaignModal({
 
           {/* Footer Actions */}
           <div
-            className="border-t border-border p-6 flex gap-3 justify-end flex-shrink-0 bg-card/80
-"
+            className="border-t border-border p-6 flex gap-3 justify-end shrink-0 bg-card/80"
           >
             <button
               onClick={onClose}

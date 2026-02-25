@@ -6,13 +6,14 @@ import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { useSidebar } from "@/context/sidebar-provider";
 import { useAuth } from "@/context/authContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (loading) return;
@@ -28,8 +29,24 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       user.role === "owner"
     ) {
       router.replace("/admin/dashboard");
+      return;
     }
-  }, [user, loading, router]);
+
+    // 🛡️ Setup completeness check
+    const isSetupIncomplete = user?.vendor?.whatsappStatus !== "connected";
+    const blockedPaths = [
+      "/inbox",
+      "/chatbot",
+      "/templates",
+      "/flows",
+      "/campaigns",
+      "/activity-logs",
+    ];
+
+    if (isSetupIncomplete && blockedPaths.some((p) => pathname.startsWith(p))) {
+      router.replace("/dashboard");
+    }
+  }, [user, loading, router, pathname]);
 
   if (loading) {
     return (

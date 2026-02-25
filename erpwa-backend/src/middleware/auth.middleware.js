@@ -14,7 +14,7 @@ export async function authenticate(req, res, next) {
       process.env.ACCESS_TOKEN_SECRET,
     );
 
-    // 🔑 Fetch user to get vendorId
+    // 🔑 Fetch user to get vendorId and subscription details
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
@@ -23,6 +23,13 @@ export async function authenticate(req, res, next) {
         email: true,
         role: true,
         vendorId: true,
+        vendor: {
+          select: {
+            subscriptionEnd: true,
+            subscriptionStart: true,
+            whatsappStatus: true,
+          },
+        },
       },
     });
 
