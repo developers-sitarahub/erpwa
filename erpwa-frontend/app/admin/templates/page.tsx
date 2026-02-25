@@ -1845,7 +1845,6 @@ export default function TemplatesPage() {
                                   lead.mobile_number,
                                 )}
                                 onChange={() => {}} // handled by parent div click
-                                onChange={() => {}} // handled by parent div click
                                 className="pointer-events-none"
                               />
                               <div className="flex flex-col">

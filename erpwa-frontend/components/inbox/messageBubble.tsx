@@ -8,6 +8,9 @@ import {
   CheckCheck,
   AlertCircle,
   ShoppingBag,
+  SquareArrowOutUpRight,
+  Phone,
+  Reply,
 } from "lucide-react";
 import type { Message, Conversation } from "@/lib/types";
 import { useState, useRef } from "react";
@@ -514,7 +517,7 @@ export default function MessageBubble({
                 className="mx-1 px-3 py-2 bg-black/5 dark:bg-white/10 border-l-4 border-primary rounded flex gap-2 cursor-pointer"
                 onClick={() => {
                   // Only call onReply if repliedMessage is a full Message object (has id and timestamp)
-                  if (isFullMessage(repliedMessage)) {
+                  if (repliedMessage.id && repliedMessage.timestamp) {
                     onReply?.(repliedMessage);
                   }
                 }}
@@ -785,7 +788,7 @@ export default function MessageBubble({
                       className="aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden group border border-border/20"
                     >
                       <div className="relative w-full aspect-square bg-muted/20 rounded mb-1">
-                        {prod.productId ? (
+                        {product.productId ? (
                           <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
                             {/* Placeholder since we don't have catalog image fetcher yet */}
                             <ShoppingBag className="w-6 h-6 opacity-20" />
@@ -793,7 +796,7 @@ export default function MessageBubble({
                         ) : null}
                       </div>
                       <div className="font-medium text-xs truncate">
-                        Code: {prod.productId}
+                        Code: {product.productId}
                       </div>
                     </div>
                   ))}

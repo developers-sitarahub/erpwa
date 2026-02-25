@@ -678,14 +678,15 @@ export default function CreateTemplateCampaignModal({
                               {/* Header Media */}
                               {(() => {
                                 // Check for Carousel Cards
+                                const templateAny = selectedTemplate as any;
                                 if (
-                                  selectedTemplate.carouselCards &&
-                                  selectedTemplate.carouselCards.length > 0
+                                  templateAny.carouselCards &&
+                                  templateAny.carouselCards.length > 0
                                 ) {
                                   return (
                                     <div className="flex overflow-x-auto gap-3 pb-4 -mx-1 px-1 snap-x custom-scrollbar">
-                                      {selectedTemplate.carouselCards.map(
-                                        (card, i) => (
+                                      {templateAny.carouselCards.map(
+                                        (card: any, i: number) => (
                                           <div
                                             key={i}
                                             className="shrink-0 w-50 bg-black/20 rounded-xl overflow-hidden snap-center flex flex-col border border-white/10 shadow-sm"
