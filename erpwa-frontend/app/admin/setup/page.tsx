@@ -8,6 +8,13 @@ import { toast } from "react-toastify";
 type WhatsAppStatus = "not_configured" | "connected" | "error";
 type SetupMethod = "embedded" | "manual";
 
+declare global {
+  interface Window {
+    FB: any;
+    fbAsyncInit: () => void;
+  }
+}
+
 export default function WhatsAppSetupPage() {
   const { user, loading: authLoading } = useAuth();
 
@@ -18,7 +25,6 @@ export default function WhatsAppSetupPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [setupMethod, setSetupMethod] = useState<SetupMethod>("embedded");
-  const [sdkReady, setSdkReady] = useState(false);
   const [setupStep, setSetupStep] = useState<string | null>(null);
 
   // We use a ref to track the session because the cleanup/finish event
