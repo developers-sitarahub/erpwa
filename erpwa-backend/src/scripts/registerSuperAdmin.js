@@ -154,7 +154,8 @@ try {
   console.log(`║  Name  : ${admin.name.padEnd(36)}║`);
   console.log(`║  Email : ${admin.email.padEnd(36)}║`);
   console.log(MID);
-  console.log("║  Login at: gpserp.com/admin-login        ║");
+  const url = `${process.env.FRONTEND_URL || "https://gpserp.com"}/admin-login`;
+  console.log(`║  Login: ${url.padEnd(37)}║`);
   console.log(END + "\n");
 } catch (err) {
   console.error("\n❌ Failed to create Super Admin:", err.message, "\n");
