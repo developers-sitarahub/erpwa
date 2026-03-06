@@ -4,7 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendMail({ to, subject, html, text }) {
   const result = await resend.emails.send({
-    from: "WhatsApp ERP <no-reply@indoglobaltradefair.com>",
+    from: "GPS ERP <no-reply@gpserp.com>",
     to,
     subject,
     html,
