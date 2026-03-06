@@ -5,7 +5,14 @@ class GalleryService {
    * List gallery images with optional filtering and pagination
    */
   static async list(vendorId, filters = {}, pagination = {}) {
-    const { category_id, subcategory_id, sort_by, sort_order, filter_by, filter_value } = filters;
+    const {
+      category_id,
+      subcategory_id,
+      sort_by,
+      sort_order,
+      filter_by,
+      filter_value,
+    } = filters;
     const { page = 1, limit = 20 } = pagination;
 
     const where = {
@@ -21,7 +28,7 @@ class GalleryService {
     // Apply additional filters
     // Apply additional filters
     if (filter_by) {
-      if (filter_by === 'price') {
+      if (filter_by === "price") {
         if (filter_value) {
           const price = parseFloat(filter_value);
           if (!isNaN(price)) {
@@ -31,11 +38,11 @@ class GalleryService {
           // Filter for items that have a price (not null)
           where.price = { not: null };
         }
-      } else if (filter_by === 'description') {
+      } else if (filter_by === "description") {
         if (filter_value) {
           where.description = {
             contains: filter_value,
-            mode: 'insensitive',
+            mode: "insensitive",
           };
         } else {
           // Filter for items that have a description (not null and not empty)
@@ -52,14 +59,14 @@ class GalleryService {
     // Determine sorting
     let orderBy = { createdAt: "desc" }; // Default
     if (sort_by) {
-      const order = sort_order === 'asc' ? 'asc' : 'desc';
-      if (sort_by === 'price') {
+      const order = sort_order === "asc" ? "asc" : "desc";
+      if (sort_by === "price") {
         orderBy = { price: order };
-      } else if (sort_by === 'name' || sort_by === 'title') {
+      } else if (sort_by === "name" || sort_by === "title") {
         orderBy = { title: order };
-      } else if (sort_by === 'modified' || sort_by === 'updatedAt') {
+      } else if (sort_by === "modified" || sort_by === "updatedAt") {
         orderBy = { updatedAt: order };
-      } else if (sort_by === 'createdAt') {
+      } else if (sort_by === "createdAt") {
         orderBy = { createdAt: order };
       }
     }
@@ -225,7 +232,9 @@ class GalleryService {
       });
 
       if (!subcategory) {
-        throw new Error("Subcategory not found or does not belong to the selected category");
+        throw new Error(
+          "Subcategory not found or does not belong to the selected category",
+        );
       }
     }
 
@@ -349,10 +358,14 @@ class GalleryService {
       updateData.priceCurrency = data.price_currency || "USD";
     }
     if (data.category_id !== undefined) {
-      updateData.categoryId = data.category_id ? parseInt(data.category_id) : null;
+      updateData.categoryId = data.category_id
+        ? parseInt(data.category_id)
+        : null;
     }
     if (data.subcategory_id !== undefined) {
-      updateData.subCategoryId = data.subcategory_id ? parseInt(data.subcategory_id) : null;
+      updateData.subCategoryId = data.subcategory_id
+        ? parseInt(data.subcategory_id)
+        : null;
     }
 
     const updated = await prisma.galleryImage.update({
@@ -408,7 +421,11 @@ class GalleryService {
    * Delete a gallery image
    */
   static async delete(vendorId, id) {
-    console.log('🗑️ GalleryService.delete called with:', { vendorId, id, parsedId: parseInt(id) });
+    console.log("🗑️ GalleryService.delete called with:", {
+      vendorId,
+      id,
+      parsedId: parseInt(id),
+    });
 
     const image = await prisma.galleryImage.findFirst({
       where: {
@@ -417,7 +434,7 @@ class GalleryService {
       },
     });
 
-    console.log('🔍 Found image:', image);
+    console.log("🔍 Found image:", image);
 
     if (!image) {
       throw new Error("Gallery image not found");
@@ -425,12 +442,12 @@ class GalleryService {
 
     // Delete from S3 if s3Key exists
     if (image.s3Key) {
-      console.log('🗑️ Deleting from S3:', image.s3Key);
+      console.log("🗑️ Deleting from S3:", image.s3Key);
       const { deleteFromS3 } = await import("../utils/s3.util.js");
       await deleteFromS3(image.s3Key);
     }
 
-    console.log('🗑️ Attempting to delete image from DB with id:', parseInt(id));
+    console.log("🗑️ Attempting to delete image from DB with id:", parseInt(id));
 
     const deleteResult = await prisma.galleryImage.delete({
       where: {
@@ -438,7 +455,7 @@ class GalleryService {
       },
     });
 
-    console.log('✅ Delete result:', deleteResult);
+    console.log("✅ Delete result:", deleteResult);
 
     return {
       success: true,
@@ -469,7 +486,7 @@ class GalleryService {
     });
 
     // Delete from S3
-    const s3Keys = images.filter(img => img.s3Key).map(img => img.s3Key);
+    const s3Keys = images.filter((img) => img.s3Key).map((img) => img.s3Key);
     if (s3Keys.length > 0) {
       console.log(`🗑️ Deleting ${s3Keys.length} images from S3`);
       const { deleteMultipleFromS3 } = await import("../utils/s3.util.js");
@@ -495,6 +512,3 @@ class GalleryService {
 }
 
 export default GalleryService;
-
-
-

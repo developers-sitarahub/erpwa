@@ -11,6 +11,13 @@ import {
   verifyForgotOtp,
   resetForgotPassword,
 } from "../controllers/forgotPassword.controller.js";
+
+import {
+  requestChangePasswordOtp,
+  verifyChangePasswordOtp,
+  changePassword,
+} from "../controllers/changePassword.controller.js";
+
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   validateEmail,
@@ -57,6 +64,38 @@ router.post(
   passwordResetLimiter,
   validatePassword,
   resetForgotPassword
+);
+
+/* ---------- CHANGE PASSWORD (OTP FLOW) ---------- */
+/**
+ * Step 1: Send OTP for Change Password
+ */
+router.post(
+  "/change-password/request-otp",
+  authenticate,
+  passwordResetLimiter,
+  requestChangePasswordOtp
+);
+
+/**
+ * Step 2: Verify Change Password OTP → issue short lived token
+ */
+router.post(
+  "/change-password/verify-otp",
+  authenticate,
+  passwordResetLimiter,
+  validateOtp,
+  verifyChangePasswordOtp
+);
+
+/**
+ * Step 3: Submit new password using the token
+ */
+router.post(
+  "/change-password/reset",
+  passwordResetLimiter,
+  validatePassword,
+  changePassword
 );
 
 export default router;

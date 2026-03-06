@@ -942,12 +942,10 @@ export const deleteFlowResponse = async (req, res) => {
     });
 
     if (!response) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Response not found or access denied",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Response not found or access denied",
+      });
     }
 
     // Delete response

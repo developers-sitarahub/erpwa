@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { ShieldCheck, Mail, Lock } from "lucide-react";
+import { ShieldCheck, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
 
 export default function SuperAdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -68,14 +69,22 @@ export default function SuperAdminLoginPage() {
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 id="sa-password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
                 disabled={loading}
-                className="w-full rounded-md border border-border bg-input px-10 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+                className="w-full rounded-md border border-border bg-input px-10 py-2 pr-10 text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 

@@ -1,11 +1,10 @@
-import prisma from '../prisma.js';
-import { comparePassword, hashPassword } from '../utils/password.js';
-import jwt from 'jsonwebtoken';
-import { generateOtp, hashOtp } from '../utils/otp.js';
-import { sendMail } from '../utils/mailer.js';
-import { passwordResetOtpTemplate } from '../emails/passwordResetOtp.template.js';
-import { vendorActivatedWithPasswordTemplate } from '../emails/vendorActivatedWithPassword.template.js';
-import crypto from 'crypto';
+import prisma from "../prisma.js";
+import { comparePassword, hashPassword } from "../utils/password.js";
+import jwt from "jsonwebtoken";
+import { generateOtp, hashOtp } from "../utils/otp.js";
+import { sendMail } from "../utils/mailer.js";
+import { passwordResetOtpTemplate } from "../emails/passwordResetOtp.template.js";
+import crypto from "crypto";
 
 /* ============================================================
  * POST /api/super-admin/login
@@ -15,41 +14,48 @@ export async function superAdminLogin(req, res) {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
     const admin = await prisma.superAdmin.findUnique({ where: { email } });
 
     if (!admin) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     const valid = await comparePassword(password, admin.passwordHash);
     if (!valid) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Generate a dedicated Super Admin JWT stored in a httpOnly cookie
     const token = jwt.sign(
-      { sub: admin.id, email: admin.email, name: admin.name, role: 'super_admin' },
+      {
+        sub: admin.id,
+        email: admin.email,
+        name: admin.name,
+        role: "super_admin",
+      },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: "8h" },
     );
 
-    res.cookie('saToken', token, {
+    res.cookie("saToken", token, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
     return res.json({
-      message: 'Login successful',
+      message: "Login successful",
       admin: { id: admin.id, email: admin.email, name: admin.name },
     });
   } catch (err) {
-    console.error('superAdminLogin error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("superAdminLogin error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -57,8 +63,8 @@ export async function superAdminLogin(req, res) {
  * POST /api/super-admin/logout
  * ============================================================ */
 export function superAdminLogout(req, res) {
-  res.clearCookie('saToken');
-  return res.json({ message: 'Logged out' });
+  res.clearCookie("saToken");
+  return res.json({ message: "Logged out" });
 }
 
 /* ============================================================
@@ -75,11 +81,18 @@ export function superAdminMe(req, res) {
 export async function getVendors(req, res) {
   try {
     const vendors = await prisma.vendor.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         users: {
-          where: { role: 'vendor_owner' },
-          select: { id: true, name: true, email: true, mobileNumber: true, createdAt: true, onboardingStatus: true },
+          where: { role: "vendor_owner" },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            mobileNumber: true,
+            createdAt: true,
+            onboardingStatus: true,
+          },
           take: 1,
         },
         _count: { select: { users: true } },
@@ -101,8 +114,8 @@ export async function getVendors(req, res) {
 
     return res.json(result);
   } catch (err) {
-    console.error('getVendors error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("getVendors error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -116,29 +129,31 @@ export async function activateVendor(req, res) {
 
     // Find the vendor_owner of this vendor
     const owner = await prisma.user.findFirst({
-      where: { vendorId: id, role: 'vendor_owner' },
+      where: { vendorId: id, role: "vendor_owner" },
     });
 
     if (!owner) {
-      return res.status(404).json({ message: 'Vendor owner not found' });
+      return res.status(404).json({ message: "Vendor owner not found" });
     }
 
-    // Generate an 8-character alphanumeric password
-    const plainPassword = crypto.randomBytes(4).toString('hex');
-    const passwordHash = await hashPassword(plainPassword);
+    // Generate a random temporary password (user won't use this directly)
+    const tempPassword = crypto.randomBytes(32).toString("hex");
+    const passwordHash = await hashPassword(tempPassword);
 
     // Set onboardingStatus to 'activated' and assign the new password
     await prisma.user.update({
       where: { id: owner.id },
-      data: { 
-        onboardingStatus: 'activated',
+      data: {
+        onboardingStatus: "activated",
         passwordHash,
       },
     });
 
     // Start the trial period for the Vendor
     const subscriptionStart = new Date();
-    const subscriptionEnd = new Date(subscriptionStart.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days
+    const subscriptionEnd = new Date(
+      subscriptionStart.getTime() + 15 * 24 * 60 * 60 * 1000,
+    ); // 15 days
 
     await prisma.vendor.update({
       where: { id: id },
@@ -148,28 +163,67 @@ export async function activateVendor(req, res) {
       },
     });
 
-    // Send activation email with generated credentials to the vendor owner
+    // Generate invite token for the link (1 hour validity)
+    const inviteToken = jwt.sign(
+      { sub: owner.id, type: "invite", email: owner.email },
+      process.env.PASSWORD_RESET_TOKEN_SECRET,
+      { expiresIn: "1h" },
+    );
+
+    const inviteLink = `${process.env.FRONTEND_URL}/create-password?token=${inviteToken}`;
+    const name = owner.name || "Vendor Owner";
+
+    // Send invite email WITHOUT OTP (user will request OTP from the page)
     if (owner.email) {
       try {
         await sendMail({
           to: owner.email,
-          ...vendorActivatedWithPasswordTemplate({ 
-            name: owner.name || 'Vendor',
-            email: owner.email,
-            password: plainPassword
-          }),
+          subject: "Welcome to WhatsApp ERP - Set Up Your Account",
+          html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #2563EB;">Welcome to the Team, ${name}!</h2>
+                    <p>Your account has been created successfully.</p>
+                    <p>To activate your account and set your password, click the button below:</p>
+
+                    <div style="margin: 30px 0; text-align: center;">
+                        <a href="${inviteLink}" style="background-color: #2563EB; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Set Up Your Password</a>
+                    </div>
+
+                    <p style="font-size: 14px; color: #666;">Or copy this link to your browser:</p>
+                    <p style="font-size: 14px; color: #666; word-break: break-all;">${inviteLink}</p>
+                    
+                    <p style="margin-top: 30px; padding-top: 20px; font-size: 13px; color: #666;">
+                        <strong>Next steps:</strong><br>
+                        1. Click the link above<br>
+                        2. Request a verification code<br>
+                        3. Enter the code from your email<br>
+                        4. Set your password
+                    </p>
+                    
+                    <p style="border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #999;">
+                        <strong style="color: #dc2626;">⚠️ This link is valid for 1 hour and can be used only once.</strong>
+                    </p>
+                </div>
+            `,
         });
-        console.log(`[EMAIL SUCCESS] Sent activation email & password to ${owner.email}`);
+        console.log(
+          `[EMAIL SUCCESS] Sent activation invite email to ${owner.email}`,
+        );
       } catch (err) {
-        console.error(`[EMAIL FAILED] Failed to send activation email to ${owner.email}:`, err);
+        console.error(
+          `[EMAIL FAILED] Failed to send activation email to ${owner.email}:`,
+          err,
+        );
         // We don't throw here to avoid preventing the activation itself if email fails
       }
     }
 
-    return res.json({ message: 'Vendor activated successfully and password sent via email.' });
+    return res.json({
+      message: "Vendor activated successfully and invite link sent via email.",
+    });
   } catch (err) {
-    console.error('activateVendor error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("activateVendor error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -183,19 +237,19 @@ export async function getVendorRegistration(req, res) {
 
     const registration = await prisma.vendorRegistration.findFirst({
       where: { vendorId: id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     // Fallback: look up via userId (in case step2 wasn't completed yet)
     if (!registration) {
       const owner = await prisma.user.findFirst({
-        where: { vendorId: id, role: 'vendor_owner' },
+        where: { vendorId: id, role: "vendor_owner" },
         select: { id: true },
       });
       if (owner) {
         const regByUser = await prisma.vendorRegistration.findFirst({
           where: { userId: owner.id },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         });
         if (regByUser) return res.json(regByUser);
       }
@@ -204,13 +258,19 @@ export async function getVendorRegistration(req, res) {
         where: { id },
         include: {
           users: {
-            where: { role: 'vendor_owner' },
-            select: { name: true, email: true, mobileNumber: true, createdAt: true, onboardingStatus: true },
+            where: { role: "vendor_owner" },
+            select: {
+              name: true,
+              email: true,
+              mobileNumber: true,
+              createdAt: true,
+              onboardingStatus: true,
+            },
             take: 1,
           },
         },
       });
-      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       const o = vendor.users[0];
       return res.json({
         ownerName: o?.name ?? null,
@@ -227,8 +287,8 @@ export async function getVendorRegistration(req, res) {
 
     return res.json(registration);
   } catch (err) {
-    console.error('getVendorRegistration error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("getVendorRegistration error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -246,8 +306,8 @@ export async function getStats(req, res) {
 
     return res.json({ vendors, users, leads });
   } catch (err) {
-    console.error('getStats error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("getStats error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -259,8 +319,11 @@ export async function getStats(req, res) {
 export async function requestChangePasswordOtp(req, res) {
   try {
     const adminId = req.superAdmin.sub;
-    const admin = await prisma.superAdmin.findUnique({ where: { id: adminId } });
-    if (!admin) return res.status(404).json({ message: 'Super admin not found' });
+    const admin = await prisma.superAdmin.findUnique({
+      where: { id: adminId },
+    });
+    if (!admin)
+      return res.status(404).json({ message: "Super admin not found" });
 
     const otp = generateOtp();
     const otpHash = hashOtp(otp);
@@ -269,26 +332,33 @@ export async function requestChangePasswordOtp(req, res) {
 
     // Sign a short-lived envelope containing the hash
     const otpToken = jwt.sign(
-      { sub: adminId, otpHash, purpose: 'sa_change_password' },
+      { sub: adminId, otpHash, purpose: "sa_change_password" },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '10m' }
+      { expiresIn: "10m" },
     );
 
     const mailResult = await sendMail({
       to: admin.email,
-      ...passwordResetOtpTemplate({ name: admin.name || 'Super Admin', otp }),
+      ...passwordResetOtpTemplate({ name: admin.name || "Super Admin", otp }),
     });
 
     if (mailResult?.error) {
-      console.error('❌ Failed to send OTP email to super admin:', mailResult.error);
-      return res.status(500).json({ message: 'Failed to send OTP email. Please try again.' });
+      console.error(
+        "❌ Failed to send OTP email to super admin:",
+        mailResult.error,
+      );
+      return res
+        .status(500)
+        .json({ message: "Failed to send OTP email. Please try again." });
     }
 
-    console.log(`✅ OTP email sent to super admin: ${admin.email} | Resend ID: ${mailResult?.data?.id}`);
-    return res.json({ message: 'OTP sent to your email', otpToken });
+    console.log(
+      `✅ OTP email sent to super admin: ${admin.email} | Resend ID: ${mailResult?.data?.id}`,
+    );
+    return res.json({ message: "OTP sent to your email", otpToken });
   } catch (err) {
-    console.error('requestChangePasswordOtp error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("requestChangePasswordOtp error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -301,35 +371,37 @@ export async function verifyChangePasswordOtp(req, res) {
   try {
     const { otpToken, otp } = req.body;
     if (!otpToken || !otp) {
-      return res.status(400).json({ message: 'otpToken and otp are required' });
+      return res.status(400).json({ message: "otpToken and otp are required" });
     }
 
     let payload;
     try {
       payload = jwt.verify(otpToken, process.env.ACCESS_TOKEN_SECRET);
     } catch {
-      return res.status(401).json({ message: 'OTP has expired. Please request a new one.' });
+      return res
+        .status(401)
+        .json({ message: "OTP has expired. Please request a new one." });
     }
 
-    if (payload.purpose !== 'sa_change_password') {
-      return res.status(401).json({ message: 'Invalid token type' });
+    if (payload.purpose !== "sa_change_password") {
+      return res.status(401).json({ message: "Invalid token type" });
     }
 
     if (hashOtp(otp) !== payload.otpHash) {
-      return res.status(400).json({ message: 'Invalid OTP' });
+      return res.status(400).json({ message: "Invalid OTP" });
     }
 
-    // Issue a resetToken (15 min)
+    // Issue a resetToken (5 min)
     const resetToken = jwt.sign(
-      { sub: payload.sub, purpose: 'sa_reset_password' },
+      { sub: payload.sub, purpose: "sa_reset_password" },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: "5m" },
     );
 
-    return res.json({ message: 'OTP verified', resetToken });
+    return res.json({ message: "OTP verified", resetToken, expires_in: 300 });
   } catch (err) {
-    console.error('verifyChangePasswordOtp error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("verifyChangePasswordOtp error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -341,23 +413,28 @@ export async function verifyChangePasswordOtp(req, res) {
 export async function resetSuperAdminPassword(req, res) {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: 'Missing reset token' });
+    if (!authHeader)
+      return res.status(401).json({ message: "Missing reset token" });
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(" ")[1];
     let payload;
     try {
       payload = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     } catch {
-      return res.status(401).json({ message: 'Reset token expired. Please start again.' });
+      return res
+        .status(401)
+        .json({ message: "Reset token expired. Please start again." });
     }
 
-    if (payload.purpose !== 'sa_reset_password') {
-      return res.status(401).json({ message: 'Invalid token type' });
+    if (payload.purpose !== "sa_reset_password") {
+      return res.status(401).json({ message: "Invalid token type" });
     }
 
     const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 8 characters" });
     }
 
     const passwordHash = await hashPassword(newPassword);
@@ -367,11 +444,13 @@ export async function resetSuperAdminPassword(req, res) {
     });
 
     // Clear the session cookie — force re-login
-    res.clearCookie('saToken');
-    return res.json({ message: 'Password updated successfully. Please login again.' });
+    res.clearCookie("saToken");
+    return res.json({
+      message: "Password updated successfully. Please login again.",
+    });
   } catch (err) {
-    console.error('resetSuperAdminPassword error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("resetSuperAdminPassword error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }
 
@@ -392,12 +471,13 @@ export async function updateSuperAdminProfile(req, res) {
       const existing = await prisma.superAdmin.findFirst({
         where: { email: email.trim(), NOT: { id: adminId } },
       });
-      if (existing) return res.status(400).json({ message: 'Email already in use' });
+      if (existing)
+        return res.status(400).json({ message: "Email already in use" });
       updateData.email = email.trim();
     }
 
     if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({ message: 'Nothing to update' });
+      return res.status(400).json({ message: "Nothing to update" });
     }
 
     const updated = await prisma.superAdmin.update({
@@ -406,9 +486,9 @@ export async function updateSuperAdminProfile(req, res) {
       select: { id: true, email: true, name: true },
     });
 
-    return res.json({ message: 'Profile updated', admin: updated });
+    return res.json({ message: "Profile updated", admin: updated });
   } catch (err) {
-    console.error('updateSuperAdminProfile error:', err);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("updateSuperAdminProfile error:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 }

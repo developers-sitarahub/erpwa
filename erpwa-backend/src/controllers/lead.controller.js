@@ -3,10 +3,7 @@ import LeadService from "../services/lead.service.js";
 class LeadController {
   static async create(req, res) {
     try {
-      const lead = await LeadService.create(
-        req.user,
-        req.body
-      );
+      const lead = await LeadService.create(req.user, req.body);
       res.json(lead);
     } catch (err) {
       res.status(400).json({ message: err.message });
@@ -14,18 +11,12 @@ class LeadController {
   }
 
   static async list(req, res) {
-    const leads = await LeadService.list(
-      req.user,
-      req.query
-    );
+    const leads = await LeadService.list(req.user, req.query);
     res.json(leads);
   }
 
   static async retrieve(req, res) {
-    const lead = await LeadService.getById(
-      req.user,
-      req.params.id
-    );
+    const lead = await LeadService.getById(req.user, req.params.id);
 
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
@@ -35,26 +26,18 @@ class LeadController {
   }
 
   static async update(req, res) {
-    const lead = await LeadService.update(
-      req.user,
-      req.params.id,
-      req.body
-    );
+    const lead = await LeadService.update(req.user, req.params.id, req.body);
     res.json(lead);
   }
 
   static async delete(req, res) {
-    await LeadService.delete(
-      req.user,
-      req.params.id
-    );
+    await LeadService.delete(req.user, req.params.id);
     res.json({ success: true });
   }
 
   static async revalidate(req, res) {
     res.json({ revalidated: true });
   }
-
 
   static async bulkCreate(req, res) {
     try {
@@ -69,10 +52,7 @@ class LeadController {
       for (const lead of leads) {
         if (!lead.phoneNumber) continue;
 
-        const created = await LeadService.create(
-          req.user,
-          lead
-        );
+        const created = await LeadService.create(req.user, lead);
         results.push(created);
       }
 
@@ -85,12 +65,6 @@ class LeadController {
       res.status(500).json({ message: "Bulk import failed" });
     }
   }
-
-
-
-
-
-
 }
 
 export default LeadController;

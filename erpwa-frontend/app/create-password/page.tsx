@@ -7,7 +7,7 @@ import { motion } from "framer-motion"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/card"
 import { Button } from "@/components/button"
 import { Input } from "@/components/input"
-import { CheckCircle, Lock, AlertCircle, Mail } from "lucide-react"
+import { CheckCircle, Lock, AlertCircle, Mail, Eye, EyeOff } from "lucide-react"
 import api from "@/lib/api"
 import { toast } from "react-toastify"
 
@@ -26,6 +26,8 @@ function CreatePasswordContent() {
   const [tokenError, setTokenError] = useState(false)
   const [resetToken, setResetToken] = useState<string | null>(null)
   const [otpRequested, setOtpRequested] = useState(false)
+  const [showPasswordToggle, setShowPasswordToggle] = useState(false)
+  const [showConfirmPasswordToggle, setShowConfirmPasswordToggle] = useState(false)
 
   useEffect(() => {
     const t = searchParams.get("token")
@@ -334,13 +336,20 @@ function CreatePasswordContent() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    type="password"
+                    type={showPasswordToggle ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"
                     disabled={loading}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordToggle((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPasswordToggle ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
                 {errors.password && <p className="text-destructive text-sm">{errors.password}</p>}
               </div>
@@ -349,13 +358,20 @@ function CreatePasswordContent() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    type="password"
+                    type={showConfirmPasswordToggle ? "text" : "password"}
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="pl-10"
                     disabled={loading}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPasswordToggle((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showConfirmPasswordToggle ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
                 {errors.confirmPassword && <p className="text-destructive text-sm">{errors.confirmPassword}</p>}
               </div>

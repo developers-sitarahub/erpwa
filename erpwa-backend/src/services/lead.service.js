@@ -16,11 +16,15 @@ class LeadService {
         },
       },
       update: {
-        ...(data.companyName !== undefined && { companyName: data.companyName }),
+        ...(data.companyName !== undefined && {
+          companyName: data.companyName,
+        }),
         ...(data.email !== undefined && { email: data.email }),
         ...(data.city !== undefined && { city: data.city }),
         ...(data.category !== undefined && { category: data.category }),
-        ...(data.subcategory !== undefined && { subcategory: data.subcategory }),
+        ...(data.subcategory !== undefined && {
+          subcategory: data.subcategory,
+        }),
         ...(data.whatsappOptIn !== undefined && {
           whatsappOptIn: data.whatsappOptIn,
         }),
@@ -73,8 +77,8 @@ class LeadService {
       payload: {
         leadId: lead.id,
         source: "manual",
-        salesPerson: lead.salesPersonName
-      }
+        salesPerson: lead.salesPersonName,
+      },
     });
 
     return lead;
@@ -179,8 +183,8 @@ class LeadService {
           oldStatus: existingLead.status,
           newStatus: data.status,
           updatedBy: user.name,
-          companyName: existingLead.companyName
-        }
+          companyName: existingLead.companyName,
+        },
       });
     }
 

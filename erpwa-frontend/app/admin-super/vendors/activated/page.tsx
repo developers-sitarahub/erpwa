@@ -36,14 +36,26 @@ type Vendor = {
   owner: Owner | null;
 };
 
-// Helper for days remaining
 function getSubscriptionStatus(endDate?: string | null) {
   if (!endDate) return null;
   const now = new Date();
   const end = new Date(endDate);
   const diffTime = end.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
+
+  if (diffTime <= 0) {
+    return { label: "Expired", isExpired: true, isWarning: false };
+  }
+
+  const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const hours = Math.floor(
+    (diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+  );
+  const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+
+  const pad = (num: number) => num.toString().padStart(2, "0");
+  const label = `${pad(days)}d ${pad(hours)}h ${pad(minutes)}m left`;
+
+  return { label, isExpired: false, isWarning: days <= 3 };
 }
 
 export default function ActivatedVendorsPage() {
@@ -240,16 +252,17 @@ export default function ActivatedVendorsPage() {
                   </td>
                   <td className="px-5 py-4">
                     {(() => {
-                      const days = getSubscriptionStatus(v.subscriptionEnd);
-                      if (days === null) {
+                      const status = getSubscriptionStatus(v.subscriptionEnd);
+                      if (!status) {
                         return (
                           <span className="text-muted-foreground text-xs italic">
                             —
                           </span>
                         );
                       }
-                      const isExpired = days < 0;
-                      const isWarning = days >= 0 && days <= 3;
+
+                      const { label, isExpired, isWarning } = status;
+
                       return (
                         <div className="flex flex-col gap-0.5">
                           <span
@@ -262,11 +275,7 @@ export default function ActivatedVendorsPage() {
                             }`}
                           >
                             <Clock className="h-3 w-3" />
-                            {isExpired
-                              ? "Expired"
-                              : days === 0
-                                ? "Ends Today"
-                                : `${days} Days Left`}
+                            {label}
                           </span>
                           <span className="text-[10px] text-muted-foreground">
                             15-day Trial

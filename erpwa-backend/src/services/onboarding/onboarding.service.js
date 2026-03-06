@@ -153,16 +153,20 @@ export async function verifyOtpAndCreateUser(data) {
   }
 
   // Save/update VendorRegistration snapshot for Step 1
-  console.log(`[VendorRegistration] Saving Step1 for user=${user.id}, email=${email}`);
+  console.log(
+    `[VendorRegistration] Saving Step1 for user=${user.id}, email=${email}`,
+  );
   await prisma.vendorRegistration.create({
     data: {
       userId: user.id,
       ownerName: name,
       ownerEmail: email,
       ownerMobile: mobile,
-    }
+    },
   });
-  console.log(`[VendorRegistration] Step1 saved successfully for user=${user.id}`);
+  console.log(
+    `[VendorRegistration] Step1 saved successfully for user=${user.id}`,
+  );
 
   return startOnboardingSession(user);
 }
@@ -174,7 +178,7 @@ export async function submitStep2(userId, payload) {
 
   const latestRegistration = await prisma.vendorRegistration.findFirst({
     where: { userId },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: "desc" },
   });
 
   let latestVendorId = user.vendorId;
@@ -202,10 +206,12 @@ export async function submitStep2(userId, payload) {
   // Update onboarding status
   let updatedUser = await prisma.user.update({
     where: { id: userId },
-    data: { onboardingStatus: 'business_info_completed' },
+    data: { onboardingStatus: "business_info_completed" },
   });
 
-  console.log(`[VendorRegistration] Saving Step2 for user=${userId}, vendorId=${latestVendorId}`);
+  console.log(
+    `[VendorRegistration] Saving Step2 for user=${userId}, vendorId=${latestVendorId}`,
+  );
 
   // Update the most recent VendorRegistration snapshot with Step 2 data
   if (latestRegistration) {
@@ -217,21 +223,21 @@ export async function submitStep2(userId, payload) {
         country,
         vendorId: latestVendorId,
         step2CompletedAt: new Date(),
-      }
+      },
     });
   } else {
     await prisma.vendorRegistration.create({
       data: {
         userId,
-        ownerName: updatedUser.name || '',
-        ownerEmail: updatedUser.email || '',
-        ownerMobile: updatedUser.mobileNumber || '',
+        ownerName: updatedUser.name || "",
+        ownerEmail: updatedUser.email || "",
+        ownerMobile: updatedUser.mobileNumber || "",
         businessName,
         businessCategory,
         country,
         vendorId: latestVendorId,
         step2CompletedAt: new Date(),
-      }
+      },
     });
   }
 

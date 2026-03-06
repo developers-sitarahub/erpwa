@@ -12,7 +12,7 @@ import {
 } from "@/components/card";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
-import { Lock, Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { Lock, Mail, ArrowLeft, CheckCircle, Clock, Eye, EyeOff } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
 import Link from "next/link";
@@ -31,6 +31,11 @@ export default function SuperAdminChangePassword() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [adminEmail, setAdminEmail] = useState<string>("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Countdown timer in seconds
+  const [timeLeft, setTimeLeft] = useState<number>(300);
 
   /* Fetch the logged-in super admin's email on mount */
   useEffect(() => {
@@ -39,6 +44,29 @@ export default function SuperAdminChangePassword() {
       .then((res) => setAdminEmail(res.data.admin.email))
       .catch(() => setAdminEmail(""));
   }, []);
+
+  useEffect(() => {
+    let timerId: NodeJS.Timeout;
+    if (step === 3 && timeLeft > 0) {
+      timerId = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+    } else if (step === 3 && timeLeft === 0) {
+      // Timeout occurred
+      toast.error("Time expired. Please request a new code.");
+      setStep(1); // Go back to start
+      setOtp("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setResetToken(null);
+    }
+    return () => clearInterval(timerId);
+  }, [step, timeLeft]);
+
+  // Format timeLeft into mm:ss
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   /* ================================================================
    * Step 1 — Send OTP to super admin's registered email
@@ -82,6 +110,7 @@ export default function SuperAdminChangePassword() {
         otp,
       });
       setResetToken(res.data.resetToken);
+      setTimeLeft(res.data.expires_in || 300);
       setStep(3);
       toast.success("Code verified! Now set your new password.");
     } catch (err: unknown) {
@@ -318,9 +347,15 @@ export default function SuperAdminChangePassword() {
       >
         <Card>
           <CardHeader>
-            <CardTitle>Set New Password</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Set New Password</CardTitle>
+              <div className="flex items-center text-sm font-medium text-destructive gap-1 bg-destructive/10 px-2 py-1 rounded">
+                <Clock className="w-4 h-4" />
+                {formatTime(timeLeft)}
+              </div>
+            </div>
             <CardDescription>
-              Create a secure password for your Super Admin account
+              Create a secure password for your account. You have 5 minutes to complete this.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -330,13 +365,20 @@ export default function SuperAdminChangePassword() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    type="password"
+                    type={showNewPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="pl-10"
                     disabled={loading}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
                 {errors.newPassword && (
                   <p className="text-destructive text-sm">
@@ -352,13 +394,20 @@ export default function SuperAdminChangePassword() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="pl-10"
                     disabled={loading}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
                 {errors.confirmPassword && (
                   <p className="text-destructive text-sm">
