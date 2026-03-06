@@ -27,6 +27,12 @@ export function SubscriptionBanner({ className = "" }: { className?: string }) {
       }
 
       const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+
+      if (days > 3650) {
+        if (active) setTimeLeft(null); // Unlimited access
+        return;
+      }
+
       const hours = Math.floor(
         (difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
       );

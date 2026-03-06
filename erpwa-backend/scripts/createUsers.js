@@ -9,6 +9,8 @@ async function main() {
   const vendor = await prisma.vendor.create({
     data: {
       name: "Sitarahub",
+      subscriptionStart: new Date(),
+      subscriptionEnd: new Date("2099-12-31T23:59:59.999Z"), // Unlimited access
     },
   });
 
@@ -51,6 +53,7 @@ async function main() {
         role: user.role,
         passwordHash,
         vendorId: vendor.id, // 🔑 THIS IS THE FIX
+        onboardingStatus: "activated", // 🔑 Directly mark as activated
       },
     });
 

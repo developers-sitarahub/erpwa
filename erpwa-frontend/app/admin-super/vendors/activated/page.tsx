@@ -47,6 +47,11 @@ function getSubscriptionStatus(endDate?: string | null) {
   }
 
   const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  if (days > 3650) {
+    return { label: "Unlimited", isExpired: false, isWarning: false, isUnlimited: true };
+  }
+
   const hours = Math.floor(
     (diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
   );
@@ -55,7 +60,7 @@ function getSubscriptionStatus(endDate?: string | null) {
   const pad = (num: number) => num.toString().padStart(2, "0");
   const label = `${pad(days)}d ${pad(hours)}h ${pad(minutes)}m left`;
 
-  return { label, isExpired: false, isWarning: days <= 3 };
+  return { label, isExpired: false, isWarning: days <= 3, isUnlimited: false };
 }
 
 export default function ActivatedVendorsPage() {
@@ -229,11 +234,10 @@ export default function ActivatedVendorsPage() {
                   </td>
                   <td className="px-5 py-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                        v.whatsappStatus === "connected"
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${v.whatsappStatus === "connected"
                           ? "bg-green-500/10 text-green-500"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                        }`}
                     >
                       {v.whatsappStatus === "connected" ? (
                         <CheckCircle className="h-3 w-3" />
@@ -261,24 +265,23 @@ export default function ActivatedVendorsPage() {
                         );
                       }
 
-                      const { label, isExpired, isWarning } = status;
+                      const { label, isExpired, isWarning, isUnlimited } = status as any;
 
                       return (
                         <div className="flex flex-col gap-0.5">
                           <span
-                            className={`inline-flex items-center gap-1 text-xs font-medium ${
-                              isExpired
+                            className={`inline-flex items-center gap-1 text-xs font-medium ${isExpired
                                 ? "text-destructive"
                                 : isWarning
                                   ? "text-orange-500"
                                   : "text-primary"
-                            }`}
+                              }`}
                           >
                             <Clock className="h-3 w-3" />
                             {label}
                           </span>
                           <span className="text-[10px] text-muted-foreground">
-                            15-day Trial
+                            {isUnlimited ? "Unlimited Access" : "15-day Trial"}
                           </span>
                         </div>
                       );
