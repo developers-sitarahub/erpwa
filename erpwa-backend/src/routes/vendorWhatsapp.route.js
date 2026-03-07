@@ -21,22 +21,7 @@ const generatePin = () =>
 const registerPhoneNumber = async (phoneNumberId, token) => {
   const pin = generatePin();
 
-  // ✅ Check current status BEFORE registering
-  const statusResp = await fetch(
-    `https://graph.facebook.com/v24.0/${phoneNumberId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
-
-  const statusData = await statusResp.json();
-
-  if (statusData?.code_verification_status === "VERIFIED") {
-    console.log("✅ Number already verified/registered");
-    return { success: true };
-  }
+  // 🔥 Always attempt to register to ensure the node is usable.
 
   // 🔥 Only register if truly needed
   const resp = await fetch(
@@ -50,7 +35,6 @@ const registerPhoneNumber = async (phoneNumberId, token) => {
       body: JSON.stringify({
         messaging_product: "whatsapp",
         pin,
-        tier: "prod",
       }),
     },
   );
@@ -168,10 +152,36 @@ router.post(
       console.error("Could not fetch tier", e);
     }
 
-    // 3️⃣ Encrypt access token
+    // 3️⃣ Attempt to Register Phone Number
+    const registration = await registerPhoneNumber(
+      whatsappPhoneNumberId,
+      whatsappAccessToken
+    );
+
+    if (!registration.success) {
+      return res.status(400).json({
+        message: "Phone number registration failed",
+        metaError: registration.error,
+      });
+    }
+
+    // 4️⃣ Attempt to Subscribe App
+    const subscription = await subscribeApp(
+      whatsappBusinessId,
+      whatsappAccessToken
+    );
+
+    if (!subscription.success) {
+      return res.status(400).json({
+        message: "Webhook subscription failed",
+        metaError: subscription.error,
+      });
+    }
+
+    // 5️⃣ Encrypt access token
     const encryptedToken = encrypt(whatsappAccessToken);
 
-    // 4️⃣ Save credentials to Vendor
+    // 6️⃣ Save credentials to Vendor
     await prisma.vendor.update({
       where: { id: req.user.vendorId },
       data: {
@@ -230,20 +240,16 @@ router.post(
       process.env.META_APP_SECRET?.substring(0, 5) + "...",
     );
 
+    const qs = new URLSearchParams({
+      client_id: process.env.META_APP_ID,
+      client_secret: process.env.META_APP_SECRET,
+      code,
+    });
+
     const tokenResp = await fetch(
-      "https://graph.facebook.com/v24.0/oauth/access_token",
+      `https://graph.facebook.com/v24.0/oauth/access_token?${qs.toString()}`,
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          client_id: process.env.META_APP_ID,
-          client_secret: process.env.META_APP_SECRET,
-          // redirect_uri: process.env.META_OAUTH_REDIRECT_URI, // ❌ Often causes mismatch for JS SDK flows
-          code,
-          grant_type: "authorization_code",
-        }),
+        method: "GET",
       },
     );
 
@@ -323,7 +329,7 @@ router.post(
           whatsappMessagingTier = numberObj.messaging_limit_tier || "UNKNOWN";
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     console.log("📱 Phone Details:", JSON.stringify(phoneDetailData, null, 2));
 
@@ -461,7 +467,7 @@ router.post(
               numberObj.messaging_limit_tier || whatsappMessagingTier;
           }
         }
-      } catch (e) {}
+      } catch (e) { }
 
       const updatedVendor = await prisma.vendor.update({
         where: { id: req.user.vendorId },

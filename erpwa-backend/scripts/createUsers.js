@@ -8,7 +8,7 @@ async function main() {
   // 1️⃣ Create Vendor FIRST
   const vendor = await prisma.vendor.create({
     data: {
-      name: "Sitarahub",
+      name: "GPSERP Support",
       subscriptionStart: new Date(),
       subscriptionEnd: new Date("2099-12-31T23:59:59.999Z"), // Unlimited access
     },
@@ -34,8 +34,8 @@ async function main() {
     //   role: "vendor_admin",
     // },
     {
-      email: "developers@sitarahub.com",
-      name: "Sitarahub Developers",
+      email: "support@gpserp.com",
+      name: "GPSERP Support",
       role: "vendor_owner",
     },
     // {
