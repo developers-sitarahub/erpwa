@@ -30,7 +30,6 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.13",
     "pg": "^8.17.2",
-    "prisma": "^7.4.2",
     "resend": "^6.9.1",
     "socket.io": "^4.8.3",
     "twilio": "^5.12.2",
@@ -38,7 +37,8 @@
   },
   "devDependencies": {
     "@types/node": "^25.1.0",
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "prisma": "^7.8.0"
   },
   "overrides": {
     "hono": "^4.11.4",
