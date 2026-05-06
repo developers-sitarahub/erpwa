@@ -426,7 +426,7 @@ export default function CreateTemplateCampaignModal({
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g., Summer Launch 2024"
+                        placeholder="e.g., Summer Launch 2026"
                         value={campaignName}
                         onChange={(e) => setCampaignName(e.target.value)}
                         className="w-full px-4 py-3 bg-input border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"

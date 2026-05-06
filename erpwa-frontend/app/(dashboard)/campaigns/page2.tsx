@@ -301,7 +301,7 @@ function CreateImageCampaignModal({
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g., Summer Sale 2024"
+                    placeholder="e.g., Summer Sale 2026"
                     value={campaignName}
                     onChange={(e) => setCampaignName(e.target.value)}
                     className="w-full px-4 py-2 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
@@ -698,7 +698,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([
     {
       id: "1",
-      name: "Summer Sale 2024",
+      name: "Summer Sale 2026",
       type: "image",
       status: "active",
       recipientCount: 256,

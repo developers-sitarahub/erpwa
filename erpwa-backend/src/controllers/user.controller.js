@@ -4,8 +4,36 @@ import { sendMail } from "../utils/mailer.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { logActivity } from "../services/activityLog.service.js";
+import { enforceTeamUsersLimit } from "../utils/subscription.js";
 
 // Force restart for prisma client update
+
+// Get Team Member limits
+export const getTeamLimits = async (req, res) => {
+    try {
+        const vendor = await prisma.vendor.findUnique({
+            where: { id: req.user.vendorId },
+            include: { subscriptionPlan: true },
+        });
+
+        if (!vendor || !vendor.subscriptionPlan) {
+            return res.json({ limit: -1, currentCount: 0 }); 
+        }
+
+        const { teamUsersLimit } = vendor.subscriptionPlan;
+        const count = await prisma.user.count({ 
+            where: { 
+                vendorId: req.user.vendorId,
+                role: { not: "vendor_owner" } 
+            } 
+        });
+
+        res.json({ limit: teamUsersLimit, currentCount: count });
+    } catch (error) {
+        console.error("Get team limits error:", error);
+        res.status(500).json({ message: "Failed to get team limits" });
+    }
+};
 
 // List all users for the current vendor
 export const listUsers = async (req, res) => {
@@ -50,6 +78,9 @@ export const createUser = async (req, res) => {
     }
 
     try {
+        // Enforce subscription plan limit
+        await enforceTeamUsersLimit(req.user.vendorId);
+
         // Check if email exists
         const existing = await prisma.user.findUnique({ where: { email } });
         if (existing) {
@@ -153,6 +184,9 @@ export const createUser = async (req, res) => {
         res.status(201).json(user);
     } catch (error) {
         console.error("Create user error:", error);
+        if (error.message && error.message.includes("Subscription limit reached")) {
+            return res.status(403).json({ message: error.message });
+        }
         res.status(500).json({ message: "Failed to create user" });
     }
 };

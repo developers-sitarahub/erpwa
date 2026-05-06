@@ -42,6 +42,8 @@ type ActivityLog = {
     status: string; // read, delivered, sent, failed, template_approved, approved, received
     event: string | null; // Operation name (receive, delivery_update, template_approval, etc.)
     category: string | null; // Category from payload
+    billingCategory?: string; // Marketing/Service computed from backend
+    approxCost?: number; // Approximate cost computed from backend
     error: string | null; // Only populated if there's an actual error
     payload: Record<string, unknown> | null;
     createdAt: string;
@@ -723,8 +725,8 @@ export default function ActivityLogsPage() {
                                 <th className="text-left px-3 py-3 font-medium">Event</th>
                                 <th className="text-left px-3 py-3 font-medium">Type</th>
                                 <th className="text-left px-3 py-3 font-medium">Phone</th>
-                                <th className="text-left px-3 py-3 font-medium">Reply Context ID</th>
                                 <th className="text-left px-3 py-3 font-medium">Category</th>
+                                <th className="text-left px-3 py-3 font-medium">Est. Cost</th>
                                 <th className="text-left px-3 py-3 font-medium">Status</th>
                                 <th className="text-left px-3 py-3 font-medium max-w-37.5">Error</th>
                                 <th className="text-center px-3 py-3 font-medium">View</th>
@@ -776,23 +778,26 @@ export default function ActivityLogsPage() {
                                             {formatPhone(log.phoneNumber)}
                                         </td>
 
-                                        {/* Reply Context */}
-                                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                                            {(log.payload as { context?: { id?: string } } | null)?.context?.id ? (
-                                                <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] truncate max-w-25 block" title={(log.payload as { context?: { id?: string } } | null)?.context?.id}>
-                                                    {(log.payload as { context?: { id?: string } } | null)?.context?.id?.slice(0, 10)}...
+                                        {/* Category */}
+                                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                                            {log.billingCategory ? (
+                                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wide border ${
+                                                    log.billingCategory === "marketing" ? "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800" :
+                                                    log.billingCategory === "utility" ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800" :
+                                                    log.billingCategory === "authentication" ? "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800" :
+                                                    "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
+                                                }`}>
+                                                    {log.billingCategory}
                                                 </span>
                                             ) : (
                                                 "-"
                                             )}
                                         </td>
 
-                                        {/* Category */}
-                                        <td className="px-3 py-2 text-xs text-muted-foreground">
-                                            {log.category ? (
-                                                <span className="bg-primary/5 text-primary border border-primary/10 px-1.5 py-0.5 rounded uppercase text-[10px] font-medium tracking-wide">
-                                                    {log.category}
-                                                </span>
+                                        {/* Est Cost */}
+                                        <td className="px-3 py-2 text-xs">
+                                            {log.approxCost !== undefined ? (
+                                                <span className="font-semibold text-foreground">₹{log.approxCost === 0 ? "0.00" : Number(log.approxCost.toFixed(4))}</span>
                                             ) : (
                                                 "-"
                                             )}

@@ -34,17 +34,26 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
     // 🛡️ Setup completeness check
     const isSetupIncomplete = user?.vendor?.whatsappStatus !== "connected";
+    const isExpired =
+      user?.vendor?.subscriptionEnd &&
+      new Date(user.vendor.subscriptionEnd).getTime() <= new Date().getTime();
+
     const blockedPaths = [
       "/admin/inbox",
       "/admin/chatbot",
       "/admin/templates",
       "/admin/flows",
       "/admin/campaigns",
+      "/admin/leads",
       "/admin/activity-logs",
     ];
 
-    if (isSetupIncomplete && blockedPaths.some((p) => pathname.startsWith(p))) {
-      router.replace("/admin/setup");
+    if (blockedPaths.some((p) => pathname.startsWith(p))) {
+      if (isSetupIncomplete) {
+        router.replace("/admin/setup");
+      } else if (isExpired) {
+        router.replace("/admin/dashboard");
+      }
     }
   }, [user, loading, router, pathname]);
 

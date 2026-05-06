@@ -246,11 +246,15 @@ router.post(
 
     // Create conversation if it doesn't exist
     if (!conversation) {
+      const { enforceConversationLimit } = await import("../utils/subscription.js");
+      await enforceConversationLimit(vendorId);
+
       conversation = await prisma.conversation.create({
         data: {
           vendorId,
           leadId: lead.id,
           channel: "whatsapp",
+          initiatedBy: "vendor",
           lastMessageAt: new Date(),
         },
       });

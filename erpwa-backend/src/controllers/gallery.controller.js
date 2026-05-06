@@ -1,5 +1,7 @@
 import GalleryService from "../services/gallery.service.js";
 import CampaignService from "../services/campaign.service.js";
+import { enforceGalleryLimit } from "../utils/subscription.js";
+import prisma from "../prisma.js";
 
 class GalleryController {
   /**
@@ -60,6 +62,7 @@ class GalleryController {
    */
   static async create(req, res) {
     try {
+      await enforceGalleryLimit(req.user.vendorId, 1);
       const result = await GalleryService.create(req.user.vendorId, req.body);
       res.json(result);
     } catch (err) {
@@ -78,6 +81,8 @@ class GalleryController {
       if (!Array.isArray(images) || images.length === 0) {
         return res.status(400).json({ error: "Images array is required" });
       }
+
+      await enforceGalleryLimit(req.user.vendorId, images.length);
 
       const result = await GalleryService.bulkCreate(req.user.vendorId, images);
       res.json(result);
@@ -149,6 +154,11 @@ class GalleryController {
     try {
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({ error: "No images provided" });
+      }
+
+      // If skipping gallery logic entirely (temp uploads), don't enforce DB plan limits
+      if (req.query.skipGallery !== 'true') {
+        await enforceGalleryLimit(req.user.vendorId, req.files.length);
       }
 
       const category_id = req.body.category_id;
@@ -232,6 +242,42 @@ class GalleryController {
       });
     } catch (err) {
       res.status(400).json({ error: err.message });
+    }
+  }
+
+  /**
+   * Get gallery limits and current usage
+   * GET /api/gallery/limits
+   */
+  static async getLimits(req, res) {
+    try {
+      const vendorId = req.user.vendorId;
+
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        include: { subscriptionPlan: true },
+      });
+
+      if (!vendor || !vendor.subscriptionPlan) {
+        return res.json({
+          limit: 0,
+          currentCount: 0,
+          planName: "Unknown",
+        });
+      }
+
+      const limit = vendor.subscriptionPlan.galleryLimit;
+      const count = await prisma.galleryImage.count({
+        where: { vendorId },
+      });
+
+      res.json({
+        limit,
+        currentCount: count,
+        planName: vendor.subscriptionPlan.name,
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch gallery limits" });
     }
   }
 }

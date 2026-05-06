@@ -119,40 +119,12 @@ export const getDashboardStats = async (req, res) => {
       prisma.activityLog.findMany({
         where: {
           vendorId,
-          OR: [
-            {
-              type: {
-                in: ["Lead", "System", "system_event", "flow_endpoint_hit"],
-              },
-            },
-            {
-              event: {
-                in: [
-                  "Lead Created",
-                  "Status Updated",
-                  "Received",
-                  "WhatsApp Connected",
-                ],
-              },
-            },
-            // Include messages that are NOT part of a campaign delivery (like incoming chat)
-            {
-              AND: [
-                { type: { contains: "Message" } },
-                { NOT: { type: { contains: "Campaign" } } },
-              ],
-            },
-          ],
-          // Still filter out technical noise
-          NOT: {
-            OR: [
-              { type: { in: ["webhook", "outbound_status"] } },
-              { status: { in: ["read", "delivered", "sent"] } },
-            ],
-          },
+          // Only show lead status updates — campaigns come from the Campaign table
+          type: "Lead",
+          event: "Status Updated",
         },
         orderBy: { createdAt: "desc" },
-        take: 100,
+        take: 20,
       }),
     ]);
 

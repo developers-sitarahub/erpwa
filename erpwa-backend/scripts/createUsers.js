@@ -23,25 +23,20 @@ async function main() {
     //   name: "Soham Sawalakhe",
     //   role: "vendor_admin",
     // },
-    // {
-    //   email: "gauravrai3133@gmail.com",
-    //   name: "Gaurav Rai",
-    //   role: "vendor_owner",
-    // },
+    {
+      email: "gauravrai3133@gmail.com",
+      name: "Gaurav Rai",
+      role: "vendor_owner",
+    },
     // {
     //   email: "pradhanpratik219@gmail.com",
     //   name: "Pratik Pradhan",
     //   role: "vendor_admin",
     // },
-    {
-      email: "support@gpserp.com",
-      name: "GPSERP Support",
-      role: "vendor_owner",
-    },
     // {
-    //   email: "developer.sitarahub@gmail.com",
-    //   name: "Developers",
-    //   role: "sales",
+    //   email: "support@gpserp.com",
+    //   name: "GPSERP Support",
+    //   role: "vendor_owner",
     // },
   ];
 
@@ -52,8 +47,8 @@ async function main() {
         name: user.name,
         role: user.role,
         passwordHash,
-        vendorId: vendor.id, // 🔑 THIS IS THE FIX
-        onboardingStatus: "activated", // 🔑 Directly mark as activated
+        vendorId: vendor.id,
+        onboardingStatus: "activated",
       },
     });
 

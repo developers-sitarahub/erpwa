@@ -128,15 +128,17 @@ interface LogoProps {
   className?: string;
   collapsed?: boolean;
   isSidebar?: boolean;
+  forceWhite?: boolean;
 }
 
-export function Logo({ className, collapsed, isSidebar = false }: LogoProps) {
+export function Logo({ className, collapsed, isSidebar = false, forceWhite = false }: LogoProps) {
   if (collapsed) {
     // Collapsed version - just the icon centered
     return (
       <div
         className={cn(
           "flex items-center justify-center select-none",
+          forceWhite && "force-dark",
           className,
         )}
       >
@@ -159,6 +161,7 @@ export function Logo({ className, collapsed, isSidebar = false }: LogoProps) {
       className={cn(
         "flex items-center select-none",
         isSidebar && !collapsed ? "justify-start" : "justify-center",
+        forceWhite && "force-dark",
         className,
       )}
     >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -19,42 +19,54 @@ export function Typewriter({
   const [isDeleting, setIsDeleting] = useState(false);
   const [index, setIndex] = useState(0);
 
+  const type = useCallback(() => {
+    const fullText = texts[index];
+    
+    if (isDeleting) {
+      if (currentText === "") {
+        setIsDeleting(false);
+        setIndex((prev) => (prev + 1) % texts.length);
+      } else {
+        setCurrentText(fullText.substring(0, currentText.length - 1));
+      }
+    } else {
+      if (currentText === fullText) {
+        return;
+      }
+      setCurrentText(fullText.substring(0, currentText.length + 1));
+    }
+  }, [currentText, isDeleting, index, texts]);
+
   useEffect(() => {
     let timeout: NodeJS.Timeout;
 
     const fullText = texts[index];
+    const finishedTyping = !isDeleting && currentText === fullText;
+    const finishedDeleting = isDeleting && currentText === "";
 
-    if (!isDeleting && currentText === fullText) {
-      // Pause at the end of typing
+    if (finishedTyping) {
       timeout = setTimeout(() => setIsDeleting(true), delay);
-    } else if (isDeleting && currentText === "") {
-      // Move to next word after deleting - wrapped in timeout to avoid state change during render pass issues
+    } else if (finishedDeleting) {
       timeout = setTimeout(() => {
         setIsDeleting(false);
         setIndex((prev) => (prev + 1) % texts.length);
-      }, 100);
+      }, 500);
     } else {
-      // Type or delete characters
-      const speed = isDeleting ? 50 : 100; // Deleting is faster than typing
-
-      timeout = setTimeout(() => {
-        setCurrentText(
-          fullText.substring(0, currentText.length + (isDeleting ? -1 : 1)),
-        );
-      }, speed);
+      const speed = isDeleting ? 40 : 80;
+      timeout = setTimeout(type, speed);
     }
 
     return () => clearTimeout(timeout);
-  }, [currentText, isDeleting, index, texts, delay]);
+  }, [currentText, isDeleting, index, texts, delay, type]);
 
   return (
-    <div className={cn("inline-flex relative", className)}>
+    <div className={cn("inline-flex relative min-h-[1.2em] items-center", className)}>
       <span className="inline-block relative">
         {currentText}
         <motion.span
           animate={{ opacity: [1, 0] }}
           transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-          className="inline-block w-[3px] h-[1em] bg-white ml-2 align-middle -mt-1"
+          className="inline-block w-[3px] h-[0.9em] bg-blue-400 ml-2 align-middle shadow-[0_0_10px_rgba(59,130,246,0.6)]"
         />
       </span>
     </div>

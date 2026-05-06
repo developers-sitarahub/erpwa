@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { Users, Store, TrendingUp } from "lucide-react";
+import { Users, Store, TrendingUp, CreditCard } from "lucide-react";
 import { toast } from "react-toastify";
 
-type Stats = { vendors: number; users: number; leads: number };
+type Stats = { vendors: number; users: number; leads: number; totalRevenue: number };
 
 export default function SuperAdminDashboard() {
-  const [stats, setStats] = useState<Stats>({ vendors: 0, users: 0, leads: 0 });
+  const [stats, setStats] = useState<Stats>({ vendors: 0, users: 0, leads: 0, totalRevenue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,27 +19,42 @@ export default function SuperAdminDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  const fmtRevenue = (val: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(val);
+  };
+
   const cards = [
     {
       label: "Total Vendors",
       sub: "Active vendors on platform",
-      value: stats.vendors,
+      value: stats.vendors.toLocaleString(),
       icon: Store,
       color: "text-cyan-400",
     },
     {
       label: "Platform Users",
       sub: "All users in system",
-      value: stats.users,
+      value: stats.users.toLocaleString(),
       icon: Users,
       color: "text-purple-400",
     },
     {
       label: "Total Leads",
       sub: "Leads across all vendors",
-      value: stats.leads,
+      value: stats.leads.toLocaleString(),
       icon: TrendingUp,
       color: "text-green-400",
+    },
+    {
+      label: "Total Revenue",
+      sub: "Life-time captured revenue",
+      value: fmtRevenue(stats.totalRevenue),
+      icon: CreditCard,
+      color: "text-amber-400",
     },
   ];
 
@@ -69,7 +84,7 @@ export default function SuperAdminDashboard() {
                 <div className="h-8 w-16 rounded bg-muted animate-pulse" />
               ) : (
                 <p className="text-4xl font-bold text-foreground">
-                  {value.toLocaleString()}
+                  {value}
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-1">{sub}</p>

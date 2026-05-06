@@ -8,7 +8,7 @@ import { Button } from "@/components/button";
 import { Badge } from "@/components/badge";
 import { Select } from "@/components/select";
 import { useAuth } from "@/context/authContext";
-import { usersAPI, User } from "@/lib/usersApi";
+import { usersAPI, User, TeamLimits } from "@/lib/usersApi";
 import { toast } from "react-toastify";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/card";
 
@@ -174,6 +174,7 @@ function AddUserModal({
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const [teamLimits, setTeamLimits] = useState<TeamLimits | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -184,9 +185,15 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await usersAPI.list();
+      const [res, limitsRes] = await Promise.all([
+        usersAPI.list(),
+        usersAPI.getLimits()
+      ]);
       if (res.data) {
         setUsers(res.data);
+      }
+      if (limitsRes.data) {
+        setTeamLimits(limitsRes.data);
       }
     } catch (error) {
       console.error("Failed to fetch users", error);
@@ -220,13 +227,29 @@ export default function UsersPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Team Members</h2>
-            <p className="text-sm text-muted-foreground">
-              View and manage users in your organization
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-sm text-muted-foreground">
+                View and manage users in your organization
+              </p>
+              {teamLimits && teamLimits.limit !== -1 && (
+                <Badge variant={teamLimits.currentCount >= teamLimits.limit ? "destructive" : "secondary"}>
+                  {teamLimits.currentCount} / {teamLimits.limit} Plan Limit
+                </Badge>
+              )}
+              {teamLimits && teamLimits.limit === -1 && (
+                <Badge variant="secondary">
+                  Unlimited Plan
+                </Badge>
+              )}
+            </div>
           </div>
 
           {isOwnerOrAdmin && (
-            <Button onClick={() => setIsModalOpen(true)}>
+            <Button 
+                onClick={() => setIsModalOpen(true)}
+                disabled={teamLimits?.limit !== -1 && (teamLimits?.currentCount || 0) >= (teamLimits?.limit || 0)}
+                title={teamLimits?.limit !== -1 && (teamLimits?.currentCount || 0) >= (teamLimits?.limit || 0) ? "Plan limit reached" : ""}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add User
             </Button>

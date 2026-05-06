@@ -455,22 +455,25 @@ export default function FlowsPage() {
     });
 
     const getStatusBadge = (status: string) => {
-        switch (status) {
+        const s = status?.toLowerCase();
+        switch (s) {
             case "approved":
+            case "published":
                 return (
-                    <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-                        Approved
+                    <Badge className="bg-green-500/10 text-green-600 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+                        {s === "published" ? "Published" : "Approved"}
                     </Badge>
                 );
             case "rejected":
+            case "deprecated":
                 return (
-                    <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-                        Rejected
+                    <Badge className="bg-red-500/10 text-red-600 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+                        {s === "deprecated" ? "Deprecated" : "Rejected"}
                     </Badge>
                 );
             case "pending":
                 return (
-                    <Badge className="bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+                    <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
                         Pending
                     </Badge>
                 );

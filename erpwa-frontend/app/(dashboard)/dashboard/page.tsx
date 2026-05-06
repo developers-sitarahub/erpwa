@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Card,
@@ -24,7 +24,11 @@ import {
   Target,
 } from "lucide-react";
 import { dashboardAPI } from "@/lib/dashboardApi";
+import api from "@/lib/api";
 import { toast } from "react-toastify";
+import { useAuth } from "@/context/authContext";
+import { Crown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface KPICardProps {
   title: string;
@@ -106,12 +110,44 @@ function KPICard({
   );
 }
 
-export default function AdminDashboard() {
+export default function Dashboard() {
+  const { user, updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [stats, setStats] = useState<Record<string, any> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [activities, setActivities] = useState<Record<string, any>[]>([]);
+
+  const rawPlanName = user?.vendor?.subscriptionPlan?.name;
+  const planName = rawPlanName === "Unlimited" ? "Custom" : (rawPlanName || "Trial");
+
+  // Debug logging for subscription issues
+  useEffect(() => {
+    if (user?.vendor) {
+      console.log("💎 Dashboard Plan:", planName, "| Backend Name:", rawPlanName);
+    }
+  }, [user, planName, rawPlanName]);
+
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const response = await dashboardAPI.getStats();
+      setStats(response.data.stats);
+      setActivities(response.data.recentActivities || []);
+      
+      // Also refresh auth user to get latest plan/timer
+      try {
+        const userRes = await api.get("/auth/me");
+        updateUser(userRes.data.user);
+      } catch (e) {
+        console.warn("Failed to refresh user in dashboard", e);
+      }
+    } catch (error: unknown) {
+      console.error("Failed to fetch dashboard data:", error);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  }, [updateUser]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -119,20 +155,7 @@ export default function AdminDashboard() {
     // Auto-refresh every 10 seconds for real-time updates
     const interval = setInterval(() => fetchDashboardData(), 10000);
     return () => clearInterval(interval);
-  }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-      const response = await dashboardAPI.getStats();
-      setStats(response.data.stats);
-      setActivities(response.data.recentActivities || []);
-    } catch (error: unknown) {
-      console.error("Failed to fetch dashboard data:", error);
-      toast.error("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchDashboardData]);
 
   if (loading) {
     return (
@@ -240,13 +263,32 @@ export default function AdminDashboard() {
           animate={{ opacity: 1 }}
           className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         >
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+              <div className={cn(
+                "px-2.5 py-1 rounded-full border flex items-center gap-1.5 shadow-xs transition-colors",
+                planName === "Custom"
+                  ? "bg-linear-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                  : planName === "Basic"
+                  ? "bg-linear-to-r from-blue-600/10 to-cyan-600/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                  : "bg-linear-to-r from-muted/50 to-muted/30 border-border text-muted-foreground"
+              )}>
+                <Crown className={cn(
+                  "w-3.5 h-3.5",
+                  planName === "Custom" ? "text-amber-500" : 
+                  planName === "Basic" ? "text-blue-500" : "text-muted-foreground"
+                )} />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  {planName} Plan
+                </span>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
               Welcome back! Here&apos;s an overview of your business
             </p>
           </div>
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-4">
             <SubscriptionBanner />
           </div>
         </motion.div>

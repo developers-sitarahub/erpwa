@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -179,17 +179,24 @@ export default function TemplatesPage() {
     }
   }, [showSendModal]);
 
+  const [templateLimits, setTemplateLimits] = useState<{ limit: number, currentCount: number } | null>(null);
+
   // Fetch Templates
   const fetchTemplates = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [localRes, metaRes] = await Promise.all([
+      const [localRes, metaRes, limitsRes] = await Promise.all([
         api.get("/vendor/templates"),
         api.get("/vendor/templates/meta").catch(() => ({ data: [] })),
+        api.get("/vendor/templates/limits").catch(() => ({ data: null }))
       ]);
 
       const localTemplates = localRes.data;
       const metaRaw = metaRes.data || [];
+
+      if (limitsRes.data) {
+        setTemplateLimits(limitsRes.data);
+      }
 
       // Parse Meta templates
       const parsedMeta = metaRaw
@@ -291,6 +298,14 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     fetchTemplates();
+
+    const handlePlanUpdate = () => {
+      fetchTemplates(true); // silent fetch
+    };
+    window.addEventListener("vendor:plan_updated", handlePlanUpdate);
+    return () => {
+      window.removeEventListener("vendor:plan_updated", handlePlanUpdate);
+    };
   }, []);
 
   // Handle URL parameters for create/edit/send from Flows page
@@ -652,7 +667,7 @@ export default function TemplatesPage() {
       try {
         await api.delete(`/vendor/templates/${id}`);
         toast.success("Template deleted successfully");
-        setTemplates((prev) => prev.filter((t) => t.id !== id));
+        fetchTemplates(true); // Refresh list + limits counter together
       } catch (error: any) {
         toast.error(formatError(error, "Failed to delete template"));
       } finally {
@@ -895,22 +910,25 @@ export default function TemplatesPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    const s = status?.toLowerCase();
+    switch (s) {
       case "approved":
+      case "published":
         return (
-          <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-            Approved
+          <Badge className="bg-green-500/10 text-green-600 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+            {s === "published" ? "Published" : "Approved"}
           </Badge>
         );
       case "rejected":
+      case "deprecated":
         return (
-          <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-            Rejected
+          <Badge className="bg-red-500/10 text-red-600 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+            {s === "deprecated" ? "Deprecated" : "Rejected"}
           </Badge>
         );
       case "pending":
         return (
-          <Badge className="bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+          <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
             Pending
           </Badge>
         );
@@ -964,10 +982,22 @@ export default function TemplatesPage() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
               Message Templates
             </h1>
-            <p className="text-sm text-muted-foreground/80 max-w-lg leading-relaxed">
-              Create and manage your WhatsApp templates. Approved templates can
-              be used for bulk marketing and utility messaging.
-            </p>
+            <div className="flex items-center gap-3 mt-2">
+              <p className="text-sm text-muted-foreground/80 max-w-lg leading-relaxed">
+                Create and manage your WhatsApp templates. Approved templates can
+                be used for bulk marketing and utility messaging.
+              </p>
+              {templateLimits && templateLimits.limit !== -1 && (
+                <Badge variant={templateLimits.currentCount >= templateLimits.limit ? "destructive" : "secondary"}>
+                  {templateLimits.currentCount} / {templateLimits.limit} Plan Limit
+                </Badge>
+              )}
+              {templateLimits && templateLimits.limit === -1 && (
+                <Badge variant="secondary">
+                  Unlimited Templates
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="flex gap-3">
             <Button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, Shield } from "lucide-react";
 import { AxiosError } from "axios";
@@ -10,12 +10,31 @@ import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (
+        user.onboardingStatus &&
+        user.onboardingStatus !== "activated" &&
+        user.role === "vendor_owner"
+      ) {
+        router.replace("/register");
+      } else if (
+        user.role === "vendor_owner" ||
+        user.role === "vendor_admin"
+      ) {
+        router.replace("/admin/dashboard");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [user, authLoading, router]);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -36,6 +55,14 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   return (
@@ -127,9 +154,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Footer */}
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} GPS erp
+          © 2026 GPS erp
         </p>
         <div className="flex justify-center gap-4 mt-2 text-xs text-muted-foreground/80">
           <a

@@ -51,6 +51,16 @@ class LeadService {
     });
 
     // 🔥 Ensure conversation exists
+    const existingConv = await prisma.conversation.findUnique({
+      where: { vendorId_leadId: { vendorId, leadId: lead.id } }
+    });
+
+    if (!existingConv) {
+      // Must dynamically import to avoid circular dependency issues if any, or static import at top
+      const { enforceConversationLimit } = await import("../utils/subscription.js");
+      await enforceConversationLimit(vendorId);
+    }
+
     await prisma.conversation.upsert({
       where: {
         vendorId_leadId: {
@@ -64,6 +74,7 @@ class LeadService {
         leadId: lead.id,
         channel: "whatsapp",
         isOpen: true,
+        initiatedBy: "vendor",
       },
     });
 

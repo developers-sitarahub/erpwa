@@ -8,9 +8,13 @@ class CampaignService {
     // Fetch phone number ID to scope messages
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { whatsappPhoneNumberId: true },
+      select: { whatsappPhoneNumberId: true, subscriptionPlan: true },
     });
     const whatsappPhoneNumberId = vendor?.whatsappPhoneNumberId || null;
+    const conversationLimit = vendor?.subscriptionPlan?.conversationLimit ?? -1;
+    let currentConversationCount = conversationLimit !== -1
+      ? await prisma.conversation.count({ where: { vendorId, initiatedBy: "vendor" } })
+      : 0;
 
     const {
       name,
@@ -99,6 +103,18 @@ class CampaignService {
 
         if (lead.blockedAt) continue;
 
+        // Enforce Limits Before Upsert
+        const existingConv = await prisma.conversation.findUnique({
+          where: { vendorId_leadId: { vendorId, leadId: lead.id } }
+        });
+
+        if (!existingConv && conversationLimit !== -1) {
+          if (currentConversationCount >= conversationLimit) {
+            throw new Error(`Subscription limit reached. Your plan allows initiating up to ${conversationLimit} conversations.`);
+          }
+          currentConversationCount++;
+        }
+
         // Upsert Conversation
         const conv = await prisma.conversation.upsert({
           where: {
@@ -113,6 +129,7 @@ class CampaignService {
             leadId: lead.id,
             channel: "whatsapp",
             isOpen: true,
+            initiatedBy: "vendor",
           },
           include: { lead: true },
         });

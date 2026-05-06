@@ -38,6 +38,10 @@ export default function GalleryPage() {
   const [filterBy, setFilterBy] = useState<string>("")
   const [isImagesExpanded, setIsImagesExpanded] = useState(false)
 
+  // Limit States
+  const [galleryLimits, setGalleryLimits] = useState<{ limit: number; currentCount: number; planName: string } | null>(null)
+  const [limitsLoading, setLimitsLoading] = useState(true)
+
   // Upload form states
   const [uploadForm, setUploadForm] = useState({
     category_id: "",
@@ -68,11 +72,32 @@ export default function GalleryPage() {
     count?: number;
   }>({ isOpen: false, type: 'single' });
 
+  // Auto-refresh state
+  const [prevCompletedCount, setPrevCompletedCount] = useState(0)
+
   // Note: Upload State and logic moved to GlobalUploadContext
 
   useEffect(() => {
     loadCategories()
+    fetchGalleryLimits()
+
+    const handlePlanUpdate = () => {
+      fetchGalleryLimits();
+    };
+    window.addEventListener("vendor:plan_updated", handlePlanUpdate);
+    return () => {
+      window.removeEventListener("vendor:plan_updated", handlePlanUpdate);
+    };
   }, [])
+
+  useEffect(() => {
+    const currentCompletedCount = uploadBatches.filter(b => b.status === 'completed' || b.status === 'partial_error').length;
+    if (currentCompletedCount > prevCompletedCount) {
+       fetchGalleryLimits();
+       loadImages(1, false);
+    }
+    setPrevCompletedCount(currentCompletedCount);
+  }, [uploadBatches, prevCompletedCount])
 
   useEffect(() => {
     // Load images whenever filters change, including when filters are cleared
@@ -88,6 +113,18 @@ export default function GalleryPage() {
       toast.error("Failed to load categories")
     }
   }
+
+  const fetchGalleryLimits = async () => {
+    try {
+      setLimitsLoading(true);
+      const res = await galleryAPI.getLimits();
+      setGalleryLimits(res.data);
+    } catch (err) {
+      console.error("Failed to fetch gallery limits", err);
+    } finally {
+      setLimitsLoading(false);
+    }
+  };
 
   const loadImages = async (page: number = 1, append: boolean = false) => {
     try {
@@ -208,6 +245,26 @@ export default function GalleryPage() {
       return
     }
 
+    // Limit check
+    if (galleryLimits && galleryLimits.limit !== -1) {
+      const pendingUploadsCount = uploadBatches.reduce((acc, batch) => {
+        if (batch.status === 'pending' || batch.status === 'processing') {
+          return acc + batch.files.filter((f: any) => f.status === 'pending' || f.status === 'processing').length;
+        }
+        return acc;
+      }, 0);
+
+      const remainingSlots = galleryLimits.limit - galleryLimits.currentCount - pendingUploadsCount;
+      if (remainingSlots <= 0) {
+        toast.error(`Limit reached! Your ${galleryLimits.planName} plan allows up to ${galleryLimits.limit} images.`);
+        return;
+      }
+      if (validImages.length > remainingSlots) {
+        toast.error(`You can only upload ${remainingSlots} more image(s) on your ${galleryLimits.planName} plan. Only the first ${remainingSlots} images will be uploaded.`);
+        validImages.splice(remainingSlots); // Only keep the allowed amount
+      }
+    }
+
     // Use global addBatch
     addBatch(
       uploadForm.category_id,
@@ -258,6 +315,7 @@ export default function GalleryPage() {
 
       setDeleteConf({ isOpen: false, type: 'single' });
       await loadImages(currentPage, false) // Reload current page
+      await fetchGalleryLimits() // Refresh limits after delete
     } catch (error: any) {
       toast.error(error.response?.data?.error || "Failed to delete image(s)")
     }
@@ -327,6 +385,16 @@ export default function GalleryPage() {
   // No global lock anymore, we lock specifically per subcategory in logic
   const isGlobalLock = false // We disabled the UI lock to allow other subcat selections
 
+  const pendingUploadsCount = uploadBatches.reduce((acc, batch) => {
+    if (batch.status === 'pending' || batch.status === 'processing') {
+      return acc + batch.files.filter((f: any) => f.status === 'pending' || f.status === 'processing').length;
+    }
+    return acc;
+  }, 0);
+
+  const isLimitReached = !!(galleryLimits && galleryLimits.limit !== -1 &&
+    galleryLimits.currentCount + pendingUploadsCount >= galleryLimits.limit && galleryLimits.limit !== 0);
+
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6">
       <div className="space-y-6">
@@ -337,8 +405,46 @@ export default function GalleryPage() {
             <p className="text-sm text-muted-foreground mt-1">
               Upload and manage images across categories
             </p>
+            {/* Limit Badge */}
+            {!limitsLoading && galleryLimits && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {galleryLimits.limit === -1 ? (
+                  <Badge className="bg-emerald-500/15 text-emerald-600 border-none font-medium hover:bg-emerald-500/25 px-3 py-1 text-sm border-emerald-500/20">
+                    ✦ Unlimited Gallery Items
+                  </Badge>
+                ) : galleryLimits.limit === 0 ? (
+                  <Badge variant="destructive" className="font-medium px-3 py-1 text-sm">
+                    ⚠ No plan assigned — contact support
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant={isLimitReached ? "destructive" : "secondary"}
+                    className={
+                      isLimitReached
+                        ? "font-medium px-3 py-1 text-sm"
+                        : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 font-medium px-3 py-1 text-sm"
+                    }
+                  >
+                    {galleryLimits.currentCount + pendingUploadsCount} / {galleryLimits.limit} used · {galleryLimits.planName} plan {pendingUploadsCount > 0 && `(+${pendingUploadsCount} pending)`}
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Limit Warning Banner */}
+        {isLimitReached && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm animate-in fade-in duration-300">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold max-w-[600px] truncate">Gallery Limit Reached</h4>
+              <p className="text-xs mt-0.5 opacity-90 max-w-[600px] truncate">
+                You have used all {galleryLimits.limit} available slots on your {galleryLimits.planName} plan. Upgrade to add more images.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Upload Section */}
         <Card className="bg-card border-border overflow-hidden">
@@ -414,11 +520,31 @@ export default function GalleryPage() {
                     accept="image/*"
                     onChange={(e) => {
                       const files = Array.from(e.target.files || [])
-                      if (files.length > 200) {
-                        toast.error("Maximum 200 images allowed")
-                        return
+                      
+                      let maxAllowed = 200;
+                      if (galleryLimits && galleryLimits.limit !== -1) {
+                        const pendingUploadsCount = uploadBatches.reduce((acc, batch) => {
+                          if (batch.status === 'pending' || batch.status === 'processing') {
+                            return acc + batch.files.filter((f: any) => f.status === 'pending' || f.status === 'processing').length;
+                          }
+                          return acc;
+                        }, 0);
+
+                        const remainingSlots = galleryLimits.limit - galleryLimits.currentCount - pendingUploadsCount;
+                        if (remainingSlots <= 0) {
+                          toast.error(`Limit reached! Your ${galleryLimits.planName} plan allows up to ${galleryLimits.limit} images.`);
+                          return;
+                        }
+                        if (files.length > remainingSlots) {
+                           toast.error(`You can only upload ${remainingSlots} more image(s). Only the first ${remainingSlots} files were selected.`);
+                           maxAllowed = remainingSlots;
+                        }
+                      } else if (files.length > 200) {
+                        toast.error("Maximum 200 images allowed per batch")
                       }
-                      setSelectedImages(files)
+                      
+                      const filesToSelect = files.slice(0, maxAllowed);
+                      setSelectedImages(filesToSelect)
                     }}
                     disabled={!uploadForm.category_id}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
@@ -446,7 +572,7 @@ export default function GalleryPage() {
                 <Button
                   onClick={handleAddToQueue}
                   className="w-full bg-primary hover:bg-primary/90 h-10"
-                  disabled={!uploadForm.category_id || selectedImages.length === 0}
+                  disabled={!uploadForm.category_id || selectedImages.length === 0 || isLimitReached}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Upload Image

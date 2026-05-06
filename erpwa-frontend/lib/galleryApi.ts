@@ -3,6 +3,10 @@ import api from './api'
 import type { ApiResponse, GalleryImage } from './types'
 
 export const galleryAPI = {
+  getLimits: async (): Promise<ApiResponse<any>> => {
+    const response = await api.get('/gallery/limits')
+    return { data: response.data }
+  },
   /**
    * List gallery images with optional filtering and pagination
    */

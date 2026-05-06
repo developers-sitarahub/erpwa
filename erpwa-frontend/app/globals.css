@@ -392,3 +392,25 @@ input[type="password"]::-ms-clear {
 .dark .react-flow__controls-button svg {
   fill: currentColor;
 }
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-invoice, #printable-invoice * {
+    visibility: visible;
+  }
+  #printable-invoice {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 20mm;
+    background: white !important;
+    color: black !important;
+    z-index: 9999;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

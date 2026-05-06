@@ -8,6 +8,10 @@ import {
   checkAndStartWorkflow,
   handleWorkflowResponse,
 } from "../services/workflowEngine.service.js";
+import {
+  trackMessage,
+  processConversationBilling,
+} from "../services/whatsappBilling.service.js";
 
 const router = express.Router();
 
@@ -128,6 +132,24 @@ router.post("/", async (req, res) => {
 
     vendorId = vendor.id;
 
+    // 🛡️ Subscription Check for Webhook
+    const isExpired = vendor.subscriptionEnd && new Date(vendor.subscriptionEnd).getTime() <= new Date().getTime();
+    if (isExpired && value.messages?.length) {
+      await logActivity({
+        vendorId,
+        whatsappBusinessId: wabaId,
+        whatsappPhoneNumberId: phoneNumberId,
+        event: "rejected",
+        status: "ignored",
+        payload: req.body,
+        responseCode: 200,
+        error: "Subscription expired - incoming message ignored",
+        processingMs: Date.now() - startTime,
+        type: "webhook",
+      });
+      return res.sendStatus(200);
+    }
+
     /* =====================================================
        1️⃣ HANDLE INBOUND CUSTOMER MESSAGES
     ===================================================== */
@@ -218,6 +240,7 @@ router.post("/", async (req, res) => {
             leadId: lead.id,
             channel: "whatsapp",
             isOpen: true,
+            initiatedBy: "lead", // 🔥 Important: Customer initiated
 
             // 🔥 SOURCE OF TRUTH
             sessionStartedAt: inboundAt,
@@ -319,7 +342,7 @@ router.post("/", async (req, res) => {
           io.to(`vendor:${vendor.id}`).emit("inbox:update", {
             conversationId: conversation.id,
           });
-        } catch {}
+        } catch { }
 
         /* 🔥 SAFE SOCKET EMIT (OPTIONAL) */
         try {
@@ -350,7 +373,7 @@ router.post("/", async (req, res) => {
             mimeType: fullMessage.media[0]?.mimeType,
             caption: fullMessage.media[0]?.caption,
           });
-        } catch (socketErr) {}
+        } catch (socketErr) { }
 
         // ============================================
         // 🚀 WORKFLOW ENGINE INTEGRATION
@@ -389,6 +412,20 @@ router.post("/", async (req, res) => {
           whatsappBusinessId: wabaId,
           whatsappPhoneNumberId: phoneNumberId || vendor.whatsappPhoneNumberId,
         });
+
+        // 📊 Billing: Track inbound message for analytics
+        try {
+          await trackMessage({
+            vendorId: vendor.id,
+            waMessageId: whatsappMessageId,
+            phoneNumber: from,
+            direction: "inbound",
+            messageType: msg.type,
+            status: "received",
+          });
+        } catch (billingErr) {
+          console.error("⚠️ Billing trackMessage (inbound) error:", billingErr.message);
+        }
       }
     }
 
@@ -407,6 +444,50 @@ router.post("/", async (req, res) => {
         const waState = waStatus.status; // sent | delivered | read | failed
         phoneNumber = waStatus.recipient_id;
         messageId = whatsappMessageId; // Always use WAMID
+
+        // ─── 📊 BILLING: Track message & process conversation ───
+        // MUST run before any `continue` — Meta sends conversation/pricing on "sent" status
+        try {
+          const convData = waStatus.conversation;
+          const convId = convData?.id || null;
+          const pricingData = waStatus.pricing;
+          const pricingCategory = pricingData?.category?.toLowerCase() || null;
+          const billable = pricingData?.billable !== false;
+
+          // Track the message (idempotent upsert)
+          await trackMessage({
+            vendorId,
+            waMessageId: whatsappMessageId,
+            phoneNumber,
+            direction: "outbound",
+            messageType: null,
+            status: waState,
+            conversationId: convId,
+            pricingCategory,
+          });
+
+          // Process conversation billing on first occurrence
+          if (convId && pricingCategory) {
+            await processConversationBilling({
+              vendorId,
+              conversationId: convId,
+              category: pricingCategory,
+              billable,
+              country: vendor.country || "India",
+            });
+          }
+
+          if (convId || pricingCategory) {
+            console.log(
+              `📊 [Billing] vendor=${vendorId} | msg=${whatsappMessageId} | ` +
+              `status=${waState} | conv=${convId || "N/A"} | ` +
+              `category=${pricingCategory || "N/A"}`
+            );
+          }
+        } catch (billingErr) {
+          console.error("⚠️ Billing processing error:", billingErr.message);
+          // Never fail the webhook due to billing errors
+        }
 
         // Log "sent" status
         if (waState === "sent") {
@@ -512,7 +593,7 @@ router.post("/", async (req, res) => {
               status: waState,
             },
           );
-        } catch {}
+        } catch { }
       }
     }
 

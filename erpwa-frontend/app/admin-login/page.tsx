@@ -1,31 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
+import { AxiosError } from "axios";
+import api, { setSuperAdminAccessToken } from "@/lib/api";
 import { ShieldCheck, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "react-toastify";
-
 export default function SuperAdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        // Try to refresh via cookie first, then verify
+        const refreshRes = await api.post<{ accessToken: string }>("/super-admin/refresh");
+        setSuperAdminAccessToken(refreshRes.data.accessToken);
+        router.push("/admin-super/dashboard");
+      } catch {
+        setInitialLoading(false);
+      }
+    };
+    checkSession();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post("/super-admin/login", { email, password });
+      const res = await api.post("/super-admin/login", { email, password });
+      setSuperAdminAccessToken(res.data.accessToken);
       toast.success("Welcome back, Super Admin!");
       router.push("/admin-super/dashboard");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Login failed");
+    } catch (err: unknown) {
+      const message =
+        err instanceof AxiosError
+          ? err.response?.data?.message
+          : "Login failed";
+      toast.error(message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">

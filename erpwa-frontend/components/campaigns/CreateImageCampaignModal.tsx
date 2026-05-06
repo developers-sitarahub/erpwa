@@ -495,7 +495,7 @@ export default function CreateImageCampaignModal({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g., Summer Sale 2024"
+                  placeholder="e.g., Summer Sale 2026"
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
                   className="w-full px-4 py-2.5 bg-input border border-border rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all"

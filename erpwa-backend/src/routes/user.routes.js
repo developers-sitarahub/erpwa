@@ -5,12 +5,14 @@ import {
     createUser,
     updateUser,
     deleteUser,
+    getTeamLimits,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
 
 router.use(authenticate);
 
+router.get("/limits", getTeamLimits);
 router.get("/", listUsers);
 router.post("/", createUser);
 router.put("/:id", updateUser);

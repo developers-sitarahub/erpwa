@@ -33,6 +33,9 @@ model Vendor {
   // Subscription Fields
   subscriptionStart     DateTime?
   subscriptionEnd       DateTime?
+  subscriptionExpiredMailSent Boolean @default(false)
+  subscriptionPlanId    String?
+  subscriptionPlan      SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id])
 
   createdAt             DateTime       @default(now())
   campaigns             Campaign[]
@@ -49,6 +52,8 @@ model Vendor {
   workflows             Workflow[]
   whatsappFlows         WhatsAppFlow[]
   vendorRegistrations   VendorRegistration[]
+  subscriptions         VendorSubscription[]
+  payments              VendorPayment[]
 }
 
 
@@ -263,6 +268,7 @@ model Conversation {
   id               String    @id @default(uuid())
   vendorId         String
   leadId           String
+  initiatedBy      String    @default("vendor") // "vendor" or "lead"
   channel          String    @default("whatsapp")
   lastMessageAt    DateTime?
   isOpen           Boolean   @default(true)
@@ -690,4 +696,185 @@ model SuperAdmin {
   name         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  refreshTokens SuperAdminRefreshToken[]
+}
+
+model SuperAdminRefreshToken {
+  id        String       @id @default(uuid())
+  adminId   String
+  tokenHash String       @unique
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+  admin     SuperAdmin   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// Subscription Plan Definitions
+// ============================================================
+model SubscriptionPlan {
+  id                 String   @id @default(uuid())
+  name               String   @unique // 'free', 'basic', 'unlimited', 'custom'
+  price              Float    @default(0.0)
+  currency           String   @default("INR")
+  durationDays       Int      @default(30)   // subscription period length
+  isActive           Boolean  @default(true) // can be disabled so it's not shown on pricing
+
+  // Resource Limits (-1 represents unlimited)
+  conversationLimit  Int      @default(100)
+  galleryLimit       Int      @default(50)
+  chatbotLimit       Int      @default(1)
+  templateLimit      Int      @default(5)
+  formLimit          Int      @default(2)
+  teamUsersLimit     Int      @default(1)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  vendors            Vendor[]
+  subscriptions      VendorSubscription[]
+}
+
+// ============================================================
+// Per-Vendor Subscription Period Tracking
+// ============================================================
+model VendorSubscription {
+  id           String   @id @default(uuid())
+  vendorId     String
+  planId       String
+
+  status       String   @default("active") // active, expired, cancelled, trial
+
+  startDate    DateTime @default(now())
+  endDate      DateTime
+
+  // Razorpay payment reference
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+
+  // Renewal metadata
+  autoRenew    Boolean  @default(false)
+  renewedFromId String? // Previous subscription ID on renewal
+
+  notes        String?  // Admin notes (e.g. "manually assigned")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vendor       Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  plan         SubscriptionPlan @relation(fields: [planId], references: [id])
+  payments     VendorPayment[]
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([endDate])
+}
+
+// ============================================================
+// Payment Transaction Log
+// ============================================================
+model VendorPayment {
+  id              String   @id @default(uuid())
+  vendorId        String
+  subscriptionId  String?
+
+  amount          Float
+  currency        String   @default("INR")
+  gateway         String   @default("razorpay")
+
+  // Razorpay specifics
+  razorpayOrderId    String?  @unique
+  razorpayPaymentId  String?  @unique
+  razorpaySignature  String?
+
+  status          String   @default("pending") // pending, captured, failed, refunded
+
+  // ── Invoice Fields ──
+  invoiceNumber     String?  @unique   // e.g. "INV-20260313-0001"
+  invoiceDate       DateTime?
+  billingName       String?            // Customer / business name at time of purchase
+  billingEmail      String?            // Email at time of purchase
+  planName          String?            // Denormalized plan name for history
+  planDuration      Int?               // Duration in days at time of purchase
+  taxAmount         Float?   @default(0)  // GST / tax component if applicable
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vendor       Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  subscription VendorSubscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([invoiceNumber])
+}
+
+// ============================================================
+// WhatsApp Billing & Analytics Module
+// ============================================================
+
+// Tracks every WhatsApp message for billing purposes (separate from inbox Message model)
+model WhatsappMessage {
+  id              String   @id @default(cuid())
+  vendorId        String
+  waMessageId     String   @unique
+  phoneNumber     String
+  direction       String   // "outbound" | "inbound"
+  conversationId  String?  // Meta conversation ID
+  messageType     String?  // text, template, image, etc.
+  status          String?  // sent, delivered, read, failed
+  pricingCategory String?  // service, utility, marketing, authentication
+  createdAt       DateTime @default(now())
+
+  @@index([vendorId])
+  @@index([vendorId, createdAt])
+  @@index([phoneNumber])
+}
+
+// Tracks Meta WhatsApp conversation sessions with pricing
+model WhatsappConversation {
+  id              String   @id @default(cuid())
+  vendorId        String
+  conversationId  String   @unique // Meta's conversation ID
+  category        String   // service, utility, marketing, authentication
+  metaCost        Float    // Cost charged by Meta
+  chargedCost     Float    // Cost charged to vendor (Meta + platform markup)
+  billable        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@index([vendorId])
+  @@index([vendorId, createdAt])
+  @@index([category])
+}
+
+// Per-country WhatsApp pricing from Meta (base rates)
+model WhatsappPricing {
+  id              String @id @default(cuid())
+  country         String @unique
+  service         Float
+  utility         Float
+  marketing       Float
+  authentication  Float
+}
+
+// Vendor pre-paid wallet for WhatsApp billing
+model VendorWallet {
+  id        String   @id @default(cuid())
+  vendorId  String   @unique
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+// Wallet transaction ledger for audit trail
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  vendorId    String
+  amount      Float    // Positive = credit, negative = debit
+  type        String   // "debit" | "credit" | "refund"
+  description String?
+  reference   String?  // conversationId or manual reference
+  balanceAfter Float   // Snapshot of balance after this transaction
+  createdAt   DateTime @default(now())
+
+  @@index([vendorId])
+  @@index([vendorId, createdAt])
 }

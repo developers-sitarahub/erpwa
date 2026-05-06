@@ -1,11 +1,25 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import api, { setAccessToken } from "@/lib/api";
-import { connectSocket, disconnectSocket } from "@/lib/socket";
+import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
+import { toast } from "react-toastify";
 
 /* ================= TYPES ================= */
+
+export type SubscriptionPlan = {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  conversationLimit: number;
+  galleryLimit: number;
+  chatbotLimit: number;
+  templateLimit: number;
+  formLimit: number;
+  teamUsersLimit: number;
+};
 
 export type User = {
   id: string;
@@ -15,11 +29,16 @@ export type User = {
   vendorId: string | null;
   onboardingStatus?: string;
   vendor?: {
+    id?: string;
+    name?: string;
     subscriptionStart: string | null;
     subscriptionEnd: string | null;
+    subscriptionPlanId?: string | null;
     whatsappStatus?: string;
+    subscriptionPlan?: SubscriptionPlan | null;
   } | null;
 };
+
 
 type AuthContextType = {
   user: User | null;
@@ -112,9 +131,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [router, pathname]);
 
+  /* ================= REAL-TIME PLAN UPDATES ================= */
+  useEffect(() => {
+    if (!user || pathname.startsWith("/admin-super")) return;
+
+    const socket = getSocket();
+    const handlePlanUpdated = (data: any) => {
+      const { plan, subscriptionEnd } = data;
+      toast.info(`Your subscription has been updated to ${plan.name} by Super Admin!`);
+      
+      // Update local user's vendor data if needed
+      setUser((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          vendor: {
+            ...prev.vendor,
+            subscriptionEnd,
+            subscriptionStart: prev.vendor?.subscriptionStart || new Date().toISOString()
+          }
+        };
+      });
+
+      // Dispatch event to instruct pages to reload limits
+      window.dispatchEvent(new Event("vendor:plan_updated"));
+    };
+
+    socket.on("vendor:plan_updated", handlePlanUpdated);
+    return () => {
+      socket.off("vendor:plan_updated", handlePlanUpdated);
+    };
+  }, [user, pathname]);
+
   /* ================= LOGIN ================= */
 
-  async function login(email: string, password: string) {
+  const login = useCallback(async (email: string, password: string) => {
     const res = await api.post("/auth/login", { email, password });
 
     const loggedInUser: User = res.data.user;
@@ -143,11 +194,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       router.replace("/dashboard");
     }
-  }
+  }, [router]);
 
   /* ================= LOGOUT ================= */
 
-  async function logout() {
+  const logout = useCallback(async () => {
     try {
       await api.post("/auth/logout");
     } finally {
@@ -156,15 +207,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       router.replace("/login");
     }
-  }
+  }, [router]);
 
   /* ================= UPDATE USER ================= */
-  function updateUser(data: Partial<User>) {
+  const updateUser = useCallback((data: Partial<User>) => {
     setUser((prev) => (prev ? { ...prev, ...data } : null));
-  }
+  }, []);
+
+  const value = { user, loading, login, logout, updateUser };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

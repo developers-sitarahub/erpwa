@@ -1,13 +1,14 @@
 import jwt from 'jsonwebtoken';
 
 export function superAdminAuth(req, res, next) {
-  const token = req.cookies?.saToken;
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
-    return res.status(401).json({ message: 'Unauthorized: No super admin token' });
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Unauthorized: No super admin token" });
   }
 
   try {
+    const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
     if (decoded.role !== 'super_admin') {

@@ -42,9 +42,9 @@ const registerPhoneNumber = async (phoneNumberId, token) => {
   const data = await resp.json();
 
   if (!resp.ok) {
-    // ✅ Already registered → treat as success
-    if (data?.error?.code === 131045) {
-      console.log("✅ Number already registered");
+    // ✅ Already registered (131045) OR Two-step verification PIN Mismatch (133005, which means it's already active & registered via Cloud API)
+    if (data?.error?.code === 131045 || data?.error?.code === 133005) {
+      console.log(`✅ Number already active/registered (Meta Error Code: ${data?.error?.code})`);
       return { success: true };
     }
 
@@ -153,16 +153,26 @@ router.post(
     }
 
     // 3️⃣ Attempt to Register Phone Number
-    const registration = await registerPhoneNumber(
-      whatsappPhoneNumberId,
-      whatsappAccessToken
-    );
+    const isTestNumber =
+      whatsappVerifiedName?.toLowerCase() === "test number" ||
+      whatsappDisplayPhoneNumber?.replace(/\D/g, "").startsWith("1555");
 
-    if (!registration.success) {
-      return res.status(400).json({
-        message: "Phone number registration failed",
-        metaError: registration.error,
-      });
+    const isAlreadyCloudAPI = phoneData?.platform_type === "CLOUD_API";
+
+    if (!isTestNumber && !isAlreadyCloudAPI) {
+      const registration = await registerPhoneNumber(
+        whatsappPhoneNumberId,
+        whatsappAccessToken
+      );
+
+      if (!registration.success) {
+        return res.status(400).json({
+          message: "Phone number registration failed",
+          metaError: registration.error,
+        });
+      }
+    } else {
+      console.log(`⚠️ Skipping registration. Test number: ${isTestNumber}, Already Cloud API: ${isAlreadyCloudAPI}`);
     }
 
     // 4️⃣ Attempt to Subscribe App
@@ -272,29 +282,6 @@ router.post(
     const accessToken = tokenData.access_token;
 
     /**
-     * ✅ STEP 1 → Register Phone Number
-     */
-    const registration = await registerPhoneNumber(
-      whatsappPhoneNumberId,
-      accessToken,
-    );
-
-    if (!registration.success) {
-      await prisma.vendor.update({
-        where: { id: req.user.vendorId },
-        data: {
-          whatsappStatus: "error",
-          whatsappLastError: JSON.stringify(registration.error),
-        },
-      });
-
-      return res.status(400).json({
-        message: "Phone number registration failed",
-        metaError: registration.error,
-      });
-    }
-
-    /**
      * ✅ Check Verification Status & Quality Rating
      */
     const phoneDetailResp = await fetch(
@@ -332,6 +319,39 @@ router.post(
     } catch (e) { }
 
     console.log("📱 Phone Details:", JSON.stringify(phoneDetailData, null, 2));
+
+    /**
+     * ✅ STEP 1 → Register Phone Number
+     */
+    const isTestNumber =
+      whatsappVerifiedName?.toLowerCase() === "test number" ||
+      whatsappDisplayPhoneNumber?.replace(/\D/g, "").startsWith("1555");
+
+    const isAlreadyCloudAPI = phoneDetailData?.platform_type === "CLOUD_API";
+
+    if (!isTestNumber && !isAlreadyCloudAPI) {
+      const registration = await registerPhoneNumber(
+        whatsappPhoneNumberId,
+        accessToken,
+      );
+
+      if (!registration.success) {
+        await prisma.vendor.update({
+          where: { id: req.user.vendorId },
+          data: {
+            whatsappStatus: "error",
+            whatsappLastError: JSON.stringify(registration.error),
+          },
+        });
+
+        return res.status(400).json({
+          message: "Phone number registration failed",
+          metaError: registration.error,
+        });
+      }
+    } else {
+      console.log(`⚠️ Skipping registration. Test number: ${isTestNumber}, Already Cloud API: ${isAlreadyCloudAPI}`);
+    }
 
     /**
      * ✅ STEP 2 → Subscribe App

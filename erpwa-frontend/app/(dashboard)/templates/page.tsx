@@ -623,19 +623,26 @@ export default function TemplatesPage() {
         buttons: metaTpl.buttons,
         metaId: metaTpl.id,
         status: metaTpl.status,
-        headerMediaUrl: headerMediaUrl
+        headerMediaUrl: headerMediaUrl,
       });
 
       const newTemplate = res.data;
       const templateWithMedia = {
         ...newTemplate,
-        media: newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media
+        media:
+          newTemplate.media?.length > 0 ? newTemplate.media : metaTpl.media,
       };
 
       setTemplates((prev) => {
-        return prev.map(p => (p.metaTemplateName === newTemplate.metaTemplateName) ? templateWithMedia : p);
+        return prev.map((p) =>
+          p.metaTemplateName === newTemplate.metaTemplateName
+            ? templateWithMedia
+            : p,
+        );
       });
-      toast.success(`"${newTemplate.displayName}" synced and approved successfully`);
+      toast.success(
+        `"${newTemplate.displayName}" synced and approved successfully`,
+      );
     } catch (error: any) {
       toast.error(formatError(error, "Failed to sync template status"));
     } finally {
@@ -695,7 +702,7 @@ export default function TemplatesPage() {
 
   const handleCardClick = (template: any) => {
     if (template.isMetaOnly) {
-      handleMetaSyncStatus(template, { stopPropagation: () => { } } as any);
+      handleMetaSyncStatus(template, { stopPropagation: () => {} } as any);
       return;
     }
 
@@ -861,22 +868,25 @@ export default function TemplatesPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    const s = status?.toLowerCase();
+    switch (s) {
       case "approved":
+      case "published":
         return (
-          <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-            Approved
+          <Badge className="bg-green-500/10 text-green-600 border-green-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+            {s === "published" ? "Published" : "Approved"}
           </Badge>
         );
       case "rejected":
+      case "deprecated":
         return (
-          <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-            Rejected
+          <Badge className="bg-red-500/10 text-red-600 border-red-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+            {s === "deprecated" ? "Deprecated" : "Rejected"}
           </Badge>
         );
       case "pending":
         return (
-          <Badge className="bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
+          <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-200/50 px-2 py-0.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
             Pending
           </Badge>
         );
@@ -1086,17 +1096,13 @@ export default function TemplatesPage() {
                               {t.displayName}
                             </h3>
                           </div>
-                          <div className="shrink-0">
-                            {t.isMetaOnly ? (
-                              <Badge
-                                variant="outline"
-                                className="border-blue-200 bg-blue-50 text-blue-700 text-[10px]"
-                              >
+                          <div className="shrink-0 flex items-center gap-2">
+                            {t.isMetaOnly && (
+                              <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px]">
                                 Meta
                               </Badge>
-                            ) : (
-                              getStatusBadge(t.status)
                             )}
+                            {getStatusBadge(t.status)}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1130,17 +1136,17 @@ export default function TemplatesPage() {
                             {(t.languages[0]?.headerType !== "TEXT" ||
                               t.templateType === "catalog" ||
                               t.templateType === "carousel") && (
-                                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                                  {t.languages[0]?.headerType === "IMAGE" ? (
-                                    <ImageIcon className="w-3 h-3" />
-                                  ) : (
-                                    <Paperclip className="w-3 h-3" />
-                                  )}
-                                  {t.languages[0]?.headerType !== "TEXT"
-                                    ? t.languages[0]?.headerType
-                                    : t.templateType}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-dashed border-border/40 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                {t.languages[0]?.headerType === "IMAGE" ? (
+                                  <ImageIcon className="w-3 h-3" />
+                                ) : (
+                                  <Paperclip className="w-3 h-3" />
+                                )}
+                                {t.languages[0]?.headerType !== "TEXT"
+                                  ? t.languages[0]?.headerType
+                                  : t.templateType}
+                              </div>
+                            )}
                             <p className="line-clamp-4 whitespace-pre-wrap">
                               {t.languages[0]?.body || "No content"}
                             </p>
@@ -1208,7 +1214,9 @@ export default function TemplatesPage() {
                             }}
                             disabled={!!syncing || !!submitting}
                           >
-                            {syncing === t.id || syncing === t.metaTemplateName || submitting === t.id ? (
+                            {syncing === t.id ||
+                            syncing === t.metaTemplateName ||
+                            submitting === t.id ? (
                               <RefreshCw className="w-3 h-3 animate-spin mr-1.5" />
                             ) : t.isMetaOnly ? (
                               <RefreshCw className="w-3 h-3 mr-1.5" />

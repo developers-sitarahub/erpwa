@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPolicyPage() {
-  const currentYear = new Date().getFullYear();
+  const currentYear = 2026;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

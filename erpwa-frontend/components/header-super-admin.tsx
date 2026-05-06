@@ -38,7 +38,10 @@ export function HeaderSuperAdmin() {
   const handleLogout = async () => {
     try {
       await api.post("/super-admin/logout");
-      router.push("/admin-login");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("sa:auth:logout"));
+        window.location.href = "/admin-login";
+      }
     } catch {
       toast.error("Logout failed");
     }

@@ -33,7 +33,7 @@ export async function syncTemplateStatuses() {
     const token = decrypt(vendor.whatsappAccessToken);
 
     const resp = await fetch(
-      `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates`,
+      `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?fields=id,status,rejected_reason&limit=100`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }

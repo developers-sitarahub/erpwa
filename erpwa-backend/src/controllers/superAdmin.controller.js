@@ -5,6 +5,17 @@ import { generateOtp, hashOtp } from "../utils/otp.js";
 import { sendMail } from "../utils/mailer.js";
 import { passwordResetOtpTemplate } from "../emails/passwordResetOtp.template.js";
 import crypto from "crypto";
+import { generateAccessToken, generateRefreshToken } from "../utils/token.js";
+import { hashToken } from "../utils/hash.js";
+import { getIO } from "../socket.js";
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
 
 /* ============================================================
  * POST /api/super-admin/login
@@ -30,28 +41,27 @@ export async function superAdminLogin(req, res) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Generate a dedicated Super Admin JWT stored in a httpOnly cookie
-    const token = jwt.sign(
-      {
-        sub: admin.id,
-        email: admin.email,
-        name: admin.name,
-        role: "super_admin",
-      },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "8h" },
-    );
+    admin.role = "super_admin"; // For token generation
+    const accessToken = generateAccessToken(admin);
+    const refreshToken = generateRefreshToken();
 
-    res.cookie("saToken", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 8 * 60 * 60 * 1000, // 8 hours
-    });
+    await prisma.$transaction([
+      prisma.superAdminRefreshToken.deleteMany({ where: { adminId: admin.id } }),
+      prisma.superAdminRefreshToken.create({
+        data: {
+          adminId: admin.id,
+          tokenHash: hashToken(refreshToken),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      }),
+    ]);
+
+    res.cookie("saRefreshToken", refreshToken, COOKIE_OPTIONS);
 
     return res.json({
       message: "Login successful",
-      admin: { id: admin.id, email: admin.email, name: admin.name },
+      accessToken,
+      admin: { id: admin.id, email: admin.email, name: admin.name, role: "super_admin" },
     });
   } catch (err) {
     console.error("superAdminLogin error:", err);
@@ -60,11 +70,62 @@ export async function superAdminLogin(req, res) {
 }
 
 /* ============================================================
+ * POST /api/super-admin/refresh
+ * ============================================================ */
+export async function superAdminRefresh(req, res) {
+  const token = req.cookies?.saRefreshToken;
+
+  if (!token) {
+    console.log("❌ S-A REFRESH: No token in cookies");
+    res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+    return res.status(401).json({ message: "No token" });
+  }
+
+  try {
+    const tokenHash = hashToken(token);
+
+    const record = await prisma.superAdminRefreshToken.findUnique({
+      where: { tokenHash },
+      include: { admin: true },
+    });
+
+    if (!record) {
+      await prisma.superAdminRefreshToken.deleteMany({ where: { tokenHash } });
+      res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    if (record.expiresAt < new Date()) {
+      await prisma.superAdminRefreshToken.delete({ where: { tokenHash } });
+      res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: "Expired refresh token" });
+    }
+
+    record.admin.role = "super_admin";
+    const accessToken = generateAccessToken(record.admin);
+    return res.json({ accessToken });
+  } catch (err) {
+    console.error("❌ S-A REFRESH ERROR:", err.message);
+    if (err.message === "Invalid refresh token" || err.message === "Expired refresh token") {
+      res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: err.message });
+    }
+    return res.status(500).json({ message: "Internal server error during refresh" });
+  }
+}
+
+/* ============================================================
  * POST /api/super-admin/logout
  * ============================================================ */
-export function superAdminLogout(req, res) {
-  res.clearCookie("saToken");
-  return res.json({ message: "Logged out" });
+export async function superAdminLogout(req, res) {
+  if (req.cookies?.saRefreshToken) {
+    const tokenHash = hashToken(req.cookies.saRefreshToken);
+    await prisma.superAdminRefreshToken.deleteMany({
+      where: { tokenHash },
+    });
+  }
+  res.clearCookie("saRefreshToken", COOKIE_OPTIONS);
+  return res.json({ message: "Logged out", success: true });
 }
 
 /* ============================================================
@@ -96,6 +157,7 @@ export async function getVendors(req, res) {
           take: 1,
         },
         _count: { select: { users: true } },
+        subscriptionPlan: { select: { id: true, name: true } }
       },
     });
 
@@ -108,6 +170,7 @@ export async function getVendors(req, res) {
       createdAt: v.createdAt,
       subscriptionStart: v.subscriptionStart,
       subscriptionEnd: v.subscriptionEnd,
+      subscriptionPlan: v.subscriptionPlan,
       userCount: v._count.users,
       owner: v.users[0] ?? null,
     }));
@@ -149,6 +212,11 @@ export async function activateVendor(req, res) {
       },
     });
 
+    // Find the default "Free" plan
+    const freePlan = await prisma.subscriptionPlan.findUnique({
+      where: { name: "Free" }
+    });
+
     // Start the trial period for the Vendor
     const subscriptionStart = new Date();
     const subscriptionEnd = new Date(
@@ -160,6 +228,7 @@ export async function activateVendor(req, res) {
       data: {
         subscriptionStart,
         subscriptionEnd,
+        subscriptionPlanId: freePlan ? freePlan.id : undefined,
       },
     });
 
@@ -223,6 +292,112 @@ export async function activateVendor(req, res) {
     });
   } catch (err) {
     console.error("activateVendor error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * PUT /api/super-admin/vendors/:id/subscription
+ * Updates a vendor's subscription end date
+ * ============================================================ */
+export async function updateVendorSubscription(req, res) {
+  try {
+    const { id } = req.params;
+    const { subscriptionEnd } = req.body;
+
+    if (!subscriptionEnd) {
+      return res.status(400).json({ message: "subscriptionEnd is required" });
+    }
+
+    const newEndDate = new Date(subscriptionEnd);
+    const updateData = { subscriptionEnd: newEndDate };
+    
+    // If the new end date is in the future, reset the expiration mail flag
+    if (newEndDate > new Date()) {
+      updateData.subscriptionExpiredMailSent = false;
+    }
+
+    const updatedVendor = await prisma.vendor.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return res.json({ message: "Vendor subscription updated successfully", vendor: updatedVendor });
+  } catch (err) {
+    console.error("updateVendorSubscription error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * PUT /api/super-admin/vendors/:id/plan
+ * Updates a vendor's subscription plan (Super Admin action)
+ * ============================================================ */
+export async function updateVendorPlan(req, res) {
+  try {
+    const { id } = req.params;
+    const { subscriptionPlanId } = req.body;
+
+    if (!subscriptionPlanId) {
+      return res.status(400).json({ message: "Subscription plan ID is required" });
+    }
+
+    // 1. Fetch vendor and target plan
+    const [vendor, plan] = await Promise.all([
+      prisma.vendor.findUnique({
+        where: { id },
+        include: { subscriptionPlan: true },
+      }),
+      prisma.subscriptionPlan.findUnique({ where: { id: subscriptionPlanId } }),
+    ]);
+
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    if (!plan) return res.status(404).json({ message: "Plan not found" });
+
+    // 2. Enforce: "Once it is free then again it cant go to free"
+    // If the target plan is Free, but the vendor already has/had a plan, block it.
+    if (plan.name === "Free" && vendor.subscriptionPlanId) {
+      return res.status(400).json({
+        message: "Vendor already has an active or previous plan. Re-assigning the Free plan is not allowed.",
+      });
+    }
+
+    // 3. Set subscription length
+    // If plan is Free, timeline is 15 days, otherwise use plan's default (usually 30)
+    const durationDays = plan.name === "Free" ? 15 : (plan.durationDays || 30);
+    const subscriptionStart = new Date();
+    const subscriptionEnd = new Date(
+      subscriptionStart.getTime() + durationDays * 24 * 60 * 60 * 1000,
+    );
+
+    const updatedVendor = await prisma.vendor.update({
+      where: { id },
+      data: {
+        subscriptionPlanId,
+        subscriptionStart,
+        subscriptionEnd,
+      },
+      include: {
+        subscriptionPlan: true,
+      },
+    });
+
+    try {
+      // Notify vendor users in real-time
+      const io = getIO();
+      if (io) {
+        io.to(`vendor:${id}`).emit("vendor:plan_updated", {
+          plan: plan,
+          subscriptionEnd,
+        });
+      }
+    } catch (e) {
+      console.error("Could not emit socket event", e);
+    }
+
+    return res.json({ message: `Vendor plan updated to ${plan.name}`, vendor: updatedVendor });
+  } catch (err) {
+    console.error("updateVendorPlan error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
@@ -298,15 +473,54 @@ export async function getVendorRegistration(req, res) {
  * ============================================================ */
 export async function getStats(req, res) {
   try {
-    const [vendors, users, leads] = await Promise.all([
+    const [vendors, users, leads, revenueData] = await Promise.all([
       prisma.vendor.count(),
       prisma.user.count(),
       prisma.lead.count(),
+      prisma.vendorPayment.aggregate({
+        where: { status: "captured" },
+        _sum: { amount: true }
+      })
     ]);
 
-    return res.json({ vendors, users, leads });
+    return res.json({ 
+      vendors, 
+      users, 
+      leads, 
+      totalRevenue: revenueData._sum.amount || 0 
+    });
   } catch (err) {
     console.error("getStats error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * GET /api/super-admin/payments
+ * Returns all vendor payments/transactions
+ * ============================================================ */
+export async function getPayments(req, res) {
+  try {
+    const payments = await prisma.vendorPayment.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
+        subscription: {
+          include: {
+            plan: true
+          }
+        }
+      }
+    });
+
+    return res.json(payments);
+  } catch (err) {
+    console.error("getPayments error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
@@ -490,5 +704,202 @@ export async function updateSuperAdminProfile(req, res) {
   } catch (err) {
     console.error("updateSuperAdminProfile error:", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * GET /api/super-admin/subscription-plans
+ * Returns all subscription plans
+ * ============================================================ */
+export async function getSubscriptionPlans(req, res) {
+  try {
+    const plans = await prisma.subscriptionPlan.findMany({
+      orderBy: { price: "asc" },
+    });
+    return res.json(plans);
+  } catch (err) {
+    console.error("getSubscriptionPlans error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * POST /api/super-admin/subscription-plans
+ * Creates a new subscription plan
+ * ============================================================ */
+export async function createSubscriptionPlan(req, res) {
+  try {
+    const { name, price, currency, durationDays, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
+
+    if (!name) return res.status(400).json({ message: "Plan name is required" });
+
+    const existing = await prisma.subscriptionPlan.findUnique({ where: { name } });
+    if (existing) return res.status(400).json({ message: "A plan with this name already exists" });
+
+    const newPlan = await prisma.subscriptionPlan.create({
+      data: {
+        name,
+        price: price || 0,
+        currency: currency || "INR",
+        durationDays: durationDays ?? 30,
+        conversationLimit: conversationLimit ?? 100,
+        galleryLimit: galleryLimit ?? 50,
+        chatbotLimit: chatbotLimit ?? 1,
+        templateLimit: templateLimit ?? 5,
+        formLimit: formLimit ?? 2,
+        teamUsersLimit: teamUsersLimit ?? 1,
+      },
+    });
+
+    return res.status(201).json({ message: "Subscription plan created", plan: newPlan });
+  } catch (err) {
+    console.error("createSubscriptionPlan error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * PUT /api/super-admin/subscription-plans/:id
+ * Updates an existing subscription plan
+ * ============================================================ */
+export async function updateSubscriptionPlan(req, res) {
+  try {
+    const { id } = req.params;
+    const { name, price, currency, durationDays, isActive, conversationLimit, galleryLimit, chatbotLimit, templateLimit, formLimit, teamUsersLimit } = req.body;
+
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id } });
+    if (!plan) return res.status(404).json({ message: "Subscription plan not found" });
+
+    if (name && name !== plan.name) {
+      const existing = await prisma.subscriptionPlan.findUnique({ where: { name } });
+      if (existing) return res.status(400).json({ message: "A plan with this name already exists" });
+    }
+
+    const updatedPlan = await prisma.subscriptionPlan.update({
+      where: { id },
+      data: {
+        name: name !== undefined ? name : plan.name,
+        price: price !== undefined ? price : plan.price,
+        currency: currency !== undefined ? currency : plan.currency,
+        durationDays: durationDays !== undefined ? durationDays : plan.durationDays,
+        isActive: isActive !== undefined ? isActive : plan.isActive,
+        conversationLimit: conversationLimit !== undefined ? conversationLimit : plan.conversationLimit,
+        galleryLimit: galleryLimit !== undefined ? galleryLimit : plan.galleryLimit,
+        chatbotLimit: chatbotLimit !== undefined ? chatbotLimit : plan.chatbotLimit,
+        templateLimit: templateLimit !== undefined ? templateLimit : plan.templateLimit,
+        formLimit: formLimit !== undefined ? formLimit : plan.formLimit,
+        teamUsersLimit: teamUsersLimit !== undefined ? teamUsersLimit : plan.teamUsersLimit,
+      },
+    });
+
+    return res.json({ message: "Subscription plan updated", plan: updatedPlan });
+  } catch (err) {
+    console.error("updateSubscriptionPlan error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * DELETE /api/super-admin/subscription-plans/:id
+ * Deletes a subscription plan
+ * ============================================================ */
+export async function deleteSubscriptionPlan(req, res) {
+  try {
+    const { id } = req.params;
+
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id } });
+    if (!plan) return res.status(404).json({ message: "Subscription plan not found" });
+
+    await prisma.subscriptionPlan.delete({ where: { id } });
+
+    return res.json({ message: "Subscription plan deleted" });
+  } catch (err) {
+    console.error("deleteSubscriptionPlan error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+/* ============================================================
+ * POST /api/super-admin/subscription-plans/init
+ * Initializes default subscription plans (Free, Basic, Custom)
+ * ============================================================ */
+export async function initSubscriptionPlans(req, res) {
+  try {
+    const defaultPlans = [
+      { name: "Free", price: 0, conversationLimit: 100, galleryLimit: 50, chatbotLimit: 1, templateLimit: 5, formLimit: 2, teamUsersLimit: 1 },
+      { name: "Basic", price: 29, conversationLimit: 1000, galleryLimit: 500, chatbotLimit: 3, templateLimit: 20, formLimit: 5, teamUsersLimit: 3 },
+      { name: "Unlimited", price: 299, conversationLimit: -1, galleryLimit: -1, chatbotLimit: -1, templateLimit: -1, formLimit: -1, teamUsersLimit: -1 },
+    ];
+
+    for (const plan of defaultPlans) {
+      await prisma.subscriptionPlan.upsert({
+        where: { name: plan.name },
+        update: plan,
+        create: plan,
+      });
+    }
+
+    // Optionally remove Premium if it exists
+    await prisma.subscriptionPlan.deleteMany({
+      where: { name: "Premium" }
+    });
+
+    return res.json({ message: "Default subscription plans initialized" });
+  } catch (err) {
+    console.error("initSubscriptionPlans error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+/* ============================================================
+ * GET /api/super-admin/invoice/:paymentId
+ * Returns full invoice details for a specific payment (Super Admin)
+ * ============================================================ */
+export async function getInvoice(req, res) {
+  try {
+    const { paymentId } = req.params;
+    const payment = await prisma.vendorPayment.findFirst({
+      where: { id: paymentId },
+      include: {
+        vendor: { select: { name: true } },
+        subscription: {
+          include: { 
+            plan: { 
+              select: { 
+                name: true, 
+                price: true, 
+                currency: true, 
+                durationDays: true 
+              } 
+            } 
+          }
+        },
+      },
+    });
+
+    if (!payment) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    return res.json({
+      id: payment.id,
+      invoiceNumber: payment.invoiceNumber || `TXN-${payment.id.slice(0, 8).toUpperCase()}`,
+      invoiceDate: payment.invoiceDate || payment.createdAt,
+      status: payment.status,
+      billingName: payment.billingName || payment.vendor?.name || "Customer",
+      billingEmail: payment.billingEmail || null,
+      planName: payment.planName || payment.subscription?.plan?.name || "Plan",
+      planDuration: payment.planDuration || payment.subscription?.plan?.durationDays || 30,
+      amount: payment.amount,
+      taxAmount: payment.taxAmount || 0,
+      totalAmount: payment.amount + (payment.taxAmount || 0),
+      currency: payment.currency,
+      gateway: payment.gateway,
+      razorpayOrderId: payment.razorpayOrderId,
+      razorpayPaymentId: payment.razorpayPaymentId,
+      createdAt: payment.createdAt,
+    });
+  } catch (err) {
+    console.error("getInvoice Super Admin error:", err);
+    return res.status(500).json({ message: "Failed to fetch invoice" });
   }
 }

@@ -196,8 +196,40 @@ router.get("/", authenticate, async (req, res) => {
             }
         });
 
+        // Enrich logs with Billing Category and Approximate Cost
+        const { getCategoryFromType } = await import("../services/whatsappBilling.service.js");
+        const { calculateChargedCost } = await import("../utils/whatsappPricing.js");
+
+        const enrichedLogs = await Promise.all(logs.map(async (log) => {
+            let billingCategory = null;
+            let cost = undefined;
+
+            if (log.type && log.type !== "User" && log.type !== "webhook" && log.type !== "system_event") {
+                if (log.direction === "inbound" || log.event === "Received") {
+                    billingCategory = "service";
+                    cost = 0;
+                } else {
+                    billingCategory = getCategoryFromType(log.type);
+                    try {
+                        const costs = await calculateChargedCost(billingCategory, "India");
+                        cost = costs.chargedCost;
+                        console.log(`💰 DEBUGLOG: type=${log.type}, cat=${billingCategory}, cost=${cost}`);
+                    } catch (err) {
+                        console.error("💰 DEBUGLOG ERROR:", err);
+                        cost = 0;
+                    }
+                }
+            }
+
+            return {
+                ...log,
+                billingCategory, // explicit so frontend correctly uses this
+                approxCost: cost
+            };
+        }));
+
         res.json({
-            logs,
+            logs: enrichedLogs,
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),

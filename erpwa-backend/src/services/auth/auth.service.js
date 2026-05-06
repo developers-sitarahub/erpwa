@@ -14,9 +14,26 @@ export async function login(email, password) {
     include: {
       vendor: {
         select: {
+          id: true,
+          name: true,
           subscriptionEnd: true,
           subscriptionStart: true,
+          subscriptionPlanId: true,
           whatsappStatus: true,
+          subscriptionPlan: {
+            select: {
+              id: true,
+              name: true,
+              price: true,
+              currency: true,
+              conversationLimit: true,
+              galleryLimit: true,
+              chatbotLimit: true,
+              templateLimit: true,
+              formLimit: true,
+              teamUsersLimit: true,
+            }
+          }
         },
       },
     },

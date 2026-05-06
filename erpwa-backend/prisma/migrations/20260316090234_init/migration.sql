@@ -1,0 +1,943 @@
+-- CreateEnum
+CREATE TYPE "CampaignType" AS ENUM ('TEMPLATE', 'IMAGE');
+
+-- CreateEnum
+CREATE TYPE "ImageCaptionMode" AS ENUM ('NONE', 'TITLE', 'DESCRIPTION', 'FULL');
+
+-- CreateEnum
+CREATE TYPE "UserRole" AS ENUM ('vendor_owner', 'owner', 'vendor_admin', 'sales');
+
+-- CreateEnum
+CREATE TYPE "MediaType" AS ENUM ('image', 'video', 'audio', 'document', 'sticker');
+
+-- CreateTable
+CREATE TABLE "Vendor" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "whatsappBusinessId" TEXT,
+    "whatsappPhoneNumberId" TEXT,
+    "whatsappAccessToken" TEXT,
+    "whatsappStatus" TEXT NOT NULL DEFAULT 'not_configured',
+    "whatsappVerifiedAt" TIMESTAMP(3),
+    "whatsappLastError" TEXT,
+    "whatsappVerificationStatus" TEXT,
+    "whatsappQualityRating" TEXT,
+    "whatsappMessagingTier" TEXT,
+    "whatsappVerifiedName" TEXT,
+    "whatsappDisplayPhoneNumber" TEXT,
+    "whatsappFlowsPublicKey" TEXT,
+    "whatsappFlowsPrivateKey" TEXT,
+    "businessCategory" TEXT,
+    "country" TEXT,
+    "businessAttributes" JSONB,
+    "subscriptionStart" TIMESTAMP(3),
+    "subscriptionEnd" TIMESTAMP(3),
+    "subscriptionPlanId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Vendor_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "User" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT,
+    "name" TEXT NOT NULL,
+    "mobileNumber" TEXT,
+    "email" TEXT,
+    "passwordHash" TEXT,
+    "role" "UserRole" NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "onboardingStatus" TEXT NOT NULL DEFAULT 'pending',
+    "isOnline" BOOLEAN NOT NULL DEFAULT false,
+    "lastLoginAt" TIMESTAMP(3),
+    "activatedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RefreshToken" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RefreshToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PasswordResetOtp" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "otpHash" TEXT NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PasswordResetOtp_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RegistrationOTP" (
+    "id" TEXT NOT NULL,
+    "mobile" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "mobileOtpHash" TEXT NOT NULL,
+    "emailOtpHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RegistrationOTP_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VendorRegistration" (
+    "id" TEXT NOT NULL,
+    "ownerName" TEXT NOT NULL,
+    "ownerEmail" TEXT NOT NULL,
+    "ownerMobile" TEXT NOT NULL,
+    "businessName" TEXT,
+    "businessCategory" TEXT,
+    "country" TEXT,
+    "userId" TEXT NOT NULL,
+    "vendorId" TEXT,
+    "step1CompletedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "step2CompletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VendorRegistration_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Lead" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "phoneNumber" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'new',
+    "whatsappOptIn" BOOLEAN NOT NULL DEFAULT true,
+    "optInSource" TEXT,
+    "optInMessage" TEXT,
+    "optInAt" TIMESTAMP(3),
+    "blockedAt" TIMESTAMP(3),
+    "lastContactedAt" TIMESTAMP(3),
+    "city" TEXT,
+    "companyName" TEXT,
+    "email" TEXT,
+    "salesPersonId" TEXT,
+    "salesPersonName" TEXT,
+    "categoryId" INTEGER,
+    "subCategoryId" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Lead_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Category" (
+    "id" SERIAL NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "parentId" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Category_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Contact" (
+    "id" SERIAL NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "companyName" TEXT NOT NULL,
+    "mobileNumber" TEXT NOT NULL,
+    "categoryId" INTEGER,
+    "subCategoryId" INTEGER,
+    "salesPersonName" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "assignedTo" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Contact_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "GalleryImage" (
+    "id" SERIAL NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "categoryId" INTEGER,
+    "subCategoryId" INTEGER,
+    "title" TEXT,
+    "description" TEXT,
+    "s3Url" TEXT NOT NULL,
+    "s3Key" TEXT,
+    "price" DOUBLE PRECISION,
+    "priceCurrency" TEXT DEFAULT 'USD',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "GalleryImage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Conversation" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "leadId" TEXT NOT NULL,
+    "initiatedBy" TEXT NOT NULL DEFAULT 'vendor',
+    "channel" TEXT NOT NULL DEFAULT 'whatsapp',
+    "lastMessageAt" TIMESTAMP(3),
+    "isOpen" BOOLEAN NOT NULL DEFAULT true,
+    "sessionStartedAt" TIMESTAMP(3),
+    "sessionExpiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Conversation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Template" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "whatsappPhoneNumberId" TEXT NOT NULL,
+    "metaTemplateName" TEXT NOT NULL,
+    "displayName" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'draft',
+    "templateType" TEXT NOT NULL DEFAULT 'standard',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+    "flowId" TEXT,
+
+    CONSTRAINT "Template_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateCarouselCard" (
+    "id" TEXT NOT NULL,
+    "templateId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "subtitle" TEXT,
+    "s3Url" TEXT,
+    "mediaHandle" TEXT,
+    "mimeType" TEXT,
+    "buttonType" TEXT DEFAULT 'URL',
+    "buttonText" TEXT,
+    "buttonValue" TEXT,
+    "position" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TemplateCarouselCard_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateButton" (
+    "id" TEXT NOT NULL,
+    "templateId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "text" TEXT NOT NULL,
+    "value" TEXT,
+    "position" INTEGER NOT NULL,
+    "flowId" TEXT,
+    "flowAction" TEXT,
+
+    CONSTRAINT "TemplateButton_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateMedia" (
+    "id" TEXT NOT NULL,
+    "templateId" TEXT NOT NULL,
+    "language" TEXT NOT NULL,
+    "position" INTEGER NOT NULL DEFAULT 0,
+    "mediaType" TEXT NOT NULL,
+    "s3Url" TEXT NOT NULL,
+    "mimeType" TEXT NOT NULL,
+    "whatsappMediaId" TEXT,
+    "uploadStatus" TEXT NOT NULL DEFAULT 'pending',
+    "uploadError" TEXT,
+    "uploadedAt" TIMESTAMP(3),
+
+    CONSTRAINT "TemplateMedia_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateLanguage" (
+    "id" TEXT NOT NULL,
+    "templateId" TEXT NOT NULL,
+    "language" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "footerText" TEXT,
+    "headerType" TEXT,
+    "headerText" TEXT,
+    "headerExampleUrl" TEXT,
+    "headerFilename" TEXT,
+    "metaStatus" TEXT NOT NULL DEFAULT 'draft',
+    "metaReason" TEXT,
+    "metaId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TemplateLanguage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TemplateCatalogProduct" (
+    "id" TEXT NOT NULL,
+    "templateId" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TemplateCatalogProduct_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Campaign" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "type" "CampaignType" NOT NULL,
+    "templateId" TEXT,
+    "categoryId" INTEGER,
+    "subCategoryId" INTEGER,
+    "imageLimit" INTEGER DEFAULT 100,
+    "captionMode" "ImageCaptionMode",
+    "name" TEXT,
+    "filters" JSONB,
+    "totalMessages" INTEGER NOT NULL DEFAULT 0,
+    "sentMessages" INTEGER NOT NULL DEFAULT 0,
+    "failedMessages" INTEGER NOT NULL DEFAULT 0,
+    "startedAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'draft',
+    "scheduledAt" TIMESTAMP(3),
+    "createdBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Campaign_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Message" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "whatsappPhoneNumberId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "campaignId" TEXT,
+    "senderId" TEXT,
+    "albumId" TEXT,
+    "direction" TEXT NOT NULL,
+    "channel" TEXT NOT NULL DEFAULT 'whatsapp',
+    "messageType" TEXT,
+    "content" TEXT,
+    "inboundPayload" JSONB,
+    "outboundPayload" JSONB,
+    "whatsappMessageId" TEXT,
+    "replyToMessageId" TEXT,
+    "status" TEXT,
+    "errorCode" TEXT,
+    "retryCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Message_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MediaAlbum" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "name" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MediaAlbum_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MediaAsset" (
+    "id" TEXT NOT NULL,
+    "albumId" TEXT,
+    "mediaType" "MediaType" NOT NULL,
+    "mimeType" TEXT NOT NULL,
+    "mediaUrl" TEXT NOT NULL,
+    "caption" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MediaAsset_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MessageMedia" (
+    "id" TEXT NOT NULL,
+    "messageId" TEXT NOT NULL,
+    "mediaType" "MediaType" NOT NULL,
+    "mimeType" TEXT NOT NULL,
+    "mediaUrl" TEXT NOT NULL,
+    "caption" TEXT,
+    "fileName" TEXT,
+    "assetId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MessageMedia_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MessageDelivery" (
+    "id" TEXT NOT NULL,
+    "messageId" TEXT NOT NULL,
+    "messageMediaId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "whatsappMsgId" TEXT,
+    "status" TEXT NOT NULL,
+    "error" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MessageDelivery_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ActivityLog" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT,
+    "conversationId" TEXT,
+    "messageId" TEXT,
+    "phoneNumber" TEXT,
+    "type" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "event" TEXT,
+    "category" TEXT,
+    "error" TEXT,
+    "payload" JSONB,
+    "direction" TEXT,
+    "responseCode" INTEGER,
+    "processingMs" INTEGER,
+    "whatsappBusinessId" TEXT,
+    "whatsappPhoneNumberId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ActivityLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Workflow" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "triggerKeyword" TEXT,
+    "nodes" JSONB NOT NULL,
+    "edges" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Workflow_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WorkflowSession" (
+    "id" TEXT NOT NULL,
+    "workflowId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
+    "currentNodeId" TEXT NOT NULL,
+    "state" JSONB,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "WorkflowSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WhatsAppFlow" (
+    "id" TEXT NOT NULL,
+    "metaFlowId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "flowJson" JSONB NOT NULL,
+    "endpointUri" TEXT,
+    "vendorId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "publishedAt" TIMESTAMP(3),
+    "deprecatedAt" TIMESTAMP(3),
+
+    CONSTRAINT "WhatsAppFlow_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "FlowResponse" (
+    "id" TEXT NOT NULL,
+    "flowId" TEXT,
+    "conversationId" TEXT NOT NULL,
+    "responseData" JSONB NOT NULL,
+    "flowToken" TEXT,
+    "status" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3),
+
+    CONSTRAINT "FlowResponse_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SuperAdmin" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "passwordHash" TEXT NOT NULL,
+    "name" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SuperAdmin_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SuperAdminRefreshToken" (
+    "id" TEXT NOT NULL,
+    "adminId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "SuperAdminRefreshToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SubscriptionPlan" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "price" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    "currency" TEXT NOT NULL DEFAULT 'INR',
+    "durationDays" INTEGER NOT NULL DEFAULT 30,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "conversationLimit" INTEGER NOT NULL DEFAULT 100,
+    "galleryLimit" INTEGER NOT NULL DEFAULT 50,
+    "chatbotLimit" INTEGER NOT NULL DEFAULT 1,
+    "templateLimit" INTEGER NOT NULL DEFAULT 5,
+    "formLimit" INTEGER NOT NULL DEFAULT 2,
+    "teamUsersLimit" INTEGER NOT NULL DEFAULT 1,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SubscriptionPlan_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VendorSubscription" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "planId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "startDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "razorpayOrderId" TEXT,
+    "razorpayPaymentId" TEXT,
+    "autoRenew" BOOLEAN NOT NULL DEFAULT false,
+    "renewedFromId" TEXT,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VendorSubscription_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VendorPayment" (
+    "id" TEXT NOT NULL,
+    "vendorId" TEXT NOT NULL,
+    "subscriptionId" TEXT,
+    "amount" DOUBLE PRECISION NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'INR',
+    "gateway" TEXT NOT NULL DEFAULT 'razorpay',
+    "razorpayOrderId" TEXT,
+    "razorpayPaymentId" TEXT,
+    "razorpaySignature" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "invoiceNumber" TEXT,
+    "invoiceDate" TIMESTAMP(3),
+    "billingName" TEXT,
+    "billingEmail" TEXT,
+    "planName" TEXT,
+    "planDuration" INTEGER,
+    "taxAmount" DOUBLE PRECISION DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VendorPayment_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_mobileNumber_key" ON "User"("mobileNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RefreshToken_tokenHash_key" ON "RefreshToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "PasswordResetOtp_userId_idx" ON "PasswordResetOtp"("userId");
+
+-- CreateIndex
+CREATE INDEX "RegistrationOTP_mobile_idx" ON "RegistrationOTP"("mobile");
+
+-- CreateIndex
+CREATE INDEX "RegistrationOTP_email_idx" ON "RegistrationOTP"("email");
+
+-- CreateIndex
+CREATE INDEX "VendorRegistration_userId_idx" ON "VendorRegistration"("userId");
+
+-- CreateIndex
+CREATE INDEX "VendorRegistration_vendorId_idx" ON "VendorRegistration"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "Lead_email_idx" ON "Lead"("email");
+
+-- CreateIndex
+CREATE INDEX "Lead_categoryId_idx" ON "Lead"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "Lead_subCategoryId_idx" ON "Lead"("subCategoryId");
+
+-- CreateIndex
+CREATE INDEX "Lead_status_idx" ON "Lead"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Lead_vendorId_phoneNumber_key" ON "Lead"("vendorId", "phoneNumber");
+
+-- CreateIndex
+CREATE INDEX "Category_vendorId_idx" ON "Category"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "Category_parentId_idx" ON "Category"("parentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Category_vendorId_name_parentId_key" ON "Category"("vendorId", "name", "parentId");
+
+-- CreateIndex
+CREATE INDEX "Contact_vendorId_idx" ON "Contact"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "Contact_categoryId_idx" ON "Contact"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "Contact_subCategoryId_idx" ON "Contact"("subCategoryId");
+
+-- CreateIndex
+CREATE INDEX "Contact_status_idx" ON "Contact"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Contact_vendorId_mobileNumber_key" ON "Contact"("vendorId", "mobileNumber");
+
+-- CreateIndex
+CREATE INDEX "GalleryImage_vendorId_idx" ON "GalleryImage"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "GalleryImage_categoryId_idx" ON "GalleryImage"("categoryId");
+
+-- CreateIndex
+CREATE INDEX "GalleryImage_subCategoryId_idx" ON "GalleryImage"("subCategoryId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Conversation_vendorId_leadId_key" ON "Conversation"("vendorId", "leadId");
+
+-- CreateIndex
+CREATE INDEX "Template_vendorId_idx" ON "Template"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "Template_whatsappPhoneNumberId_idx" ON "Template"("whatsappPhoneNumberId");
+
+-- CreateIndex
+CREATE INDEX "Template_createdBy_idx" ON "Template"("createdBy");
+
+-- CreateIndex
+CREATE INDEX "Template_flowId_idx" ON "Template"("flowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Template_whatsappPhoneNumberId_metaTemplateName_key" ON "Template"("whatsappPhoneNumberId", "metaTemplateName");
+
+-- CreateIndex
+CREATE INDEX "TemplateCarouselCard_templateId_idx" ON "TemplateCarouselCard"("templateId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TemplateCarouselCard_templateId_position_key" ON "TemplateCarouselCard"("templateId", "position");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TemplateButton_templateId_position_key" ON "TemplateButton"("templateId", "position");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TemplateMedia_templateId_language_position_key" ON "TemplateMedia"("templateId", "language", "position");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TemplateLanguage_templateId_language_key" ON "TemplateLanguage"("templateId", "language");
+
+-- CreateIndex
+CREATE INDEX "TemplateCatalogProduct_templateId_idx" ON "TemplateCatalogProduct"("templateId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TemplateCatalogProduct_templateId_position_key" ON "TemplateCatalogProduct"("templateId", "position");
+
+-- CreateIndex
+CREATE INDEX "Campaign_vendorId_idx" ON "Campaign"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "Campaign_type_idx" ON "Campaign"("type");
+
+-- CreateIndex
+CREATE INDEX "Campaign_createdBy_idx" ON "Campaign"("createdBy");
+
+-- CreateIndex
+CREATE INDEX "Message_vendorId_idx" ON "Message"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "Message_whatsappPhoneNumberId_idx" ON "Message"("whatsappPhoneNumberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "MessageDelivery_messageMediaId_conversationId_key" ON "MessageDelivery"("messageMediaId", "conversationId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_vendorId_idx" ON "ActivityLog"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_conversationId_idx" ON "ActivityLog"("conversationId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_messageId_idx" ON "ActivityLog"("messageId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_status_idx" ON "ActivityLog"("status");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_createdAt_idx" ON "ActivityLog"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_type_idx" ON "ActivityLog"("type");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_whatsappBusinessId_idx" ON "ActivityLog"("whatsappBusinessId");
+
+-- CreateIndex
+CREATE INDEX "ActivityLog_whatsappPhoneNumberId_idx" ON "ActivityLog"("whatsappPhoneNumberId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Workflow_vendorId_triggerKeyword_key" ON "Workflow"("vendorId", "triggerKeyword");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "WhatsAppFlow_metaFlowId_key" ON "WhatsAppFlow"("metaFlowId");
+
+-- CreateIndex
+CREATE INDEX "WhatsAppFlow_vendorId_idx" ON "WhatsAppFlow"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "WhatsAppFlow_metaFlowId_idx" ON "WhatsAppFlow"("metaFlowId");
+
+-- CreateIndex
+CREATE INDEX "WhatsAppFlow_status_idx" ON "WhatsAppFlow"("status");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_flowId_idx" ON "FlowResponse"("flowId");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_conversationId_idx" ON "FlowResponse"("conversationId");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_flowToken_idx" ON "FlowResponse"("flowToken");
+
+-- CreateIndex
+CREATE INDEX "FlowResponse_status_idx" ON "FlowResponse"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SuperAdmin_email_key" ON "SuperAdmin"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SuperAdminRefreshToken_tokenHash_key" ON "SuperAdminRefreshToken"("tokenHash");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SubscriptionPlan_name_key" ON "SubscriptionPlan"("name");
+
+-- CreateIndex
+CREATE INDEX "VendorSubscription_vendorId_idx" ON "VendorSubscription"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "VendorSubscription_status_idx" ON "VendorSubscription"("status");
+
+-- CreateIndex
+CREATE INDEX "VendorSubscription_endDate_idx" ON "VendorSubscription"("endDate");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorPayment_razorpayOrderId_key" ON "VendorPayment"("razorpayOrderId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorPayment_razorpayPaymentId_key" ON "VendorPayment"("razorpayPaymentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VendorPayment_invoiceNumber_key" ON "VendorPayment"("invoiceNumber");
+
+-- CreateIndex
+CREATE INDEX "VendorPayment_vendorId_idx" ON "VendorPayment"("vendorId");
+
+-- CreateIndex
+CREATE INDEX "VendorPayment_status_idx" ON "VendorPayment"("status");
+
+-- CreateIndex
+CREATE INDEX "VendorPayment_invoiceNumber_idx" ON "VendorPayment"("invoiceNumber");
+
+-- AddForeignKey
+ALTER TABLE "Vendor" ADD CONSTRAINT "Vendor_subscriptionPlanId_fkey" FOREIGN KEY ("subscriptionPlanId") REFERENCES "SubscriptionPlan"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RefreshToken" ADD CONSTRAINT "RefreshToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PasswordResetOtp" ADD CONSTRAINT "PasswordResetOtp_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorRegistration" ADD CONSTRAINT "VendorRegistration_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorRegistration" ADD CONSTRAINT "VendorRegistration_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Lead" ADD CONSTRAINT "Lead_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Lead" ADD CONSTRAINT "Lead_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Lead" ADD CONSTRAINT "Lead_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Category" ADD CONSTRAINT "Category_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Category"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Category" ADD CONSTRAINT "Category_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Contact" ADD CONSTRAINT "Contact_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Contact" ADD CONSTRAINT "Contact_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Contact" ADD CONSTRAINT "Contact_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GalleryImage" ADD CONSTRAINT "GalleryImage_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GalleryImage" ADD CONSTRAINT "GalleryImage_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "Category"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GalleryImage" ADD CONSTRAINT "GalleryImage_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_leadId_fkey" FOREIGN KEY ("leadId") REFERENCES "Lead"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Template" ADD CONSTRAINT "Template_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Template" ADD CONSTRAINT "Template_flowId_fkey" FOREIGN KEY ("flowId") REFERENCES "WhatsAppFlow"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateCarouselCard" ADD CONSTRAINT "TemplateCarouselCard_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateButton" ADD CONSTRAINT "TemplateButton_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateMedia" ADD CONSTRAINT "TemplateMedia_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateLanguage" ADD CONSTRAINT "TemplateLanguage_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TemplateCatalogProduct" ADD CONSTRAINT "TemplateCatalogProduct_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Campaign" ADD CONSTRAINT "Campaign_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Campaign" ADD CONSTRAINT "Campaign_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Message" ADD CONSTRAINT "Message_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Message" ADD CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Message" ADD CONSTRAINT "Message_campaignId_fkey" FOREIGN KEY ("campaignId") REFERENCES "Campaign"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Message" ADD CONSTRAINT "Message_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Message" ADD CONSTRAINT "Message_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "MediaAlbum"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MediaAlbum" ADD CONSTRAINT "MediaAlbum_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MediaAsset" ADD CONSTRAINT "MediaAsset_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "MediaAlbum"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MessageMedia" ADD CONSTRAINT "MessageMedia_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MessageDelivery" ADD CONSTRAINT "MessageDelivery_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MessageDelivery" ADD CONSTRAINT "MessageDelivery_messageMediaId_fkey" FOREIGN KEY ("messageMediaId") REFERENCES "MessageMedia"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Workflow" ADD CONSTRAINT "Workflow_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WorkflowSession" ADD CONSTRAINT "WorkflowSession_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "Workflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WhatsAppFlow" ADD CONSTRAINT "WhatsAppFlow_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FlowResponse" ADD CONSTRAINT "FlowResponse_flowId_fkey" FOREIGN KEY ("flowId") REFERENCES "WhatsAppFlow"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FlowResponse" ADD CONSTRAINT "FlowResponse_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SuperAdminRefreshToken" ADD CONSTRAINT "SuperAdminRefreshToken_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "SuperAdmin"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorSubscription" ADD CONSTRAINT "VendorSubscription_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorSubscription" ADD CONSTRAINT "VendorSubscription_planId_fkey" FOREIGN KEY ("planId") REFERENCES "SubscriptionPlan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorPayment" ADD CONSTRAINT "VendorPayment_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "Vendor"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VendorPayment" ADD CONSTRAINT "VendorPayment_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "VendorSubscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;

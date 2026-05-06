@@ -2,6 +2,7 @@ import express from "express";
 import fetch from "node-fetch";
 import prisma from "../prisma.js";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { enforceConversationLimit } from "../utils/subscription.js";
 import { requireRoles } from "../middleware/requireRole.middleware.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { decrypt } from "../utils/encryption.js";
@@ -331,7 +332,15 @@ router.post(
           },
         });
 
-        // 💬 SYNC CONVERSATION
+        // 💬 ENFORCE LIMIT & SYNC CONVERSATION
+        const existingConv = await prisma.conversation.findUnique({
+          where: { vendorId_leadId: { vendorId: vendor.id, leadId: lead.id } },
+        });
+
+        if (!existingConv) {
+          await enforceConversationLimit(vendor.id);
+        }
+
         const conversation = await prisma.conversation.upsert({
           where: {
             vendorId_leadId: {
@@ -345,6 +354,7 @@ router.post(
             leadId: lead.id,
             channel: "whatsapp",
             isOpen: true,
+            initiatedBy: "vendor",
             lastMessageAt: new Date(),
           },
         });

@@ -10,27 +10,65 @@ import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GPSERP - WhatsApp Automation & ERP",
+  title: {
+    template: "%s | GPSERP",
+    default: "GPSERP - WhatsApp Automation & ERP",
+  },
   description:
     "Enterprise Resource Planning & WhatsApp Automation. Unlock native flows, dual workflow engines, and interactive catalogs.",
-  keywords:
-    "GPSERP, WhatsApp Automation, ERP, CRM, WhatsApp Business API, Lead Management",
+  keywords: [
+    "GPSERP",
+    "WhatsApp Automation",
+    "ERP",
+    "CRM",
+    "WhatsApp Business API",
+    "Lead Management",
+    "Customer Support",
+    "Interactive Catalogs",
+    "Native Flows",
+  ],
+  authors: [{ name: "GPSERP" }],
+  creator: "GPSERP",
   openGraph: {
-    title: "GPSERP - WhatsApp Automation & ERP",
+    title: {
+      template: "%s | GPSERP",
+      default: "GPSERP - WhatsApp Automation & ERP",
+    },
     description:
       "The complete toolkit for modern businesses to scale their messaging on WhatsApp.",
     siteName: "GPSERP",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: {
+      template: "%s | GPSERP",
+      default: "GPSERP - WhatsApp Automation & ERP",
+    },
+    description:
+      "The complete toolkit for modern businesses to scale their messaging on WhatsApp.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon_io/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon_io/favicon-16x16.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon_io/favicon.ico",
+    apple: "/favicon_io/apple-touch-icon.png",
   },
-  manifest: "/site.webmanifest",
+  manifest: "/favicon_io/site.webmanifest",
 };
 
 export default function RootLayout({

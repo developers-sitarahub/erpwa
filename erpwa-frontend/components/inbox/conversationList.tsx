@@ -1,4 +1,12 @@
-import { Search, MoreVertical, MessageCircle, Loader2, UserPlus, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  Search,
+  MoreVertical,
+  MessageCircle,
+  Loader2,
+  UserPlus,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getConversationTick } from "@/utils/getConversationTicks";
 import { useState, useEffect } from "react";
@@ -8,6 +16,7 @@ import {
   createWhatsAppConversation,
 } from "@/lib/whatsappApi";
 import { toast } from "react-toastify";
+import { useAuth } from "@/context/authContext";
 
 export default function ConversationList({
   conversations,
@@ -22,6 +31,8 @@ export default function ConversationList({
   onSelect: (id: string) => void;
   onReload?: () => Promise<void>;
 }) {
+  const { user } = useAuth();
+  const isSales = user?.role === "sales";
   const [searchQuery, setSearchQuery] = useState("");
   const [isChecking, setIsChecking] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -55,8 +66,10 @@ export default function ConversationList({
     // Check if lead already has a conversation
     const hasConversation = conversations.some(
       (c) =>
-        c.phone?.replace(/\D/g, "") === lead.mobile_number?.replace(/\D/g, "") ||
-        c.phone?.replace(/\D/g, "") === (lead as any).phoneNumber?.replace(/\D/g, "")
+        c.phone?.replace(/\D/g, "") ===
+          lead.mobile_number?.replace(/\D/g, "") ||
+        c.phone?.replace(/\D/g, "") ===
+          (lead as any).phoneNumber?.replace(/\D/g, ""),
     );
     if (hasConversation) return false;
 
@@ -66,7 +79,8 @@ export default function ConversationList({
       const name = lead.company_name || (lead as any).companyName || "";
       const phone = lead.mobile_number || (lead as any).phoneNumber || "";
       return (
-        name.toLowerCase().includes(query) || phone.toLowerCase().includes(query)
+        name.toLowerCase().includes(query) ||
+        phone.toLowerCase().includes(query)
       );
     }
 
@@ -128,7 +142,7 @@ export default function ConversationList({
         const result = await createWhatsAppConversation(
           whatsappCheckResult.phoneNumber,
           whatsappCheckResult.lead?.companyName ||
-          whatsappCheckResult.phoneNumber,
+            whatsappCheckResult.phoneNumber,
         );
 
         // Reload conversations list to include the new one
@@ -170,7 +184,7 @@ export default function ConversationList({
     try {
       const result = await createWhatsAppConversation(
         phoneNumber,
-        companyName || phoneNumber
+        companyName || phoneNumber,
       );
 
       if (onReload) {
@@ -179,7 +193,6 @@ export default function ConversationList({
       onSelect(result.conversationId);
       setLeadsSearchQuery(""); // Clear search after selection
       setIsLeadsOpen(false); // Close drawer
-
     } catch (error) {
       console.error("Failed to start chat with lead", error);
       toast.error("Failed to start chat");
@@ -203,11 +216,8 @@ export default function ConversationList({
         </div>
       </div>
 
-
-
       {/* RELATIVE CONTAINER FOR SEARCH + LIST + DRAWER */}
       <div className="flex-1 relative flex flex-col overflow-hidden bg-background">
-
         {/* Main Search Bar (Included in relative container so drawer covers it) */}
         <div className="flex-none px-3 py-2 bg-card border-b border-border">
           <div className="flex items-center gap-3 bg-muted/50 rounded-lg px-4 py-2">
@@ -226,7 +236,9 @@ export default function ConversationList({
         </div>
 
         {/* MAIN CONVERSATION LIST (Scrollable) */}
-        <div className={`flex-1 overflow-y-auto pb-[64px] ${isLeadsOpen ? 'invisible' : 'visible'}`}>
+        <div
+          className={`flex-1 overflow-y-auto pb-[64px] ${isLeadsOpen ? "invisible" : "visible"}`}
+        >
           {/* WhatsApp Number Check Result */}
           {whatsappCheckResult &&
             whatsappCheckResult.isOnWhatsApp &&
@@ -277,8 +289,9 @@ export default function ConversationList({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.03 }}
               onClick={() => onSelect(conv.id)}
-              className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${selected === conv.id ? "bg-muted" : ""
-                }`}
+              className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${
+                selected === conv.id ? "bg-muted" : ""
+              }`}
             >
               <div className="flex items-start gap-3">
                 <div className="relative flex-shrink-0">
@@ -305,10 +318,11 @@ export default function ConversationList({
                       )}
 
                       <p
-                        className={`text-sm truncate ${conv.hasUnread
-                          ? "text-foreground"
-                          : "text-muted-foreground"
-                          }`}
+                        className={`text-sm truncate ${
+                          conv.hasUnread
+                            ? "text-foreground"
+                            : "text-muted-foreground"
+                        }`}
                       >
                         {conv.lastMessage}
                       </p>
@@ -340,7 +354,7 @@ export default function ConversationList({
         </div>
 
         {/* COLLAPSED FOOTER (Visible when drawer closed) */}
-        {!isLeadsOpen && assignedLeads.length > 0 && (
+        {!isLeadsOpen && isSales && assignedLeads.length > 0 && (
           <div className="absolute bottom-0 left-0 right-0 h-[64px] border-t border-border bg-card z-10">
             <button
               onClick={() => setIsLeadsOpen(true)}
@@ -352,7 +366,18 @@ export default function ConversationList({
                   Assigned to you
                 </span>
                 <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
-                  {assignedLeads.filter(l => !conversations.some(c => c.phone?.replace(/\D/g, "") === l.mobile_number?.replace(/\D/g, "") || c.phone?.replace(/\D/g, "") === (l as any).phoneNumber?.replace(/\D/g, ""))).length}
+                  {
+                    assignedLeads.filter(
+                      (l) =>
+                        !conversations.some(
+                          (c) =>
+                            c.phone?.replace(/\D/g, "") ===
+                              l.mobile_number?.replace(/\D/g, "") ||
+                            c.phone?.replace(/\D/g, "") ===
+                              (l as any).phoneNumber?.replace(/\D/g, ""),
+                        ),
+                    ).length
+                  }
                 </span>
               </div>
               <ChevronUp className="w-5 h-5 text-muted-foreground" />
@@ -362,16 +387,16 @@ export default function ConversationList({
 
         {/* EXPANDED DRAWER (Slide Up) */}
         <AnimatePresence>
-          {isLeadsOpen && (
+          {isLeadsOpen && isSales && (
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{
                 type: "spring",
-                damping: 30,     // Increased damping for less "pop" / bounce
-                stiffness: 300,  // Keep stiffness
-                mass: 0.8        // Slightly lighter feel
+                damping: 30, // Increased damping for less "pop" / bounce
+                stiffness: 300, // Keep stiffness
+                mass: 0.8, // Slightly lighter feel
               }}
               className="absolute inset-0 bg-background z-20 flex flex-col shadow-[-5px_0_15px_rgba(0,0,0,0.1)]" // Added shadow
             >

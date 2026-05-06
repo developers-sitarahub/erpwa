@@ -8,7 +8,7 @@ import { Badge } from "@/components/badge"
 import { Input } from "@/components/input"
 import { Plus, Edit2, Trash2, Circle, X, Loader2, Ban, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { useAuth } from "@/context/authContext"
-import { usersAPI, User } from "@/lib/usersApi"
+import { usersAPI, User, TeamLimits } from "@/lib/usersApi"
 import { toast } from "react-toastify"
 
 import { getSocket } from "@/lib/socket"
@@ -16,6 +16,7 @@ import { getSocket } from "@/lib/socket"
 export default function ManageTeam() {
   const { user } = useAuth()
   const [team, setTeam] = useState<User[]>([])
+  const [teamLimits, setTeamLimits] = useState<TeamLimits | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -48,9 +49,15 @@ export default function ManageTeam() {
 
   const fetchUsers = async () => {
     try {
-      const res = await usersAPI.list()
+      const [res, limitsRes] = await Promise.all([
+        usersAPI.list(),
+        usersAPI.getLimits()
+      ])
       if (res.data) {
         setTeam(res.data)
+      }
+      if (limitsRes.data) {
+        setTeamLimits(limitsRes.data)
       }
     } catch (error) {
       console.error("Failed to fetch users", error)
@@ -238,6 +245,11 @@ export default function ManageTeam() {
                 await usersAPI.delete(id)
                 toast.success("✅ Team member removed successfully")
                 setTeam(prev => prev.filter(m => m.id !== id))
+                
+                // Refresh limits so the count goes down
+                usersAPI.getLimits().then(res => {
+                  if (res.data) setTeamLimits(res.data)
+                }).catch(err => console.error("Failed to refresh limits", err))
               } catch (error) {
                 toast.error("❌ Failed to delete user")
               }
@@ -277,9 +289,27 @@ export default function ManageTeam() {
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Manage Team</h1>
-            <p className="text-sm text-muted-foreground mt-2">View and manage sales team members</p>
+            <div className="flex items-center gap-3 mt-2">
+              <p className="text-sm text-muted-foreground">View and manage sales team members</p>
+              {teamLimits && teamLimits.limit !== -1 && (
+                <Badge variant={teamLimits.currentCount >= teamLimits.limit ? "destructive" : "secondary"}>
+                  {teamLimits.currentCount} / {teamLimits.limit} Plan Limit
+                </Badge>
+              )}
+              {teamLimits && teamLimits.limit === -1 && (
+                <Badge variant="secondary">
+                  Unlimited Plan
+                </Badge>
+              )}
+            </div>
           </div>
-          <Button size="md" className="w-full sm:w-auto" onClick={openAddModal}>
+          <Button 
+            size="md" 
+            className="w-full sm:w-auto" 
+            onClick={openAddModal}
+            disabled={teamLimits?.limit !== -1 && (teamLimits?.currentCount || 0) >= (teamLimits?.limit || 0)}
+            title={teamLimits?.limit !== -1 && (teamLimits?.currentCount || 0) >= (teamLimits?.limit || 0) ? "Plan limit reached" : ""}
+          >
             <Plus className="w-5 h-5 mr-2" />
             Add Member
           </Button>

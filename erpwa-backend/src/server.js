@@ -1,4 +1,4 @@
-// Server entry point
+// Server entry point — restarted 2026-03-12
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import http from "http";
 import multer from "multer";
 import "./cron/templateStatus.cron.js";
+import "./cron/subscriptionExpiry.cron.js";
 import prisma from "./prisma.js";
 import { processWhatsappQueue } from "./workers/whatsapp.worker.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -17,6 +18,8 @@ import whatsappTestRoutes from "./routes/whatsappTest.route.js";
 import vendorTemplateRoutes from "./routes/vendorTemplate.route.js";
 import vendorWhatsappTemplateSendRoutes from "./routes/vendorWhatsappTemplateSend.route.js";
 import workflowRoutes from "./routes/workflow.routes.js";
+import { getChatbotLimits } from "./controllers/workflow.controller.js";
+import { authenticate } from "./middleware/auth.middleware.js";
 import inboxRoutes from "./routes/inbox.route.js";
 import categoryRoutes from "./routes/category.routes.js";
 import leadRoutes from "./routes/lead.routes.js";
@@ -33,6 +36,10 @@ import WhatsappNumberCheckRoute from "./routes/whatsappNumberCheck.route.js";
 import activityLogsRoutes from "./routes/activityLogs.route.js";
 import whatsappFlowsRoutes from "./routes/whatsappFlows.route.js";
 import superAdminRoutes from "./routes/superAdmin.routes.js";
+import whatsappAnalyticsRoutes from "./routes/analytics.route.js";
+import subscriptionRoutes from "./routes/subscription.routes.js";
+import contactRoutes from "./routes/contact.routes.js";
+
 
 const app = express();
 app.set("trust proxy", 1);
@@ -64,6 +71,8 @@ app.use("/api/vendor", vendorWhatsappRoutes);
 app.use("/api/vendor/whatsapp", vendorWhatsappMessageRoutes);
 app.use("/api/vendor/templates", vendorTemplateRoutes);
 app.use("/api/vendor/whatsapp/template", vendorWhatsappTemplateSendRoutes);
+// Register /limits BEFORE the router to prevent /:id from catching it
+app.get("/api/workflow/limits", authenticate, getChatbotLimits);
 app.use("/api/workflow", workflowRoutes);
 app.use("/api/inbox", inboxRoutes);
 app.use("/api/categories", categoryRoutes);
@@ -80,6 +89,11 @@ app.use("/test", testUploadRoute);
 app.use("/api/whatsapp", WhatsappNumberCheckRoute);
 app.use("/api/whatsapp/flows", whatsappFlowsRoutes);
 app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/analytics/whatsapp", whatsappAnalyticsRoutes);
+app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/contact", contactRoutes);
+
+
 
 /* ================= ERROR HANDLING ================= */
 app.use((err, req, res, next) => {

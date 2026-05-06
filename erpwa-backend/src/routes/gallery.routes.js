@@ -26,6 +26,7 @@ const upload = multer({
 router.use(authenticate);
 
 // Gallery routes
+router.get("/limits", GalleryController.getLimits);
 router.get("/", GalleryController.list);
 router.post("/", GalleryController.create);
 router.post("/bulk", GalleryController.bulkCreate);

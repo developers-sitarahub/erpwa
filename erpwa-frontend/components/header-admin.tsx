@@ -29,8 +29,8 @@ export function HeaderAdmin() {
   }, []);
 
   return (
-    <header className="border-b border-sidebar-border bg-card sticky top-0 z-40">
-      <div className="flex items-center justify-between px-6 py-4 h-16">
+    <header className="border-b border-sidebar-border bg-card sticky top-0 z-40 h-16 flex items-center">
+      <div className="flex items-center justify-between px-6 w-full">
         {/* Title */}
         <h2 className="text-xl font-semibold text-foreground">
           Admin Dashboard

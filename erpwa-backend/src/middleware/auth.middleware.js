@@ -17,21 +17,19 @@ export async function authenticate(req, res, next) {
     // 🔑 Fetch user to get vendorId and subscription details
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        vendorId: true,
+      include: {
         vendor: {
-          select: {
-            subscriptionEnd: true,
-            subscriptionStart: true,
-            whatsappStatus: true,
-          },
-        },
-      },
+          include: {
+            subscriptionPlan: true
+          }
+        }
+      }
     });
+
+    console.log("------------------------------------------");
+    console.log("🚀 [AUTH_MIDDLEWARE] User:", user?.email);
+    console.log("📦 [AUTH_MIDDLEWARE] Plan:", user?.vendor?.subscriptionPlan?.name || "MISSING");
+    console.log("------------------------------------------");
 
     if (!user) {
       return res.status(401).json({ message: "User not found" });

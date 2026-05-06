@@ -8,12 +8,14 @@ interface WorkflowListModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (workflow: any) => void;
+  onWorkflowDeleted?: () => void; // called after deletion so parent can refresh limits
 }
 
 export default function WorkflowListModal({
   isOpen,
   onClose,
   onSelect,
+  onWorkflowDeleted,
 }: WorkflowListModalProps) {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,7 @@ export default function WorkflowListModal({
     try {
       await api.delete(`/workflow/${id}`);
       setWorkflows((prev) => prev.filter((w) => w.id !== id));
+      onWorkflowDeleted?.(); // notify parent to refresh limit counter
     } catch (error) {
       console.error("Failed to delete", error);
     }

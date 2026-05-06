@@ -100,7 +100,7 @@ const TestimonialCard = ({
 
 export function TestimonialsSection() {
   return (
-    <section id="testimonials" className="mb-24 py-24 relative overflow-hidden">
+    <section id="testimonials" className="py-24 pb-8 relative overflow-hidden">
       {/* Background Ambience consistent with page theme */}
       <div className="absolute inset-0 bg-transparent pointer-events-none" />
 

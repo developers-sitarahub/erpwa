@@ -11,6 +11,8 @@ import {
   X,
   Clock,
   ShieldCheck,
+  Zap,
+  CreditCard,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,8 @@ type NavItem = {
 
 const topMenuItems: NavItem[] = [
   { href: "/admin-super/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/admin-super/plans", icon: Zap, label: "Plans" },
+  { href: "/admin-super/transactions", icon: CreditCard, label: "Transactions" },
 ];
 
 const bottomMenuItems: NavItem[] = [
@@ -66,13 +70,16 @@ export function SidebarSuperAdmin() {
         ).length;
         setRequestedCount(count);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleLogout = async () => {
     try {
       await api.post("/super-admin/logout");
-      router.push("/admin-login");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("sa:auth:logout"));
+        window.location.href = "/admin-login";
+      }
     } catch {
       toast.error("Logout failed");
     }

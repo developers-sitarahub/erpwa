@@ -1,4 +1,5 @@
 import prisma from "../prisma.js";
+import { enforceChatbotLimit } from "../utils/subscription.js";
 
 export const createWorkflow = async (req, res) => {
   try {
@@ -9,7 +10,7 @@ export const createWorkflow = async (req, res) => {
       return res.status(400).json({ error: "Trigger keyword is required" });
     }
 
-    // 1. Update by ID if provided
+    // 1. Update by ID if provided — updating is always allowed (not a new chatbot)
     if (id) {
       const existing = await prisma.workflow.findUnique({ where: { id } });
       if (existing && existing.vendorId === vendorId) {
@@ -36,7 +37,7 @@ export const createWorkflow = async (req, res) => {
     });
 
     if (existingByKeyword) {
-      // Update existing workflow if found
+      // Update existing workflow if found — not a new chatbot, skip limit check
       const updated = await prisma.workflow.update({
         where: { id: existingByKeyword.id },
         data: {
@@ -49,7 +50,14 @@ export const createWorkflow = async (req, res) => {
       return res.json(updated);
     }
 
-    // 3. Create new
+    // 3. Creating a NEW workflow — enforce chatbot limit
+    try {
+      await enforceChatbotLimit(vendorId);
+    } catch (limitError) {
+      return res.status(403).json({ error: limitError.message });
+    }
+
+    // 4. Create new
     const workflow = await prisma.workflow.create({
       data: {
         vendorId,
@@ -121,5 +129,28 @@ export const deleteWorkflow = async (req, res) => {
   } catch (error) {
     console.error("Delete Workflow Error:", error);
     res.status(500).json({ error: "Failed to delete workflow" });
+  }
+};
+
+export const getChatbotLimits = async (req, res) => {
+  try {
+    const vendorId = req.user.vendorId;
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: { subscriptionPlan: true },
+    });
+
+    if (!vendor || !vendor.subscriptionPlan) {
+      return res.json({ limit: 0, currentCount: 0, planName: null });
+    }
+
+    const { chatbotLimit, name: planName } = vendor.subscriptionPlan;
+    const count = await prisma.workflow.count({ where: { vendorId } });
+
+    res.json({ limit: chatbotLimit, currentCount: count, planName });
+  } catch (error) {
+    console.error("Get Chatbot Limits Error:", error);
+    res.status(500).json({ error: "Failed to get chatbot limits" });
   }
 };

@@ -13,7 +13,16 @@ export interface User {
     activatedAt?: string
 }
 
+export interface TeamLimits {
+    limit: number
+    currentCount: number
+}
+
 export const usersAPI = {
+    getLimits: async (): Promise<ApiResponse<TeamLimits>> => {
+        const response = await api.get('/users/limits')
+        return { data: response.data }
+    },
     list: async (role?: string): Promise<ApiResponse<User[]>> => {
         const url = role ? `/users?role=${role}` : '/users'
         const response = await api.get(url)
