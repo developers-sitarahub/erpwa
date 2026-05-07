@@ -5,6 +5,14 @@ import { hashPassword } from "../src/utils/password.js";
 async function main() {
   const passwordHash = await hashPassword("Eqweasd@123");
 
+  const unlimitedPlan = await prisma.subscriptionPlan.findFirst({
+    where: { name: "Unlimited" }
+  });
+
+  if (!unlimitedPlan) {
+    throw new Error("Unlimited plan not found in database. Run initPlans.js first.");
+  }
+
   const entities = [
     {
       vendorName: "GPSERP Support",
@@ -25,12 +33,17 @@ async function main() {
   ];
 
   for (const entity of entities) {
+    // 1 month from now
+    const subEnd = new Date();
+    subEnd.setMonth(subEnd.getMonth() + 1);
+
     // 1️⃣ Create Vendor
     const vendor = await prisma.vendor.create({
       data: {
         name: entity.vendorName,
         subscriptionStart: new Date(),
-        subscriptionEnd: new Date("2099-12-31T23:59:59.999Z"), // Unlimited access
+        subscriptionEnd: subEnd, // 1 month access
+        subscriptionPlanId: unlimitedPlan.id,
       },
     });
 
