@@ -683,7 +683,7 @@ export default function AdminSettings() {
             key="upgrade-modal"
             onClose={() => { setShowUpgrade(false); fetchSub(); fetchPayments(); }}
             currentPlanId={plan?.id}
-            isOnPaidPlan={plan && plan.price > 0}
+            isOnPaidPlan={!!plan && plan.price > 0}
             user={user}
           />
         )}
