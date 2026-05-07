@@ -520,4 +520,118 @@ router.post(
   }),
 );
 
+/**
+ * ===============================
+ * REVERIFY WHATSAPP REGISTRATION
+ * ===============================
+ * Access: vendor_owner, vendor_admin
+ */
+router.post(
+  "/whatsapp/reverify",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin"]),
+  asyncHandler(async (req, res) => {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+    });
+
+    if (
+      !vendor ||
+      !vendor.whatsappAccessToken ||
+      !vendor.whatsappPhoneNumberId
+    ) {
+      return res.status(400).json({ message: "WhatsApp not fully configured" });
+    }
+
+    const { whatsappPhoneNumberId, whatsappBusinessId } = vendor;
+    const whatsappAccessToken = decrypt(vendor.whatsappAccessToken);
+
+    // 1️⃣ Re-attempt registration
+    const registration = await registerPhoneNumber(
+      whatsappPhoneNumberId,
+      whatsappAccessToken
+    );
+
+    if (!registration.success) {
+      const errCode = registration.error?.error?.code;
+      const isTokenExpired = errCode === 190 || errCode === 463;
+      
+      return res.status(400).json({
+        message: isTokenExpired 
+          ? "Your Meta access token has expired. Please click 'Reconfigure Connection' below to re-authenticate."
+          : "Phone number registration failed",
+        metaError: registration.error,
+      });
+    }
+
+    // 2️⃣ Sync Health Status
+    try {
+      const phoneDetailResp = await fetch(
+        `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+        { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
+      );
+      const phoneDetailData = await phoneDetailResp.json();
+
+      const whatsappVerificationStatus =
+        phoneDetailData?.code_verification_status || "NOT_VERIFIED";
+      const whatsappQualityRating =
+        phoneDetailData?.quality_rating ||
+        vendor.whatsappQualityRating ||
+        "UNKNOWN";
+      const whatsappVerifiedName =
+        phoneDetailData?.verified_name || vendor.whatsappVerifiedName || null;
+      const whatsappDisplayPhoneNumber =
+        phoneDetailData?.display_phone_number ||
+        vendor.whatsappDisplayPhoneNumber ||
+        null;
+
+      let whatsappMessagingTier = vendor.whatsappMessagingTier || "UNKNOWN";
+      try {
+        const phoneHealthResp = await fetch(
+          `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+          { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
+        );
+        const phoneHealthData = await phoneHealthResp.json();
+        if (phoneHealthData?.data && Array.isArray(phoneHealthData.data)) {
+          const numberObj = phoneHealthData.data.find(
+            (n) => n.id === whatsappPhoneNumberId,
+          );
+          if (numberObj) {
+            whatsappMessagingTier =
+              numberObj.messaging_limit_tier || whatsappMessagingTier;
+          }
+        }
+      } catch (e) { }
+
+      const updatedVendor = await prisma.vendor.update({
+        where: { id: req.user.vendorId },
+        data: {
+          whatsappVerificationStatus,
+          whatsappQualityRating,
+          whatsappMessagingTier,
+          whatsappVerifiedName,
+          whatsappDisplayPhoneNumber,
+        },
+        select: {
+          whatsappBusinessId: true,
+          whatsappPhoneNumberId: true,
+          whatsappStatus: true,
+          whatsappVerifiedAt: true,
+          whatsappLastError: true,
+          whatsappVerificationStatus: true,
+          whatsappQualityRating: true,
+          whatsappMessagingTier: true,
+          whatsappVerifiedName: true,
+          whatsappDisplayPhoneNumber: true,
+        },
+      });
+
+      res.json(updatedVendor);
+    } catch (err) {
+      console.error("Reverify status error:", err);
+      res.status(500).json({ message: "Registration succeeded but failed to refresh WhatsApp status." });
+    }
+  }),
+);
+
 export default router;

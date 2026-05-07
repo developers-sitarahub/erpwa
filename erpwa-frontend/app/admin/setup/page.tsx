@@ -255,6 +255,22 @@ export default function WhatsAppSetupPage() {
     }
   }
 
+  const [reverifying, setReverifying] = useState(false);
+
+  async function handleReverify() {
+    setReverifying(true);
+    try {
+      const res = await api.post("/vendor/whatsapp/reverify");
+      setConfig(res.data);
+      toast.success("Phone number re-verified successfully");
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error.response?.data?.message || "Failed to re-verify phone number");
+    } finally {
+      setReverifying(false);
+    }
+  }
+
   /* ================= EMBEDDED SIGNUP ================= */
 
   function handleEmbeddedSignup() {
@@ -407,13 +423,25 @@ export default function WhatsAppSetupPage() {
             ) {
               return (
                 <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-md p-4 text-sm space-y-1">
-                  <p className="font-semibold">
-                    ⚠️ Phone verification incomplete
-                  </p>
-                  <p>
-                    Your number is connected but verification is not complete.
-                    Messaging may be blocked.
-                  </p>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold">
+                        ⚠️ Phone verification incomplete
+                      </p>
+                      <p className="mt-1">
+                        Your number is connected but verification is not complete.
+                        Messaging may be blocked.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleReverify}
+                      disabled={reverifying}
+                      className="ml-4 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {reverifying ? <span className="animate-spin">⏳</span> : <span>🔄</span>}
+                      {reverifying ? "Re-verifying..." : "Re-verify"}
+                    </button>
+                  </div>
                 </div>
               );
             }
