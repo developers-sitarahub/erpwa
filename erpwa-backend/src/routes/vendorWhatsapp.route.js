@@ -634,4 +634,155 @@ router.post(
   }),
 );
 
+/**
+ * ===============================
+ * REQUEST VERIFICATION CODE
+ * ===============================
+ * Triggered by Meta Cloud API to send SMS/Voice code
+ */
+router.post(
+  "/whatsapp/register",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin"]),
+  asyncHandler(async (req, res) => {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+    });
+
+    if (!vendor || !vendor.whatsappAccessToken || !vendor.whatsappPhoneNumberId) {
+      return res.status(400).json({ message: "WhatsApp not fully configured" });
+    }
+
+    const { whatsappPhoneNumberId } = vendor;
+    const whatsappAccessToken = decrypt(vendor.whatsappAccessToken);
+
+    // Meta API: POST /<PHONE_NUMBER_ID>/request_code
+    const resp = await fetch(
+      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}/request_code`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${whatsappAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          code_method: "SMS",
+          language: "en_US",
+        }),
+      },
+    );
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      return res.status(400).json({
+        message: "Failed to request verification code",
+        metaError: data?.error || data,
+      });
+    }
+
+    res.json({ success: true, message: "Verification code requested via SMS" });
+  }),
+);
+
+/**
+ * ===============================
+ * VERIFY CODE & REGISTER
+ * ===============================
+ * Submits the code to Meta and then registers the number
+ */
+router.post(
+  "/whatsapp/verify",
+  authenticate,
+  requireRoles(["vendor_owner", "vendor_admin"]),
+  asyncHandler(async (req, res) => {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ message: "Verification code is required" });
+    }
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: req.user.vendorId },
+    });
+
+    if (!vendor || !vendor.whatsappAccessToken || !vendor.whatsappPhoneNumberId) {
+      return res.status(400).json({ message: "WhatsApp not fully configured" });
+    }
+
+    const { whatsappPhoneNumberId, whatsappBusinessId } = vendor;
+    const whatsappAccessToken = decrypt(vendor.whatsappAccessToken);
+
+    // 1️⃣ Verify the code: POST /<PHONE_NUMBER_ID>/verify
+    const verifyResp = await fetch(
+      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}/verify`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${whatsappAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          code,
+        }),
+      },
+    );
+
+    const verifyData = await verifyResp.json();
+
+    if (!verifyResp.ok) {
+      return res.status(400).json({
+        message: "Verification failed",
+        metaError: verifyData?.error || verifyData,
+      });
+    }
+
+    // 2️⃣ Register the number: POST /<PHONE_NUMBER_ID>/register
+    const registration = await registerPhoneNumber(
+      whatsappPhoneNumberId,
+      whatsappAccessToken
+    );
+
+    if (!registration.success) {
+      return res.status(400).json({
+        message: "Code verified but registration failed",
+        metaError: registration.error,
+      });
+    }
+
+    // 3️⃣ Refresh vendor status
+    const phoneDetailResp = await fetch(
+      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+      { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
+    );
+    const phoneDetailData = await phoneDetailResp.json();
+
+    const whatsappVerificationStatus =
+      phoneDetailData?.code_verification_status || "VERIFIED";
+    
+    const updatedVendor = await prisma.vendor.update({
+      where: { id: req.user.vendorId },
+      data: {
+        whatsappVerificationStatus,
+        whatsappStatus: "connected",
+        whatsappVerifiedAt: new Date(),
+      },
+      select: {
+        whatsappBusinessId: true,
+        whatsappPhoneNumberId: true,
+        whatsappStatus: true,
+        whatsappVerifiedAt: true,
+        whatsappLastError: true,
+        whatsappVerificationStatus: true,
+        whatsappQualityRating: true,
+        whatsappMessagingTier: true,
+        whatsappVerifiedName: true,
+        whatsappDisplayPhoneNumber: true,
+      },
+    });
+
+    res.json(updatedVendor);
+  }),
+);
+
 export default router;

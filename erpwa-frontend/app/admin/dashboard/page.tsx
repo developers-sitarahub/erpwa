@@ -11,6 +11,7 @@ import {
   CardDescription,
 } from "@/components/card";
 import { SubscriptionBanner } from "@/components/subscription-banner";
+import { WhatsAppAlert } from "@/components/whatsapp-alert";
 
 import {
   Users,
@@ -294,6 +295,9 @@ export default function AdminDashboard() {
             <SubscriptionBanner />
           </div>
         </motion.div>
+
+        {/* WhatsApp Verification Alert */}
+        <WhatsAppAlert />
 
         {/* KPI Cards */}
         <motion.div

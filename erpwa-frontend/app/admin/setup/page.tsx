@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/authContext";
 import { toast } from "react-toastify";
+import { motion } from "framer-motion";
+import { Smartphone, RefreshCcw } from "lucide-react";
 
 type WhatsAppStatus = "not_configured" | "connected" | "error";
 type SetupMethod = "embedded" | "manual";
@@ -56,6 +58,9 @@ export default function WhatsAppSetupPage() {
     whatsappBusinessId: string;
     whatsappPhoneNumberId: string;
   } | null>(null);
+
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
 
   /* ================= CONFIRM TOAST ================= */
 
@@ -260,14 +265,47 @@ export default function WhatsAppSetupPage() {
   async function handleReverify() {
     setReverifying(true);
     try {
+      // 1. Try a quick reverify (retries registration without code)
       const res = await api.post("/vendor/whatsapp/reverify");
       setConfig(res.data);
-      toast.success("Phone number re-verified successfully");
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      toast.error(error.response?.data?.message || "Failed to re-verify phone number");
+      
+      if (res.data.whatsappVerificationStatus === "VERIFIED") {
+        toast.success("WhatsApp connection verified successfully!");
+        setShowCodeInput(false);
+        setStatus("connected");
+      } else {
+        // 2. If still not verified, request a code
+        await api.post("/vendor/whatsapp/register");
+        setShowCodeInput(true);
+        toast.info("A verification code has been sent to your WhatsApp number.");
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Verification failed";
+      toast.error(msg);
     } finally {
       setReverifying(false);
+    }
+  }
+
+  const [verifying, setVerifying] = useState(false);
+
+  async function handleVerifyCode() {
+    if (!verificationCode || verificationCode.length !== 6) {
+      toast.error("Please enter a valid 6-digit code");
+      return;
+    }
+    setVerifying(true);
+    try {
+      const res = await api.post("/vendor/whatsapp/verify", { code: verificationCode });
+      setConfig(res.data);
+      setShowCodeInput(false);
+      setVerificationCode("");
+      toast.success("Phone number verified and registered successfully");
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error.response?.data?.message || "Verification failed. Please check the code.");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -423,24 +461,80 @@ export default function WhatsAppSetupPage() {
             ) {
               return (
                 <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-md p-4 text-sm space-y-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold">
-                        ⚠️ Phone verification incomplete
-                      </p>
-                      <p className="mt-1">
-                        Your number is connected but verification is not complete.
-                        Messaging may be blocked.
-                      </p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold">
+                          ⚠️ Phone verification incomplete
+                        </p>
+                        <p className="mt-1">
+                          Your number is connected but verification is not complete.
+                          Messaging may be blocked.
+                        </p>
+                      </div>
+                      {!showCodeInput && (
+                        <button
+                          onClick={handleReverify}
+                          disabled={reverifying}
+                          className="ml-4 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {reverifying ? (
+                            <span className="animate-spin text-[10px]">⏳</span>
+                          ) : (
+                            <span>🔄</span>
+                          )}
+                          {reverifying ? "Sending Code..." : "Send Verification Code"}
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={handleReverify}
-                      disabled={reverifying}
-                      className="ml-4 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {reverifying ? <span className="animate-spin">⏳</span> : <span>🔄</span>}
-                      {reverifying ? "Re-verifying..." : "Re-verify"}
-                    </button>
+
+                    {showCodeInput && (
+                      <div className="bg-background/50 p-4 rounded-lg border border-destructive/20 space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold uppercase tracking-wider opacity-70">
+                            Enter 6-Digit Code
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={verificationCode}
+                              onChange={(e) =>
+                                setVerificationCode(
+                                  e.target.value.replace(/\D/g, ""),
+                                )
+                              }
+                              placeholder="123456"
+                              className="flex-1 bg-background border border-border rounded-md px-3 py-2 text-sm font-mono tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                            />
+                            <button
+                              onClick={handleVerifyCode}
+                              disabled={verifying}
+                              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-bold transition disabled:opacity-50 flex items-center gap-2"
+                            >
+                              {verifying ? (
+                                <span className="animate-spin text-[10px]">
+                                  ⏳
+                                </span>
+                              ) : null}
+                              {verifying ? "Verifying..." : "Verify"}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <p className="text-[10px] opacity-70">
+                            Didn't receive the code? Wait a few minutes before
+                            retrying.
+                          </p>
+                          <button
+                            onClick={() => setShowCodeInput(false)}
+                            className="text-[10px] underline hover:no-underline"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -618,36 +712,68 @@ export default function WhatsAppSetupPage() {
 
       {/* ================= SETUP METHOD SELECTION ================= */}
       {(status !== "connected" || isEditing) && (
-        <div className="space-y-4">
-          {/* Setup Method Tabs */}
-          <div className="bg-card border border-border rounded-lg p-1 flex gap-1">
-            <button
+        <div className="space-y-8">
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-bold">Choose Setup Method</h2>
+            <p className="text-sm text-muted-foreground">Select how you want to connect your WhatsApp Business account</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Embedded Card */}
+            <motion.button
+              whileHover={{ y: -4, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setSetupMethod("embedded")}
-              className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-colors ${
+              className={`relative overflow-hidden flex flex-col p-6 rounded-2xl border-2 text-left transition-all ${
                 setupMethod === "embedded"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted"
+                  ? "border-primary bg-primary/5 ring-4 ring-primary/10"
+                  : "border-border bg-card hover:border-primary/50"
               }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <span>🚀</span>
-                <span>Embedded Signup</span>
-                <span className="text-xs opacity-75">(Recommended)</span>
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-xl ${setupMethod === "embedded" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+                  <Smartphone className="w-6 h-6" />
+                </div>
+                {setupMethod === "embedded" && (
+                  <div className="bg-primary text-white px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter">Selected</div>
+                )}
               </div>
-            </button>
-            <button
+              <h3 className="font-bold text-lg mb-1">Embedded Signup</h3>
+              <p className="text-sm text-muted-foreground mb-4">The easiest and fastest way. Connect directly through Meta's secure popup.</p>
+              <div className="mt-auto flex items-center gap-2 text-xs font-semibold text-primary">
+                <span>Recommended</span>
+                <span className="w-1 h-1 rounded-full bg-primary/30"></span>
+                <span>Fastest Setup</span>
+              </div>
+            </motion.button>
+
+            {/* Manual Card */}
+            <motion.button
+              whileHover={{ y: -4, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)" }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setSetupMethod("manual")}
-              className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-colors ${
+              className={`relative overflow-hidden flex flex-col p-6 rounded-2xl border-2 text-left transition-all ${
                 setupMethod === "manual"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted"
+                  ? "border-primary bg-primary/5 ring-4 ring-primary/10"
+                  : "border-border bg-card hover:border-primary/50"
               }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <span>⚙️</span>
-                <span>Manual Setup</span>
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-xl ${setupMethod === "manual" ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+                  <RefreshCcw className="w-6 h-6" />
+                </div>
+                {setupMethod === "manual" && (
+                  <div className="bg-primary text-white px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter">Selected</div>
+                )}
               </div>
-            </button>
+              <h3 className="font-bold text-lg mb-1">Manual Setup</h3>
+              <p className="text-sm text-muted-foreground mb-4">For advanced users. Manually enter Business IDs and Access Tokens.</p>
+              <div className="mt-auto flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                <span>Advanced</span>
+                <span className="w-1 h-1 rounded-full bg-muted-foreground/30"></span>
+                <span>Granular Control</span>
+              </div>
+            </motion.button>
           </div>
 
           {/* ================= EMBEDDED SIGNUP ================= */}
