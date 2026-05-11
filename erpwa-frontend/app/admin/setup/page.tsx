@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/authContext";
 import { toast } from "react-toastify";
 import { motion } from "framer-motion";
-import { Smartphone, RefreshCcw, AlertCircle } from "lucide-react";
+import { Smartphone, RefreshCcw } from "lucide-react";
 
 type WhatsAppStatus = "not_configured" | "connected" | "error";
 type SetupMethod = "embedded" | "manual";
