@@ -555,9 +555,9 @@ router.post(
     if (!registration.success) {
       const errCode = registration.error?.error?.code;
       const isTokenExpired = errCode === 190 || errCode === 463;
-      
+
       return res.status(400).json({
-        message: isTokenExpired 
+        message: isTokenExpired
           ? "Your Meta access token has expired. Please click 'Reconfigure Connection' below to re-authenticate."
           : "Phone number registration failed",
         metaError: registration.error,
@@ -759,7 +759,7 @@ router.post(
 
     const whatsappVerificationStatus =
       phoneDetailData?.code_verification_status || "VERIFIED";
-    
+
     const updatedVendor = await prisma.vendor.update({
       where: { id: req.user.vendorId },
       data: {
