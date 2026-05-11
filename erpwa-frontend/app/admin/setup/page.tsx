@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/authContext";
 import { toast } from "react-toastify";
 import { motion } from "framer-motion";
-import { Smartphone, RefreshCcw } from "lucide-react";
+import { Smartphone, RefreshCcw, AlertCircle } from "lucide-react";
 
 type WhatsAppStatus = "not_configured" | "connected" | "error";
 type SetupMethod = "embedded" | "manual";
@@ -172,27 +172,34 @@ export default function WhatsAppSetupPage() {
 
     async function loadStatus() {
       try {
-        const res = await api.get("/vendor/whatsapp");
+        // 🛡️ Always try to sync with Meta on page load for the most accurate status
+        const res = await api.post("/vendor/whatsapp/refresh-status");
         setStatus(res.data.whatsappStatus);
         setError(res.data.whatsappLastError);
         setConfig(res.data);
-        if (
-          user?.vendor &&
-          user.vendor.whatsappStatus !== res.data.whatsappStatus
-        ) {
+        
+        if (user?.vendor && user.vendor.whatsappStatus !== res.data.whatsappStatus) {
           updateUser({
             vendor: { ...user.vendor, whatsappStatus: res.data.whatsappStatus },
           });
         }
-      } catch {
-        setStatus("not_configured");
+      } catch (err: any) {
+        // Fallback to GET if POST fails (e.g. not configured yet)
+        try {
+          const res = await api.get("/vendor/whatsapp");
+          setStatus(res.data.whatsappStatus);
+          setError(res.data.whatsappLastError);
+          setConfig(res.data);
+        } catch {
+          setStatus("not_configured");
+        }
       } finally {
         setPageLoading(false);
       }
     }
 
     loadStatus();
-  }, [user]);
+  }, [user, updateUser]);
 
   /* ================= PREFILL FORM ON EDIT ================= */
   useEffect(() => {
@@ -450,38 +457,72 @@ export default function WhatsAppSetupPage() {
         )}
       </div>
 
-      {/* ================= CONNECTED VIEW ================= */}
-      {status === "connected" && !isEditing && (
+      {/* ================= CONNECTED/ERROR VIEW ================= */}
+      {((status === "connected" || status === "error") &&
+        !isEditing &&
+        config.whatsappPhoneNumberId) && (
         <div className="space-y-6">
           {/* Main Alerts */}
           {(() => {
+            if (status === "error") {
+               return (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-xl p-6 space-y-4 shadow-sm relative overflow-hidden">
+                   <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                      <AlertCircle className="w-16 h-16" />
+                   </div>
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                      <div className="space-y-1">
+                        <p className="font-bold text-lg">Connection Issue Detected</p>
+                        <p className="text-sm opacity-90">
+                           Meta reported an issue with your connection: <span className="font-mono bg-destructive/10 px-1 rounded">{error || "Unknown error"}</span>
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleReverify}
+                        disabled={reverifying}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-6 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-lg active:scale-95 disabled:opacity-50"
+                      >
+                        {reverifying ? (
+                          <RefreshCcw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <span>🔄</span>
+                        )}
+                        {reverifying ? "Retrying..." : "Retry Registration"}
+                      </button>
+                   </div>
+                </div>
+               );
+            }
+
             if (
               config.whatsappVerificationStatus &&
               config.whatsappVerificationStatus !== "VERIFIED"
             ) {
               return (
-                <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-md p-4 text-sm space-y-1">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-semibold">
-                          ⚠️ Phone verification incomplete
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl p-6 space-y-4 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                      <Smartphone className="w-16 h-16" />
+                  </div>
+                  <div className="flex flex-col gap-4 relative z-10">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="font-bold text-lg">
+                          Verification Incomplete
                         </p>
-                        <p className="mt-1">
-                          Your number is connected but verification is not complete.
-                          Messaging may be blocked.
+                        <p className="text-sm opacity-90">
+                          Your number is connected but not yet verified with Meta. You must verify it to start messaging.
                         </p>
                       </div>
                       {!showCodeInput && (
                         <button
                           onClick={handleReverify}
                           disabled={reverifying}
-                          className="ml-4 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-2 disabled:opacity-50"
+                          className="bg-amber-600 text-white hover:bg-amber-700 px-6 py-2.5 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-lg active:scale-95 disabled:opacity-50"
                         >
                           {reverifying ? (
-                            <span className="animate-spin text-[10px]">⏳</span>
+                            <RefreshCcw className="w-4 h-4 animate-spin" />
                           ) : (
-                            <span>🔄</span>
+                            <span>🔑</span>
                           )}
                           {reverifying ? "Sending Code..." : "Send Verification Code"}
                         </button>
@@ -489,12 +530,16 @@ export default function WhatsAppSetupPage() {
                     </div>
 
                     {showCodeInput && (
-                      <div className="bg-background/50 p-4 rounded-lg border border-destructive/20 space-y-3">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold uppercase tracking-wider opacity-70">
-                            Enter 6-Digit Code
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-background/80 backdrop-blur-sm p-6 rounded-2xl border border-amber-500/30 space-y-4 shadow-xl"
+                      >
+                        <div className="space-y-2">
+                          <label className="text-xs font-black uppercase tracking-widest opacity-60">
+                            Enter 6-Digit SMS/Voice Code
                           </label>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-3">
                             <input
                               type="text"
                               maxLength={6}
@@ -504,36 +549,33 @@ export default function WhatsAppSetupPage() {
                                   e.target.value.replace(/\D/g, ""),
                                 )
                               }
-                              placeholder="123456"
-                              className="flex-1 bg-background border border-border rounded-md px-3 py-2 text-sm font-mono tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                              placeholder="123 456"
+                              className="flex-1 bg-background border-2 border-border rounded-xl px-4 py-3 text-lg font-mono tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-primary text-foreground transition-all"
                             />
                             <button
                               onClick={handleVerifyCode}
                               disabled={verifying}
-                              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-bold transition disabled:opacity-50 flex items-center gap-2"
+                              className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                             >
                               {verifying ? (
-                                <span className="animate-spin text-[10px]">
-                                  ⏳
-                                </span>
+                                <RefreshCcw className="w-4 h-4 animate-spin" />
                               ) : null}
-                              {verifying ? "Verifying..." : "Verify"}
+                              {verifying ? "Verifying..." : "Confirm Code"}
                             </button>
                           </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <p className="text-[10px] opacity-70">
-                            Didn't receive the code? Wait a few minutes before
-                            retrying.
+                        <div className="flex justify-between items-center text-[10px] font-medium opacity-60">
+                          <p>
+                            Didn't receive the code? Wait 2 minutes before retrying.
                           </p>
                           <button
                             onClick={() => setShowCodeInput(false)}
-                            className="text-[10px] underline hover:no-underline"
+                            className="underline hover:text-primary"
                           >
                             Cancel
                           </button>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
                   </div>
                 </div>
