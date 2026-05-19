@@ -21,6 +21,7 @@ import {
   updateVendorPlan,
   getPayments,
   getInvoice,
+  getRazorpayLogs,
 } from "../controllers/superAdmin.controller.js";
 import { superAdminAuth } from "../middleware/superAdminAuth.middleware.js";
 
@@ -41,6 +42,7 @@ router.put("/vendors/:id/plan", superAdminAuth, updateVendorPlan);
 router.get("/stats", superAdminAuth, getStats);
 router.get("/payments", superAdminAuth, getPayments);
 router.get("/invoice/:paymentId", superAdminAuth, getInvoice);
+router.get("/razorpay-logs", superAdminAuth, getRazorpayLogs);
 
 /* ---- Profile ---- */
 router.put("/profile", superAdminAuth, updateSuperAdminProfile);

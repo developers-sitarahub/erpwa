@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Zap,
   CreditCard,
+  Activity,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const topMenuItems: NavItem[] = [
   { href: "/admin-super/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/admin-super/plans", icon: Zap, label: "Plans" },
   { href: "/admin-super/transactions", icon: CreditCard, label: "Transactions" },
+  { href: "/admin-super/razorpay-logs", icon: Activity, label: "Razorpay Logs" },
 ];
 
 const bottomMenuItems: NavItem[] = [

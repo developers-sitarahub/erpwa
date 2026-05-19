@@ -44,7 +44,13 @@ import contactRoutes from "./routes/contact.routes.js";
 const app = express();
 app.set("trust proxy", 1);
 /* ================= MIDDLEWARE ================= */
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 app.use(cookieParser());
 
 const allowedOrigins = process.env.FRONTEND_URL

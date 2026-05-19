@@ -3,33 +3,41 @@ import prisma from "../src/prisma.js";
 import { hashPassword } from "../src/utils/password.js";
 
 async function main() {
-  const passwordHash = await hashPassword("Eqweasd@123");
+  const passwordHash = await hashPassword("Password@123");
 
-  const unlimitedPlan = await prisma.subscriptionPlan.findFirst({
-    where: { name: "Unlimited" }
+  // 1️⃣ Create Vendor FIRST
+  const vendor = await prisma.vendor.create({
+    data: {
+      name: "GPSERP Support",
+      subscriptionStart: new Date(),
+      subscriptionEnd: new Date("2099-12-31T23:59:59.999Z"), // Unlimited access
+    },
   });
 
-  if (!unlimitedPlan) {
-    throw new Error("Unlimited plan not found in database. Run initPlans.js first.");
-  }
+  console.log("✅ Vendor created:", vendor.id);
 
-  const entities = [
+  // 2️⃣ Create users linked to vendor
+  const users = [
+    // {
+    //   email: "sohamsawalakhe@gmail.com",
+    //   name: "Soham Sawalakhe",
+    //   role: "vendor_admin",
+    // },
     {
-      vendorName: "GPSERP Support",
-      user: {
-        email: "support@gpserp.com",
-        name: "GPSERP Support",
-        role: "vendor_owner",
-      }
+      email: "gauravrai3133@gmail.com",
+      name: "Gaurav Rai",
+      role: "vendor_owner",
     },
-    {
-      vendorName: "GPSERP Marketing",
-      user: {
-        email: "admin@gpserp.com",
-        name: "GPSERP Marketing",
-        role: "vendor_owner",
-      }
-    }
+    // {
+    //   email: "pradhanpratik219@gmail.com",
+    //   name: "Pratik Pradhan",
+    //   role: "vendor_admin",
+    // },
+    // {
+    //   email: "support@gpserp.com",
+    //   name: "GPSERP Support",
+    //   role: "vendor_owner",
+    // },
   ];
 
   for (const entity of entities) {

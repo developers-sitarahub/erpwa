@@ -903,3 +903,35 @@ export async function getInvoice(req, res) {
     return res.status(500).json({ message: "Failed to fetch invoice" });
   }
 }
+
+/* ============================================================
+ * GET /api/super-admin/razorpay-logs
+ * Returns all Razorpay webhook events logged in ActivityLog
+ * ============================================================ */
+export async function getRazorpayLogs(req, res) {
+  try {
+    const logs = await prisma.activityLog.findMany({
+      where: {
+        type: "Razorpay",
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      // Limit to last 500 to prevent massive payload, or implement pagination
+      take: 500,
+    });
+
+    return res.json(logs);
+  } catch (err) {
+    console.error("getRazorpayLogs error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
