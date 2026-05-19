@@ -454,4 +454,83 @@ router.post(
   }),
 );
 
+/**
+ * ===============================
+ * DELETE A MESSAGE COMPLETELY (DELETE FOR ME)
+ * ===============================
+ * Removes the message from the database completely without leaving a trace
+ */
+router.delete(
+  "/messages/:messageId",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { messageId } = req.params;
+    const vendorId = req.user.vendorId;
+
+    // Find the message and verify ownership
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      select: { id: true, whatsappMessageId: true, vendorId: true, conversationId: true },
+    });
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    if (message.vendorId !== vendorId) {
+      return res.status(403).json({ message: "Unauthorized to delete this message" });
+    }
+
+    // Role-based filtering: Sales persons can only access assigned leads
+    if (req.user.role === "sales") {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: message.conversationId },
+        include: { lead: true },
+      });
+      if (conversation?.lead?.salesPersonId && conversation.lead.salesPersonId !== req.user.id) {
+        return res.status(403).json({ message: "Unauthorized to delete this message" });
+      }
+    }
+
+    // Hard delete the message completely
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete associated ActivityLogs if any exist
+      const messageIdFilters = [message.id];
+      if (message.whatsappMessageId) {
+        messageIdFilters.push(message.whatsappMessageId);
+      }
+
+      await tx.activityLog.deleteMany({
+        where: {
+          messageId: { in: messageIdFilters },
+        },
+      });
+
+      // 2. Delete the message itself (MessageMedia & MessageDelivery cascade deletes)
+      await tx.message.delete({
+        where: { id: messageId },
+      });
+    });
+
+    // Emit socket event to notify clients that a message was deleted in real time
+    try {
+      const io = getIO();
+      io.to(`conversation:${message.conversationId}`).emit("message:deleted", {
+        messageId,
+        conversationId: message.conversationId,
+      });
+
+      // Also update the inbox list preview
+      io.to(`vendor:${vendorId}`).emit("inbox:update", {
+        conversationId: message.conversationId,
+      });
+    } catch (err) {
+      console.error("Socket error emitting message:deleted:", err);
+    }
+
+    res.json({ success: true, message: "Message deleted completely" });
+  })
+);
+
 export default router;
+

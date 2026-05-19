@@ -13,6 +13,7 @@ interface Props {
     onClose: () => void;
     onReply: (message: Message) => void;
     onCopy: (message: Message) => void;
+    onDelete?: (message: Message) => void;
 }
 
 export default function ActionMenu({
@@ -20,6 +21,7 @@ export default function ActionMenu({
     onClose,
     onReply,
     onCopy,
+    onDelete,
 }: Props) {
     if (!actionMenu) return null;
 
@@ -73,7 +75,14 @@ export default function ActionMenu({
                         }}
                     />
 
-                    <ActionButton label="Delete" destructive />
+                    <ActionButton
+                        label="Delete for me"
+                        destructive
+                        onClick={() => {
+                            if (onDelete) onDelete(message);
+                            onClose();
+                        }}
+                    />
                 </motion.div>
             </>
         </AnimatePresence>

@@ -637,6 +637,17 @@ function ChatArea({
     };
   };
 
+  const handleDeleteMessage = async (message: Message) => {
+    try {
+      await api.delete(`/inbox/messages/${message.id}`);
+      setMessages((prev) => prev.filter((m) => m.id !== message.id));
+      toast.success("Message deleted completely");
+    } catch (err) {
+      console.error("Failed to delete message", err);
+      toast.error("Failed to delete message");
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col relative h-full overflow-hidden">
       <ChatHeader
@@ -769,6 +780,7 @@ function ChatArea({
             setTimeout(() => setCopied(false), 1200);
           }
         }}
+        onDelete={handleDeleteMessage}
       />
 
       {copied && (

@@ -88,13 +88,22 @@ export function useChatSocket({
       });
     };
 
+    /* =========================
+       DELETED MESSAGE HANDLER
+    ========================== */
+    const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    };
+
     socket.on("message:new", handleNewMessage);
     socket.on("message:status", handleStatusUpdate);
+    socket.on("message:deleted", handleMessageDeleted);
 
     return () => {
       socket.emit("leave-conversation", conversationId);
       socket.off("message:new", handleNewMessage);
       socket.off("message:status", handleStatusUpdate);
+      socket.off("message:deleted", handleMessageDeleted);
     };
   }, [
     conversationId,
