@@ -136,12 +136,21 @@ router.post(
 
       const to = String(rawTo).replace(/\D/g, ""); // Remove non-digits
 
+      const existingLead = await prisma.lead.findFirst({
+        where: { vendorId: vendor.id, phoneNumber: to },
+      });
+
+      if (existingLead && existingLead.blockedAt) {
+        results.push({
+          to,
+          success: false,
+          error: "This contact is blocked. Unblock them first to send messages.",
+        });
+        continue;
+      }
+
       /** 🛡️ ROLE-BASED CHECK */
       if (req.user.role === "sales") {
-        const existingLead = await prisma.lead.findFirst({
-          where: { vendorId: vendor.id, phoneNumber: to },
-        });
-
         if (
           existingLead &&
           existingLead.salesPersonName &&

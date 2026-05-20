@@ -57,6 +57,7 @@ router.get(
             phoneNumber: true,
             companyName: true,
             status: true,
+            blockedAt: true,
           },
         },
         messages: {
@@ -138,6 +139,7 @@ router.get(
             companyName: true,
             salesPersonId: true, // ✅ Ensure we select this for checking
             status: true,
+            blockedAt: true,
           },
         },
         messages: {
@@ -529,6 +531,256 @@ router.delete(
     }
 
     res.json({ success: true, message: "Message deleted completely" });
+  })
+);
+
+/**
+ * ===============================
+ * GET BLOCKED USERS
+ * ===============================
+ * Retrieves the list of blocked WhatsApp users for the vendor
+ */
+router.get(
+  "/blocked",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const vendorId = req.user.vendorId;
+
+    // Fetch vendor details
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { whatsappAccessToken: true, whatsappPhoneNumberId: true },
+    });
+
+    if (!vendor || !vendor.whatsappAccessToken || !vendor.whatsappPhoneNumberId) {
+      return res.status(400).json({ message: "WhatsApp not configured for this vendor" });
+    }
+
+    const accessToken = decrypt(vendor.whatsappAccessToken);
+    const phoneId = vendor.whatsappPhoneNumberId;
+
+    // Call Meta Graph API
+    const limit = req.query.limit || 100;
+    const after = req.query.after || "";
+    let url = `https://graph.facebook.com/v24.0/${phoneId}/block_users?limit=${limit}`;
+    if (after) {
+      url += `&after=${after}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok) {
+      console.error("Meta Get Blocked Users API failed:", resData);
+      return res.status(response.status).json({
+        message: "Failed to retrieve blocked users list from WhatsApp",
+        error: resData,
+      });
+    }
+
+    return res.json(resData);
+  })
+);
+
+/**
+ * ===============================
+ * BLOCK A USER
+ * ===============================
+ * Blocks a user on Meta and updates their Lead status locally
+ */
+router.post(
+  "/conversations/:conversationId/block",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { conversationId } = req.params;
+    const vendorId = req.user.vendorId;
+
+    // 1. Fetch conversation with lead and vendor details
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, vendorId },
+      include: {
+        lead: true,
+        vendor: true,
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    if (!conversation.vendor.whatsappAccessToken || !conversation.vendor.whatsappPhoneNumberId) {
+      return res.status(400).json({ message: "WhatsApp not configured for this vendor" });
+    }
+
+    const userPhoneNumber = conversation.lead.phoneNumber;
+    const accessToken = decrypt(conversation.vendor.whatsappAccessToken);
+    const phoneId = conversation.vendor.whatsappPhoneNumberId;
+
+    // 2. Call Meta Graph API to block the user
+    const url = `https://graph.facebook.com/v24.0/${phoneId}/block_users`;
+    const payload = {
+      messaging_product: "whatsapp",
+      block_users: [
+        {
+          user: userPhoneNumber,
+        },
+      ],
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok) {
+      console.error("Meta Block Users API failed:", resData);
+      return res.status(response.status).json({
+        message: "Failed to block user on WhatsApp",
+        error: resData,
+      });
+    }
+
+    // Check if there are failed users in the response
+    const failed = resData.block_users?.failed_users || [];
+    if (failed.length > 0) {
+      return res.status(400).json({
+        message: failed[0].errors?.[0]?.message || "Failed to block user",
+        errors: failed[0].errors,
+      });
+    }
+
+    // 3. Update the Lead status in DB (blockedAt)
+    const updatedLead = await prisma.lead.update({
+      where: { id: conversation.lead.id },
+      data: { blockedAt: new Date() },
+    });
+
+    // 4. Send real-time socket events
+    try {
+      const io = getIO();
+      io.to(`conversation:${conversationId}`).emit("conversation:blocked_status", {
+        conversationId,
+        isBlocked: true,
+        blockedAt: updatedLead.blockedAt,
+      });
+      io.to(`vendor:${vendorId}`).emit("inbox:update", {
+        conversationId,
+      });
+    } catch (err) {
+      console.error("Socket emit failed:", err);
+    }
+
+    return res.json({ success: true, message: "User blocked successfully", data: resData });
+  })
+);
+
+/**
+ * ===============================
+ * UNBLOCK A USER
+ * ===============================
+ * Unblocks a user on Meta and updates their Lead status locally
+ */
+router.post(
+  "/conversations/:conversationId/unblock",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { conversationId } = req.params;
+    const vendorId = req.user.vendorId;
+
+    // 1. Fetch conversation with lead and vendor details
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, vendorId },
+      include: {
+        lead: true,
+        vendor: true,
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    if (!conversation.vendor.whatsappAccessToken || !conversation.vendor.whatsappPhoneNumberId) {
+      return res.status(400).json({ message: "WhatsApp not configured for this vendor" });
+    }
+
+    const userPhoneNumber = conversation.lead.phoneNumber;
+    const accessToken = decrypt(conversation.vendor.whatsappAccessToken);
+    const phoneId = conversation.vendor.whatsappPhoneNumberId;
+
+    // 2. Call Meta Graph API to unblock the user using DELETE
+    const url = `https://graph.facebook.com/v24.0/${phoneId}/block_users`;
+    const payload = {
+      messaging_product: "whatsapp",
+      block_users: [
+        {
+          user: userPhoneNumber,
+        },
+      ],
+    };
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok) {
+      console.error("Meta Unblock Users API failed:", resData);
+      return res.status(response.status).json({
+        message: "Failed to unblock user on WhatsApp",
+        error: resData,
+      });
+    }
+
+    // Check if there are failed users in the response
+    const failed = resData.block_users?.failed_users || [];
+    if (failed.length > 0) {
+      return res.status(400).json({
+        message: failed[0].errors?.[0]?.message || "Failed to unblock user",
+        errors: failed[0].errors,
+      });
+    }
+
+    // 3. Update the Lead status in DB (blockedAt = null)
+    await prisma.lead.update({
+      where: { id: conversation.lead.id },
+      data: { blockedAt: null },
+    });
+
+    // 4. Send real-time socket events
+    try {
+      const io = getIO();
+      io.to(`conversation:${conversationId}`).emit("conversation:blocked_status", {
+        conversationId,
+        isBlocked: false,
+        blockedAt: null,
+      });
+      io.to(`vendor:${vendorId}`).emit("inbox:update", {
+        conversationId,
+      });
+    } catch (err) {
+      console.error("Socket emit failed:", err);
+    }
+
+    return res.json({ success: true, message: "User unblocked successfully", data: resData });
   })
 );
 

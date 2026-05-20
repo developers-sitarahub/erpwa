@@ -29,6 +29,14 @@ export default function ChatFooter({
   onSendTemplate,
   isSessionActive,
 }: Props) {
+  if (conversation.isBlocked) {
+    return (
+      <div className="relative z-10 flex-shrink-0 bg-muted/30 border-t border-border px-4 py-4 text-center text-xs sm:text-sm text-muted-foreground font-medium flex items-center justify-center gap-2 select-none">
+        <span>This contact is blocked. Unblock them to resume conversation.</span>
+      </div>
+    );
+  }
+
   return (
     <div className="relative z-10 flex-shrink-0 bg-card border-t border-border">
       {/* REPLY PREVIEW */}

@@ -99,6 +99,7 @@ export interface Conversation {
   sessionActive?: boolean; // ✅ ADD
   sessionExpiresAt?: string | null;
   templateRequired?: boolean;
+  isBlocked?: boolean;
 }
 
 export interface Message {

@@ -21,6 +21,7 @@ interface UseChatSocketParams {
     status: Message["status"],
   ) => void;
   onCustomerMessage?: () => void;
+  onBlockedStatusChange?: (isBlocked: boolean) => void;
 }
 
 export function useChatSocket({
@@ -28,6 +29,7 @@ export function useChatSocket({
   setMessages,
   onUpdateConversationStatus,
   onCustomerMessage,
+  onBlockedStatusChange,
 }: UseChatSocketParams) {
   useEffect(() => {
     if (!conversationId) return;
@@ -95,20 +97,30 @@ export function useChatSocket({
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
     };
 
+    /* =========================
+       BLOCKED STATUS HANDLER
+    ========================== */
+    const handleBlockedStatus = ({ isBlocked }: { isBlocked: boolean }) => {
+      onBlockedStatusChange?.(isBlocked);
+    };
+
     socket.on("message:new", handleNewMessage);
     socket.on("message:status", handleStatusUpdate);
     socket.on("message:deleted", handleMessageDeleted);
+    socket.on("conversation:blocked_status", handleBlockedStatus);
 
     return () => {
       socket.emit("leave-conversation", conversationId);
       socket.off("message:new", handleNewMessage);
       socket.off("message:status", handleStatusUpdate);
       socket.off("message:deleted", handleMessageDeleted);
+      socket.off("conversation:blocked_status", handleBlockedStatus);
     };
   }, [
     conversationId,
     setMessages,
     onUpdateConversationStatus,
     onCustomerMessage,
+    onBlockedStatusChange,
   ]);
 }

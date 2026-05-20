@@ -45,6 +45,7 @@ interface ApiConversation {
     companyName: string | null;
     phoneNumber: string;
     status?: "new" | "contacted" | "qualified" | "converted" | "lost";
+    blockedAt?: string | null;
   };
   messages: {
     content: string;
@@ -115,6 +116,8 @@ function ChatArea({
   onUpdateConversationStatus,
   onMarkAsRead,
   onUpdateLeadStatus,
+  onToggleBlock,
+  onBlockedStatusChange,
 }: {
   conversation: Conversation;
   messages: Message[];
@@ -127,6 +130,8 @@ function ChatArea({
   ) => void;
   onMarkAsRead?: (conversationId: string) => void;
   onUpdateLeadStatus?: (leadId: number, status: string) => Promise<void>;
+  onToggleBlock?: (conversationId: string, isBlocked: boolean) => Promise<void>;
+  onBlockedStatusChange?: (isBlocked: boolean) => void;
 }) {
   const [inputValue, setInputValue] = useState("");
   const [sending, setSending] = useState(false);
@@ -223,6 +228,7 @@ function ChatArea({
         readSentRef.current.delete(conversation.id);
       }
     },
+    onBlockedStatusChange,
   });
 
   useReadReceipts({
@@ -634,6 +640,7 @@ function ChatArea({
         conversation={conversation}
         onBack={onBack}
         onUpdateLeadStatus={onUpdateLeadStatus}
+        onToggleBlock={() => onToggleBlock?.(conversation.id, !!conversation.isBlocked)}
       />
 
       <SessionBanner
@@ -901,6 +908,7 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
     sessionActive: c.sessionActive ?? true,
     sessionExpiresAt: c.sessionExpiresAt ?? null,
     templateRequired: c.sessionActive === false,
+    isBlocked: !!c.lead.blockedAt,
   };
 };
 
@@ -1019,6 +1027,7 @@ export default function InboxPage() {
                 sessionActive: res.data.sessionActive,
                 sessionExpiresAt: res.data.sessionExpiresAt,
                 status: res.data.lead?.status || c.status || "new",
+                isBlocked: !!res.data.lead?.blockedAt,
               }
             : c,
         ),
@@ -1078,6 +1087,24 @@ export default function InboxPage() {
     }
   };
 
+  const handleToggleBlock = async (conversationId: string, isBlocked: boolean) => {
+    try {
+      const endpoint = `/inbox/conversations/${conversationId}/${isBlocked ? "unblock" : "block"}`;
+      await api.post(endpoint);
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId ? { ...c, isBlocked: !isBlocked } : c
+        )
+      );
+
+      toast.success(`Contact ${isBlocked ? "unblocked" : "blocked"} successfully`);
+    } catch (err: any) {
+      console.error("Failed to toggle block", err);
+      toast.error(err?.response?.data?.message || "Failed to toggle block");
+    }
+  };
+
   useEffect(() => {
     loadInbox();
     if (chatId) {
@@ -1117,6 +1144,14 @@ export default function InboxPage() {
             onUpdateConversationStatus={handleUpdateConversationStatus}
             onMarkAsRead={handleMarkAsRead}
             onUpdateLeadStatus={handleUpdateLeadStatus}
+            onToggleBlock={handleToggleBlock}
+            onBlockedStatusChange={(isBlocked) => {
+              setConversations((prev) =>
+                prev.map((c) =>
+                  c.id === currentConversation.id ? { ...c, isBlocked } : c
+                )
+              );
+            }}
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-muted/10">

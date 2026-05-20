@@ -91,6 +91,12 @@ router.post(
       });
     }
 
+    if (conversation.lead.blockedAt) {
+      return res.status(400).json({
+        message: "This contact is blocked. Unblock them first to send messages.",
+      });
+    }
+
     /* ===============================
        3️⃣ Check 24h WhatsApp window
     =============================== */
@@ -296,6 +302,12 @@ router.post(
     ) {
       return res.status(400).json({
         message: "24-hour window expired. Use template message.",
+      });
+    }
+
+    if (conversation.lead.blockedAt) {
+      return res.status(400).json({
+        message: "This contact is blocked. Unblock them first to send messages.",
       });
     }
 
