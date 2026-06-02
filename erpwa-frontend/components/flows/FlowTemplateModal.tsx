@@ -37,7 +37,7 @@ interface Props {
     flows: Flow[];
 }
 
-const formatError = (error: {response?: {data?: {details?: {error_user_msg?: string; error_user_title?: string; message?: string}; message?: string}}}, defaultMsg: string) => {
+const formatError = (error: {response?: {data?: {details?: {error_user_msg?: string; error_user_title?: string; message?: string; error_subcode?: number}; message?: string}}}, defaultMsg: string) => {
     const errorData = error.response?.data;
     let msg = errorData?.details?.error_user_msg || errorData?.details?.message || errorData?.message || defaultMsg;
     const title = errorData?.details?.error_user_title;
@@ -45,6 +45,8 @@ const formatError = (error: {response?: {data?: {details?: {error_user_msg?: str
         msg = "Too many variables for the text length.";
     } else if (msg.includes("more than two consecutive newline characters")) {
         msg = "Invalid body: Check newlines, parameters, or emojis.";
+    } else if (errorData?.details?.error_subcode === 2388023 || msg.includes("content is being deleted") || msg.includes("language is being deleted")) {
+        msg = "This template name is locked by Meta due to deletion of a language. Please create a new template with a different name (e.g. add a suffix like '_v2') to submit immediately, or wait 4 weeks.";
     }
     return title ? `${title}: ${msg}` : msg;
 };

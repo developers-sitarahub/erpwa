@@ -61,6 +61,8 @@ const formatError = (error: any, defaultMsg: string) => {
     msg = "Too many variables for the text length.";
   } else if (msg.includes("more than two consecutive newline characters")) {
     msg = "Invalid body: Check newlines, parameters, or emojis.";
+  } else if (errorData?.details?.error_subcode === 2388023 || msg.includes("content is being deleted") || msg.includes("language is being deleted")) {
+    msg = "This template name is locked by Meta due to deletion of a language. Please create a new template with a different name (e.g. add a suffix like '_v2') to submit immediately, or wait 4 weeks.";
   }
 
   return title ? `${title}: ${msg}` : msg;

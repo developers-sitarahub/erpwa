@@ -554,8 +554,14 @@ export const publishFlow = async (req, res) => {
     // This ensures ngrok changes are automatically synced to Meta during publish
     if (process.env.META_OAUTH_REDIRECT_URI) {
       try {
-        const baseUrl = new URL(process.env.META_OAUTH_REDIRECT_URI).origin;
-        const detectedUri = `${baseUrl}/api/whatsapp/flows/endpoint`;
+        const flowsPath = process.env.META_FLOWS_ENDPOINT_PATH || "/api/whatsapp/flows/endpoint";
+        let detectedUri;
+        if (flowsPath.startsWith("http://") || flowsPath.startsWith("https://")) {
+          detectedUri = flowsPath;
+        } else {
+          const baseUrl = new URL(process.env.META_OAUTH_REDIRECT_URI).origin;
+          detectedUri = `${baseUrl}${flowsPath}`;
+        }
 
         // If the detected URI is different from what's in DB, or DB is empty, use the detected one
         if (detectedUri !== finalEndpointUri) {

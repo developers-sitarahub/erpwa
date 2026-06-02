@@ -67,9 +67,9 @@ export default function ConversationList({
     const hasConversation = conversations.some(
       (c) =>
         c.phone?.replace(/\D/g, "") ===
-          lead.mobile_number?.replace(/\D/g, "") ||
+        lead.mobile_number?.replace(/\D/g, "") ||
         c.phone?.replace(/\D/g, "") ===
-          (lead as any).phoneNumber?.replace(/\D/g, ""),
+        (lead as any).phoneNumber?.replace(/\D/g, ""),
     );
     if (hasConversation) return false;
 
@@ -142,7 +142,7 @@ export default function ConversationList({
         const result = await createWhatsAppConversation(
           whatsappCheckResult.phoneNumber,
           whatsappCheckResult.lead?.companyName ||
-            whatsappCheckResult.phoneNumber,
+          whatsappCheckResult.phoneNumber,
         );
 
         // Reload conversations list to include the new one
@@ -289,9 +289,8 @@ export default function ConversationList({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.03 }}
               onClick={() => onSelect(conv.id)}
-              className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${
-                selected === conv.id ? "bg-muted" : ""
-              }`}
+              className={`w-full px-4 py-3 border-b border-border/50 text-left transition-colors hover:bg-muted/50 ${selected === conv.id ? "bg-muted" : ""
+                }`}
             >
               <div className="flex items-start gap-3">
                 <div className="relative flex-shrink-0">
@@ -318,11 +317,10 @@ export default function ConversationList({
                       )}
 
                       <p
-                        className={`text-sm truncate ${
-                          conv.hasUnread
+                        className={`text-sm truncate ${conv.hasUnread
                             ? "text-foreground"
                             : "text-muted-foreground"
-                        }`}
+                          }`}
                       >
                         {conv.lastMessage}
                       </p>
@@ -372,9 +370,9 @@ export default function ConversationList({
                         !conversations.some(
                           (c) =>
                             c.phone?.replace(/\D/g, "") ===
-                              l.mobile_number?.replace(/\D/g, "") ||
+                            l.mobile_number?.replace(/\D/g, "") ||
                             c.phone?.replace(/\D/g, "") ===
-                              (l as any).phoneNumber?.replace(/\D/g, ""),
+                            (l as any).phoneNumber?.replace(/\D/g, ""),
                         ),
                     ).length
                   }

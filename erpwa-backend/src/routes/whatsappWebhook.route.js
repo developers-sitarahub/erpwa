@@ -201,6 +201,10 @@ router.post("/", async (req, res) => {
           continue;
         }
 
+        // Extract WhatsApp profile name
+        const contactObj = value.contacts?.find((c) => c.wa_id === from);
+        const profileName = contactObj?.profile?.name || null;
+
         // 🔹 Find or create lead
         const lead = await prisma.lead.upsert({
           where: {
@@ -209,13 +213,17 @@ router.post("/", async (req, res) => {
               phoneNumber: from,
             },
           },
-          update: { lastContactedAt: inboundAt },
+          update: { 
+            lastContactedAt: inboundAt,
+            ...(profileName ? { whatsappName: profileName } : {}),
+          },
           create: {
             vendorId: vendor.id,
             phoneNumber: from,
             whatsappOptIn: true,
             optInSource: "inbound",
             optInAt: inboundAt,
+            whatsappName: profileName,
           },
         });
 

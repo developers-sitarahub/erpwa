@@ -161,6 +161,7 @@ model Lead {
 
   city            String?
   companyName     String?
+  whatsappName    String?
   email           String?
   salesPersonId   String?
   salesPersonName String?
@@ -223,6 +224,7 @@ model Contact {
   id              Int       @id @default(autoincrement())
   vendorId        String
   companyName     String
+  whatsappName    String?
   mobileNumber    String
   categoryId      Int?
   subCategoryId   Int?

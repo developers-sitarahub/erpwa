@@ -56,6 +56,7 @@ router.get(
             id: true,
             phoneNumber: true,
             companyName: true,
+            whatsappName: true,
             status: true,
             blockedAt: true,
           },
@@ -137,6 +138,7 @@ router.get(
             id: true,
             phoneNumber: true,
             companyName: true,
+            whatsappName: true,
             salesPersonId: true, // ✅ Ensure we select this for checking
             status: true,
             blockedAt: true,

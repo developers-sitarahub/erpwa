@@ -43,6 +43,7 @@ interface ApiConversation {
   lead: {
     id: number;
     companyName: string | null;
+    whatsappName?: string | null;
     phoneNumber: string;
     status?: "new" | "contacted" | "qualified" | "converted" | "lost";
     blockedAt?: string | null;
@@ -871,7 +872,19 @@ const mapApiConversation = (c: ApiConversation): Conversation => {
 
   return {
     id: c.id,
-    companyName: c.lead.companyName || c.lead.phoneNumber,
+    companyName: (() => {
+      const company = c.lead.companyName;
+      const whatsapp = c.lead.whatsappName;
+      const phone = c.lead.phoneNumber;
+      console.log("🔍 MAPPING LEAD DISPLAY (DASHBOARD):", { id: c.id, company, whatsapp, phone });
+      if (!company) return whatsapp || phone;
+      const cleanCompany = company.replace(/[+\-\s()]/g, "");
+      const isPhoneOnly = /^\d+$/.test(cleanCompany);
+      if (isPhoneOnly && whatsapp) {
+        return whatsapp;
+      }
+      return company;
+    })(),
     phone: c.lead.phoneNumber,
     status: c.lead.status || "new",
     leadId: c.lead.id,
@@ -997,9 +1010,9 @@ export default function InboxPage() {
               m.outboundPayload?.template ||
               (m.outboundPayload?.name
                 ? {
-                    footer: m.outboundPayload.footer,
-                    buttons: m.outboundPayload.buttons,
-                  }
+                  footer: m.outboundPayload.footer,
+                  buttons: m.outboundPayload.buttons,
+                }
                 : undefined),
 
             // ✅ Map outboundPayload for interactive messages
@@ -1022,13 +1035,13 @@ export default function InboxPage() {
         prev.map((c) =>
           c.id === id
             ? {
-                ...c,
-                sessionStarted: res.data.sessionStarted,
-                sessionActive: res.data.sessionActive,
-                sessionExpiresAt: res.data.sessionExpiresAt,
-                status: res.data.lead?.status || c.status || "new",
-                isBlocked: !!res.data.lead?.blockedAt,
-              }
+              ...c,
+              sessionStarted: res.data.sessionStarted,
+              sessionActive: res.data.sessionActive,
+              sessionExpiresAt: res.data.sessionExpiresAt,
+              status: res.data.lead?.status || c.status || "new",
+              isBlocked: !!res.data.lead?.blockedAt,
+            }
             : c,
         ),
       );
@@ -1119,9 +1132,8 @@ export default function InboxPage() {
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden bg-background">
       <div
-        className={`${
-          showChat ? "hidden md:block" : "block"
-        } w-full md:w-auto h-full shrink-0`}
+        className={`${showChat ? "hidden md:block" : "block"
+          } w-full md:w-auto h-full shrink-0`}
       >
         <ConversationList
           conversations={conversations}

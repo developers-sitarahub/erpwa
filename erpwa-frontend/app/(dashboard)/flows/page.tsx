@@ -171,9 +171,31 @@ interface ApiError {
         data?: {
             message?: string;
             validationErrors?: Array<{ error: string }>;
+            details?: {
+                error_user_msg?: string;
+                error_user_title?: string;
+                error_subcode?: number;
+                message?: string;
+            };
         };
     };
 }
+
+const formatError = (error: any, defaultMsg: string) => {
+    const errorData = error.response?.data;
+    let msg = errorData?.details?.error_user_msg || errorData?.details?.message || errorData?.message || defaultMsg;
+    const title = errorData?.details?.error_user_title;
+
+    if (msg.includes("too many variables for its length")) {
+        msg = "Too many variables for the text length.";
+    } else if (msg.includes("more than two consecutive newline characters")) {
+        msg = "Invalid body: Check newlines, parameters, or emojis.";
+    } else if (errorData?.details?.error_subcode === 2388023 || msg.includes("content is being deleted") || msg.includes("language is being deleted")) {
+        msg = "This template name is locked by Meta due to deletion of a language. Please create a new template with a different name (e.g. add a suffix like '_v2') to submit immediately, or wait 4 weeks.";
+    }
+
+    return title ? `${title}: ${msg}` : msg;
+};
 
 export default function FlowsPage() {
     const [flows, setFlows] = useState<Flow[]>([]);
@@ -265,8 +287,7 @@ export default function FlowsPage() {
             setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, status: 'pending' } : t));
             fetchTemplates();
         } catch (error: unknown) {
-            const message = (error as ApiError).response?.data?.message || "Failed to submit template";
-            toast.error(message);
+            toast.error(formatError(error, "Failed to submit template"));
         } finally {
             setSubmitting(null);
         }
@@ -283,8 +304,7 @@ export default function FlowsPage() {
             }
             fetchTemplates();
         } catch (error: unknown) {
-            const message = (error as ApiError).response?.data?.message || "Failed to sync status";
-            toast.error(message);
+            toast.error(formatError(error, "Failed to sync status"));
         } finally {
             setSyncingId(null);
         }
