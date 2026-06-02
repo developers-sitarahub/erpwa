@@ -2,7 +2,7 @@ import fetch from "node-fetch";
 
 export async function downloadWhatsappMedia(mediaId, accessToken) {
   // 1️⃣ Get media metadata
-  const metaRes = await fetch(`https://graph.facebook.com/v24.0/${mediaId}`, {
+  const metaRes = await fetch(`https://graph.facebook.com/v25.0/${mediaId}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },

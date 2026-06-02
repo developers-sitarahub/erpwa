@@ -137,7 +137,7 @@ router.post(
        6️⃣ Send message to WhatsApp
     =============================== */
     const response = await fetch(
-      `https://graph.facebook.com/v24.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
+      `https://graph.facebook.com/v25.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
       {
         method: "POST",
         headers: {
@@ -332,7 +332,7 @@ router.post(
     });
 
     const uploadRes = await fetch(
-      `https://graph.facebook.com/v24.0/${phoneNumberId}/media`,
+      `https://graph.facebook.com/v25.0/${phoneNumberId}/media`,
       {
         method: "POST",
         headers: {
@@ -365,7 +365,7 @@ router.post(
           : "document";
 
     const sendRes = await fetch(
-      `https://graph.facebook.com/v24.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`,
       {
         method: "POST",
         headers: {

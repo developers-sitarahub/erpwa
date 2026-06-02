@@ -276,7 +276,7 @@ router.post(
 
         /** 🔹 SEND TO WHATSAPP */
         const metaResp = await fetch(
-          `https://graph.facebook.com/v24.0/${vendor.whatsappPhoneNumberId}/messages`,
+          `https://graph.facebook.com/v25.0/${vendor.whatsappPhoneNumberId}/messages`,
           {
             method: "POST",
             headers: {

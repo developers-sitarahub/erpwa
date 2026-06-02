@@ -7,7 +7,7 @@ export async function sendWhatsAppImage({
   imageUrl,
   caption,
 }) {
-  const url = `https://graph.facebook.com/v24.0/${phoneNumberId}/messages`;
+  const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
 
   const payload = {
     messaging_product: "whatsapp",
@@ -37,7 +37,7 @@ export async function sendWhatsAppTemplate({
   languageCode,
   components = [],
 }) {
-  const url = `https://graph.facebook.com/v24.0/${phoneNumberId}/messages`;
+  const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
 
   const payload = {
     messaging_product: "whatsapp",

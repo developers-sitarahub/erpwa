@@ -411,7 +411,7 @@ router.post(
       console.log("📡 Sending WhatsApp READ receipt");
       console.log(
         "POST URL:",
-        `https://graph.facebook.com/v24.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
+        `https://graph.facebook.com/v25.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
       );
 
       const payload = {
@@ -423,7 +423,7 @@ router.post(
       console.log("📡 Payload:", payload);
 
       const waRes = await fetch(
-        `https://graph.facebook.com/v24.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
+        `https://graph.facebook.com/v25.0/${conversation.vendor.whatsappPhoneNumberId}/messages`,
         {
           method: "POST",
           headers: {
@@ -564,7 +564,7 @@ router.get(
     // Call Meta Graph API
     const limit = req.query.limit || 100;
     const after = req.query.after || "";
-    let url = `https://graph.facebook.com/v24.0/${phoneId}/block_users?limit=${limit}`;
+    let url = `https://graph.facebook.com/v25.0/${phoneId}/block_users?limit=${limit}`;
     if (after) {
       url += `&after=${after}`;
     }
@@ -625,7 +625,7 @@ router.post(
     const phoneId = conversation.vendor.whatsappPhoneNumberId;
 
     // 2. Call Meta Graph API to block the user
-    const url = `https://graph.facebook.com/v24.0/${phoneId}/block_users`;
+    const url = `https://graph.facebook.com/v25.0/${phoneId}/block_users`;
     const payload = {
       messaging_product: "whatsapp",
       block_users: [
@@ -723,7 +723,7 @@ router.post(
     const phoneId = conversation.vendor.whatsappPhoneNumberId;
 
     // 2. Call Meta Graph API to unblock the user using DELETE
-    const url = `https://graph.facebook.com/v24.0/${phoneId}/block_users`;
+    const url = `https://graph.facebook.com/v25.0/${phoneId}/block_users`;
     const payload = {
       messaging_product: "whatsapp",
       block_users: [

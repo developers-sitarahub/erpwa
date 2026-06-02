@@ -107,7 +107,7 @@ export default function WhatsAppSetupPage() {
       window.FB.init({
         appId: process.env.NEXT_PUBLIC_META_APP_ID!,
         xfbml: false,
-        version: "v24.0",
+        version: "v25.0",
       });
     };
 

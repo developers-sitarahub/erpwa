@@ -25,7 +25,7 @@ const registerPhoneNumber = async (phoneNumberId, token) => {
 
   // 🔥 Only register if truly needed
   const resp = await fetch(
-    `https://graph.facebook.com/v24.0/${phoneNumberId}/register`,
+    `https://graph.facebook.com/v25.0/${phoneNumberId}/register`,
     {
       method: "POST",
       headers: {
@@ -60,7 +60,7 @@ const registerPhoneNumber = async (phoneNumberId, token) => {
  */
 const subscribeApp = async (whatsappBusinessId, token) => {
   const resp = await fetch(
-    `https://graph.facebook.com/v24.0/${whatsappBusinessId}/subscribed_apps`,
+    `https://graph.facebook.com/v25.0/${whatsappBusinessId}/subscribed_apps`,
     {
       method: "POST",
       headers: {
@@ -109,7 +109,7 @@ router.post(
 
     // 2️⃣ Validate credentials with Meta API
     const metaResp = await fetch(
-      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+      `https://graph.facebook.com/v25.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
       {
         headers: {
           Authorization: `Bearer ${whatsappAccessToken}`,
@@ -136,7 +136,7 @@ router.post(
     let whatsappMessagingTier = "UNKNOWN";
     try {
       const phoneHealthResp = await fetch(
-        `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+        `https://graph.facebook.com/v25.0/${whatsappBusinessId}/phone_numbers`,
         { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
       );
       const phoneHealthData = await phoneHealthResp.json();
@@ -257,7 +257,7 @@ router.post(
     });
 
     const tokenResp = await fetch(
-      `https://graph.facebook.com/v24.0/oauth/access_token?${qs.toString()}`,
+      `https://graph.facebook.com/v25.0/oauth/access_token?${qs.toString()}`,
       {
         method: "GET",
       },
@@ -285,7 +285,7 @@ router.post(
      * ✅ Check Verification Status & Quality Rating
      */
     const phoneDetailResp = await fetch(
-      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+      `https://graph.facebook.com/v25.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -304,7 +304,7 @@ router.post(
     let whatsappMessagingTier = "UNKNOWN";
     try {
       const phoneHealthResp = await fetch(
-        `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+        `https://graph.facebook.com/v25.0/${whatsappBusinessId}/phone_numbers`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       const phoneHealthData = await phoneHealthResp.json();
@@ -453,7 +453,7 @@ router.post(
 
     try {
       const phoneDetailResp = await fetch(
-        `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+        `https://graph.facebook.com/v25.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
         { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
       );
       const phoneDetailData = await phoneDetailResp.json();
@@ -474,7 +474,7 @@ router.post(
       let whatsappMessagingTier = vendor.whatsappMessagingTier || "UNKNOWN";
       try {
         const phoneHealthResp = await fetch(
-          `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+          `https://graph.facebook.com/v25.0/${whatsappBusinessId}/phone_numbers`,
           { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
         );
         const phoneHealthData = await phoneHealthResp.json();
@@ -567,7 +567,7 @@ router.post(
     // 2️⃣ Sync Health Status
     try {
       const phoneDetailResp = await fetch(
-        `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+        `https://graph.facebook.com/v25.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
         { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
       );
       const phoneDetailData = await phoneDetailResp.json();
@@ -588,7 +588,7 @@ router.post(
       let whatsappMessagingTier = vendor.whatsappMessagingTier || "UNKNOWN";
       try {
         const phoneHealthResp = await fetch(
-          `https://graph.facebook.com/v24.0/${whatsappBusinessId}/phone_numbers`,
+          `https://graph.facebook.com/v25.0/${whatsappBusinessId}/phone_numbers`,
           { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
         );
         const phoneHealthData = await phoneHealthResp.json();
@@ -658,7 +658,7 @@ router.post(
 
     // Meta API: POST /<PHONE_NUMBER_ID>/request_code
     const resp = await fetch(
-      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}/request_code`,
+      `https://graph.facebook.com/v25.0/${whatsappPhoneNumberId}/request_code`,
       {
         method: "POST",
         headers: {
@@ -713,9 +713,9 @@ router.post(
     const { whatsappPhoneNumberId, whatsappBusinessId } = vendor;
     const whatsappAccessToken = decrypt(vendor.whatsappAccessToken);
 
-    // 1️⃣ Verify the code: POST /<PHONE_NUMBER_ID>/verify
+    // 1️⃣ Verify the code: POST /<PHONE_NUMBER_ID>/verify_code
     const verifyResp = await fetch(
-      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}/verify`,
+      `https://graph.facebook.com/v25.0/${whatsappPhoneNumberId}/verify_code`,
       {
         method: "POST",
         headers: {
@@ -752,7 +752,7 @@ router.post(
 
     // 3️⃣ Refresh vendor status
     const phoneDetailResp = await fetch(
-      `https://graph.facebook.com/v24.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
+      `https://graph.facebook.com/v25.0/${whatsappPhoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,platform_type,status`,
       { headers: { Authorization: `Bearer ${whatsappAccessToken}` } },
     );
     const phoneDetailData = await phoneDetailResp.json();

@@ -150,7 +150,7 @@ router.get(
     try {
       // Fetch templates from Meta API
       const metaResp = await fetch(
-        `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?fields=name,components,language,status,category,id&limit=500`,
+        `https://graph.facebook.com/v25.0/${vendor.whatsappBusinessId}/message_templates?fields=name,components,language,status,category,id&limit=500`,
         {
           headers: { Authorization: `Bearer ${accessToken}` },
         },
@@ -443,7 +443,7 @@ router.delete(
     const accessToken = decrypt(vendor.whatsappAccessToken);
 
     try {
-      const url = `https://graph.facebook.com/v24.0/${vendor.whatsappBusinessId}/message_templates?name=${name}`;
+      const url = `https://graph.facebook.com/v25.0/${vendor.whatsappBusinessId}/message_templates?name=${name}`;
       console.log(`🗑️ Deleting Meta-only template: ${name}`);
 
       const metaResp = await fetch(url, {
@@ -1331,7 +1331,7 @@ router.post(
     console.log("Meta API Request Body:", JSON.stringify(payload, null, 2));
 
     const metaResp = await fetch(
-      `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates`,
+      `https://graph.facebook.com/v25.0/${template.vendor.whatsappBusinessId}/message_templates`,
       {
         method: "POST",
         headers: {
@@ -1426,7 +1426,7 @@ router.delete(
     if (template.status !== "draft") {
       try {
         const accessToken = decrypt(template.vendor.whatsappAccessToken);
-        const url = `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`;
+        const url = `https://graph.facebook.com/v25.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`;
 
         console.log(`🗑️ Deleting from Meta: ${template.metaTemplateName}`);
 
@@ -1495,7 +1495,7 @@ router.post(
 
     // Fetch all templates from Meta
     const metaResp = await fetch(
-      `https://graph.facebook.com/v24.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`,
+      `https://graph.facebook.com/v25.0/${template.vendor.whatsappBusinessId}/message_templates?name=${template.metaTemplateName}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       },

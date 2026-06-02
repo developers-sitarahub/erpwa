@@ -39,7 +39,7 @@ export async function sendMessage(vendorId, conversationId, contentObj) {
     const to = conversation.lead.phoneNumber;
 
     // 2. Construct Payload
-    const url = `https://graph.facebook.com/v24.0/${phoneNumberId}/messages`;
+    const url = `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`;
 
     let whatsappPayload = {
       messaging_product: "whatsapp",
