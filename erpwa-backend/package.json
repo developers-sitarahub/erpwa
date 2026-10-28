@@ -28,7 +28,6 @@
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
-    "nodemailer": "^7.0.13",
     "pg": "^8.17.2",
     "razorpay": "^2.9.6",
     "resend": "^6.9.1",
